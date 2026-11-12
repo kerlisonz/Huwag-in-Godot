@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/third_party/Pixel Crawler - Free Pack (Exterior 0.1)/Pixel Crawler - Free Pack/Environment/Props/Static/Rocks.png" id="1_rocks"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_rock"]
+radius = 10.0
+
+[node name="ForestRock" type="StaticBody2D"]
+y_sort_enabled = true
+collision_layer = 1
+collision_mask = 6
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture_filter = 0
+texture = ExtResource("1_rocks")
+offset = Vector2(0, -6)
+region_enabled = true
+region_rect = Rect2(36, 18, 32, 30)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_rock")

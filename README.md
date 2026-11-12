@@ -54,7 +54,9 @@ A continuidade narrativa é fonte de verdade e está documentada em [`docs/conti
 - **Três estados de percepção** via shader: manhã filtrada, tarde âmbar e Ato 3 monocromático.
 - **HUD** com vida, água, mochila e indicador de percepção.
 - **Save/load em JSON** com switches, variáveis, inventário e posição.
-- **Áudio procedural** de combate sintetizado em GDScript, sem dependências externas.
+- **Menu inicial autoral** com capa em pixel art, opções de áudio e acessibilidade.
+- **Áudio procedural completo** em GDScript: trilhas, ambiências de dia/noite/Ato 3 e efeitos sonoros.
+- **Minigame VHS de memória/trauma** no Ato 3 e sequência final com créditos.
 - **Cinco cenários** conectados: quarto, rua, quartel, floresta e clareira.
 - **Testes headless** e captura automatizada de tela.
 
@@ -154,32 +156,39 @@ flowchart LR
 
 ```text
 HuwagGodot/
-├── addons/                  # Ferramentas de desenvolvimento
+├── addons/                  # Plugins de desenvolvimento (ver docs/recursos-e-licencas.md)
 ├── assets/
-│   ├── _archive/            # Pacotes não usados (ignorados pelo Godot)
-│   ├── audio/               # Reservado para SFX e música
-│   ├── characters/
-│   │   ├── portraits/       # Retratos casual e BFP
-│   │   └── sprites/         # Spritesheets 4-direcionais
-│   ├── environments/        # Cenários autorais
+│   ├── _archive/            # Pacotes não usados e fontes brutas (ignorado pelo Godot; conteúdo pesado fica fora do Git)
+│   ├── characters/          # Retratos, spritesheets e criatura aquática
+│   ├── enemies/             # Santelmo
+│   ├── environments/        # Quarto, rua, floresta, lagoa
 │   ├── fonts/               # Fonte pixelada da UI
+│   ├── props/               # Adereços (ninho de ovos etc.)
 │   ├── third_party/         # Pacotes externos em uso
-│   └── ui/                  # Reservado para interface
+│   ├── tilesets/            # Tilesets nativos
+│   └── ui/                  # Capa e elementos de interface
 ├── docs/                    # Continuidade, arte, licenças, estrutura
-│   ├── logs/                # Artefatos de execução
-│   └── screenshots/         # Capturas da documentação
+│   ├── logs/                # Artefatos de execução (ignorados pelo Git)
+│   ├── screenshots/         # Capturas da documentação
+│   └── third_party_licenses/ # Termos de assets externos arquivados
 ├── scenes/
-│   ├── characters/          # Player
-│   ├── components/          # Interactable
-│   ├── levels/              # Cinco cenários (+ _archive/)
-│   ├── main/                # Main.tscn
+│   ├── characters/          # Player, Huwag e criatura aquática
+│   ├── components/          # Interactable, árvores e pedras
+│   ├── enemies/             # Santelmo
+│   ├── levels/              # Cenários jogáveis (+ _archive/)
+│   ├── main/                # Main.tscn e orquestração
+│   ├── menu/                # Menu inicial e créditos finais
 │   └── ui/                  # DialogueBox e HUD
 ├── scripts/
 │   ├── audio/               # Síntese de SFX
-│   ├── autoload/            # GameState
-│   └── dialogue/            # Perfis de personagem
+│   ├── autoload/            # GameState e AudioManager
+│   ├── characters/          # Lógica de criaturas
+│   ├── dialogue/            # Perfis de personagem
+│   ├── enemies/             # IA do Santelmo
+│   ├── levels/              # Lógica de floresta e clareira
+│   └── utils/               # Geração procedural de assets
 ├── shaders/                 # perception_filter.gdshader
-├── tests/                   # Runners headless
+├── tests/                   # Runners headless e capturas
 ├── project.godot
 └── README.md
 ```
@@ -190,7 +199,7 @@ Detalhes de convenções e fluxo de cenas em [`docs/estrutura-do-projeto.md`](do
 
 1. Instale o **Godot 4.7** (build padrão, sem .NET).
 2. Abra o Godot, clique em **Importar** e selecione `project.godot`.
-3. Pressione <kbd>F5</kbd>. A cena principal é `scenes/main/Main.tscn`.
+3. Pressione <kbd>F5</kbd>. A cena principal é `scenes/menu/TitleScreen.tscn`; `scenes/main/Main.tscn` é o hub que orquestra os níveis.
 
 Na primeira abertura, o Godot reimporta texturas e fontes. Se preferir a linha de comando:
 
@@ -202,16 +211,24 @@ Os addons em `addons/` são ferramentas de desenvolvimento e podem ser desativad
 
 ## Testes
 
-Os runners usam `--headless` e gravam capturas em `docs/screenshots/`:
+Os runners usam `--headless` e alguns gravam capturas em `docs/screenshots/`:
 
 ```bash
+# Suítes de validação
+godot --headless --path . --script res://tests/test_full_acts_flow.gd
 godot --headless --path . --script res://tests/test_full_room_suite.gd
-godot --headless --path . --script res://tests/test_room_validation.gd
-godot --headless --path . --script res://tests/test_room_runner.gd
-godot --headless --path . --script res://tests/capture_actual_gameplay.gd
+godot --headless --path . --script res://tests/test_new_street_flow.gd
+godot --headless --path . --script res://tests/test_forest_santelmo.gd
+godot --headless --path . --script res://tests/test_clearing_interaction_and_room.gd
+godot --headless --path . --script res://tests/test_antigravity_bridge.gd
+
+# Capturas automatizadas
+godot --headless --path . --script res://tests/capture_acts_and_menu.gd
+godot --headless --path . --script res://tests/capture_visual_walkthrough.gd
+godot --headless --path . --script res://tests/capture_room_states.gd
 ```
 
-> Os testes exigem o executável `godot` no `PATH`. Eles ainda não foram executados neste ambiente porque a engine não está instalada; a validação atual é estática (caminhos `res://` e `source_file` dos `.import`).
+> Os runners exigem o executável `godot` (4.7) no `PATH`. Sem a engine instalada, a validação possível é estática: caminhos `res://` e `source_file` dos arquivos `.import`.
 
 ## Documentação
 
@@ -220,26 +237,30 @@ godot --headless --path . --script res://tests/capture_actual_gameplay.gd
 | [`docs/continuidade-narrativa.md`](docs/continuidade-narrativa.md) | Invariantes da história, personagens e revelação. |
 | [`docs/direcao-de-arte.md`](docs/direcao-de-arte.md) | Paletas dos Atos 1–2 e 3, motivos e referências de Agdangan. |
 | [`docs/recursos-e-licencas.md`](docs/recursos-e-licencas.md) | Proveniência, termos e política de assets. |
+| [`docs/third_party_licenses/`](docs/third_party_licenses/) | Textos de licença de assets externos arquivados. |
 | [`docs/estrutura-do-projeto.md`](docs/estrutura-do-projeto.md) | Árvore de pastas, convenções e fluxo de cenas. |
 | [`docs/auditoria-original.md`](docs/auditoria-original.md) | O que foi encontrado no repositório público original. |
 | [`AGENTS.md`](AGENTS.md) | Regras de trabalho e integridade do projeto. |
 
 ## Créditos e licenças
 
-**Arte autoral:** retratos, spritesheets, cenário do quarto e tipografia fazem parte deste projeto. **Pacotes externos:** `Modern_Interiors_Free_v2.2` e `Serene_Village_revamped_v1.9` (LimeZu), `Pixel Art Top Down - Basic v1.2.3` (Cainos), `Pixel Crawler - Free Pack` e `Top-Down_Retro_Interior`. Os termos completos estão em [`docs/recursos-e-licencas.md`](docs/recursos-e-licencas.md).
+**Arte autoral:** retratos, spritesheets, cenário do quarto e tipografia fazem parte deste projeto. **Pacotes externos:** `Modern_Interiors_Free_v2.2` e `Serene_Village_revamped_v1.9` (LimeZu), `Pixel Art Top Down - Basic v1.2.3` (Cainos), `Pixel Crawler - Free Pack` e `Top-Down_Retro_Interior`. Os termos completos estão em [`docs/recursos-e-licencas.md`](docs/recursos-e-licencas.md) e os textos de licença em [`docs/third_party_licenses/`](docs/third_party_licenses/).
 
-Este repositório **não distribui assets RTP proprietários do RPG Maker MZ**. Vários pacotes externos são de uso **não comercial**; verifique a licença antes de redistribuir ou publicar builds.
+Este repositório **não distribui assets RTP proprietários do RPG Maker MZ**. Vários pacotes externos são de uso **não comercial**; verifique a licença antes de redistribuir ou publicar builds. Pacotes arquivados e fontes brutas de IA ficam em `assets/_archive/` apenas localmente, fora do Git, para preservar a proveniência sem redistribuir conteúdo de terceiros.
 
 ## Roadmap
 
 - [x] Vertical slice jogável com cinco cenários
 - [x] Movimento, combate leve, magia de água e troca de roupa
 - [x] Diálogo com retratos, expressões e escolhas
-- [x] Shader de percepção em três estados
-- [x] Save/load em JSON e HUD
-- [ ] Conteúdo completo dos Atos 1–3
+- [x] Shader de percepção em três estados e efeitos VHS analógicos controlados
+- [x] Save/load em JSON com persistência real, validação e HUD
+- [x] Conteúdo completo dos Atos 1–3
+- [x] Menu Inicial com Capa Autoral em Pixel Art e navegação por teclado/mouse
+- [x] Minigame retro VHS de Memória / Trauma do Ato 3
+- [x] Sistema de Áudio Autoral procedural (BGM, Ambiências de Dia/Noite/Ato 3 e SFX)
+- [x] Sequência Final e Créditos do Ato 3
 - [ ] Retratos definitivos para Cap. Reyes, equipe do quartel e NPCs
-- [ ] Música e ambiência
 - [ ] Localização para inglês e filipino
 - [ ] Export builds para Windows, Linux e macOS
 

@@ -1,0 +1,110 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scenes/levels/vhs_memory_minigame.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/characters/Player.tscn" id="2_player"]
+[ext_resource type="Shader" path="res://shaders/perception_filter.gdshader" id="3_shader"]
+[ext_resource type="FontFile" path="res://assets/fonts/undertale-deltarune-extended-fixed.otf" id="4_font"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vhs_intense"]
+shader = ExtResource("3_shader")
+shader_parameter/afternoon_mix = 0.0
+shader_parameter/night_mix = 0.0
+shader_parameter/unfiltered_mix = 1.0
+shader_parameter/vhs_scanline_alpha = 0.28
+shader_parameter/vhs_noise_intensity = 0.08
+shader_parameter/vhs_chromatic_aberration = 0.75
+shader_parameter/vhs_tracking_jitter = 0.45
+shader_parameter/vhs_crt_vignette = 0.55
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_door"]
+size = Vector2(40, 60)
+
+[node name="VHSMemoryMinigame" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="Hazards" type="Node2D" parent="."]
+
+[node name="Interactables" type="Node2D" parent="."]
+
+[node name="YSortEntities" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="Player" parent="YSortEntities" instance=ExtResource("2_player")]
+position = Vector2(80, 180)
+
+[node name="ExitDoor" type="Area2D" parent="."]
+position = Vector2(560, 180)
+collision_layer = 0
+collision_mask = 2
+monitoring = false
+
+[node name="Collision" type="CollisionShape2D" parent="ExitDoor"]
+shape = SubResource("RectangleShape2D_door")
+
+[node name="ExitDoorVisual" type="ColorRect" parent="ExitDoor"]
+offset_left = -16.0
+offset_top = -28.0
+offset_right = 16.0
+offset_bottom = 28.0
+color = Color(0.95, 0.85, 0.45, 0.4)
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="VHSFilter" type="ColorRect" parent="CanvasLayer"]
+material = SubResource("ShaderMaterial_vhs_intense")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="UI" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="VBox" type="VBoxContainer" parent="CanvasLayer/UI"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 16.0
+offset_top = 10.0
+offset_right = -16.0
+offset_bottom = 45.0
+grow_horizontal = 2
+
+[node name="Title" type="Label" parent="CanvasLayer/UI/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.42, 0.35, 1)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 8
+text = "REC ● FITA 03 · LABIRINTO DE CINZAS (INCÊNDIO DE AGDANGAN 2025)"
+
+[node name="FragmentsLabel" type="Label" parent="CanvasLayer/UI/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.88, 0.60, 1)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 8
+text = "Fragmentos de Memória: 0 / 4"
+
+[node name="ObjectiveLabel" type="Label" parent="CanvasLayer/UI"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -24.0
+offset_right = -16.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.78, 0.80, 0.86, 0.9)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 7
+text = "Navegue pelo labirinto. Evite as erupções de chamas telegrafadas e recupere as 4 memórias."

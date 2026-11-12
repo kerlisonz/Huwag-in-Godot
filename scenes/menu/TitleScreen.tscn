@@ -1,0 +1,270 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scenes/menu/title_screen.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/ui/title_cover.png" id="2_cover"]
+[ext_resource type="Shader" path="res://shaders/perception_filter.gdshader" id="3_shader"]
+[ext_resource type="FontFile" path="res://assets/fonts/undertale-deltarune-extended-fixed.otf" id="4_font"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vhs"]
+shader = ExtResource("3_shader")
+shader_parameter/afternoon_mix = 0.0
+shader_parameter/night_mix = 0.0
+shader_parameter/unfiltered_mix = 0.0
+shader_parameter/vhs_scanline_alpha = 0.12
+shader_parameter/vhs_noise_intensity = 0.03
+shader_parameter/vhs_chromatic_aberration = 0.45
+shader_parameter/vhs_tracking_jitter = 0.20
+shader_parameter/vhs_crt_vignette = 0.35
+
+[node name="TitleScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_fonts/font = ExtResource("4_font")
+script = ExtResource("1_script")
+
+[node name="CoverTexture" type="TextureRect" parent="."]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_cover")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="PerceptionLayer" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_vhs")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="VBoxTitle" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 28.0
+offset_right = 380.0
+offset_bottom = 120.0
+theme_override_constants/separation = 2
+
+[node name="TitleLabel" type="Label" parent="VBoxTitle"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.960784, 0.796078, 0.360784, 1)
+theme_override_colors/font_shadow_color = Color(0.0784314, 0.0705882, 0.0941176, 1)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 36
+text = "HUWAG"
+
+[node name="SubtitleLabel" type="Label" parent="VBoxTitle"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.847059, 0.811765, 0.572549, 1)
+theme_override_colors/font_shadow_color = Color(0.05, 0.05, 0.08, 0.8)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 8
+text = "Ang Katotohanan sa Likod ng Usok · Terror Psicológico"
+
+[node name="MenuContainer" type="MarginContainer" parent="."]
+layout_mode = 0
+offset_left = 42.0
+offset_top = 138.0
+offset_right = 310.0
+offset_bottom = 318.0
+
+[node name="MenuVBox" type="VBoxContainer" parent="MenuContainer"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="BtnNewGame" type="Button" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.94, 0.96, 1)
+theme_override_colors/font_hover_color = Color(1, 0.9, 0.45, 1)
+theme_override_colors/font_focus_color = Color(1, 0.9, 0.45, 1)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 9
+alignment = 0
+text = "►  NOVO JOGO"
+
+[node name="BtnContinue" type="Button" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.94, 0.96, 1)
+theme_override_colors/font_hover_color = Color(1, 0.9, 0.45, 1)
+theme_override_colors/font_focus_color = Color(1, 0.9, 0.45, 1)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 9
+alignment = 0
+text = "►  CONTINUAR"
+
+[node name="BtnOptions" type="Button" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.94, 0.96, 1)
+theme_override_colors/font_hover_color = Color(1, 0.9, 0.45, 1)
+theme_override_colors/font_focus_color = Color(1, 0.9, 0.45, 1)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 9
+alignment = 0
+text = "►  OPÇÕES & SOM"
+
+[node name="BtnExit" type="Button" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.94, 0.96, 1)
+theme_override_colors/font_hover_color = Color(1, 0.9, 0.45, 1)
+theme_override_colors/font_focus_color = Color(1, 0.9, 0.45, 1)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 9
+alignment = 0
+text = "►  SAIR DO JOGO"
+
+[node name="SaveInfoLabel" type="Label" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.72, 0.65, 0.9)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 7
+text = "Verificando arquivos de save..."
+
+[node name="VersionLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -170.0
+offset_top = -24.0
+offset_right = -12.0
+offset_bottom = -8.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.48, 0.52, 0.58, 0.8)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 7
+text = "Huwag · Agdangan, Quezon"
+horizontal_alignment = 2
+
+[node name="OptionsModal" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.05, 0.08, 0.88)
+
+[node name="Card" type="PanelContainer" parent="OptionsModal"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -120.0
+offset_right = 160.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="OptionsModal/Card"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="OptionsModal/Card/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="OptionsModal/Card/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.80, 0.36, 1)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 11
+text = "CONFIGURAÇÕES & ACESSIBILIDADE"
+
+[node name="ChkFlashes" type="CheckBox" parent="OptionsModal/Card/Margin/VBox"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 8
+text = "Reduzir flashes luminosos na tela"
+
+[node name="ChkVHS" type="CheckBox" parent="OptionsModal/Card/Margin/VBox"]
+layout_mode = 2
+button_pressed = true
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 8
+text = "Efeitos VHS analógicos e instabilidade"
+
+[node name="MasterRow" type="HBoxContainer" parent="OptionsModal/Card/Margin/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="OptionsModal/Card/Margin/VBox/MasterRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 8
+text = "Volume Geral:"
+
+[node name="SliderMaster" type="HSlider" parent="OptionsModal/Card/Margin/VBox/MasterRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.05
+value = 1.0
+
+[node name="MusicRow" type="HBoxContainer" parent="OptionsModal/Card/Margin/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="OptionsModal/Card/Margin/VBox/MusicRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 8
+text = "Música/Ambiência:"
+
+[node name="SliderMusic" type="HSlider" parent="OptionsModal/Card/Margin/VBox/MusicRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.05
+value = 0.8
+
+[node name="SfxRow" type="HBoxContainer" parent="OptionsModal/Card/Margin/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="OptionsModal/Card/Margin/VBox/SfxRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 8
+text = "Efeitos Sonoros:"
+
+[node name="SliderSfx" type="HSlider" parent="OptionsModal/Card/Margin/VBox/SfxRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.05
+value = 0.9
+
+[node name="BtnCloseOptions" type="Button" parent="OptionsModal/Card/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.80, 0.36, 1)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 9
+text = "FECHAR CONFIGURAÇÕES"

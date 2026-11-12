@@ -46,6 +46,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_F1 or event.keycode == KEY_ESCAPE:
 			_toggle_controls_modal()
 			get_viewport().set_input_as_handled()
+		elif controls_modal and controls_modal.visible and event.keycode == KEY_M:
+			get_tree().change_scene_to_file("res://scenes/menu/TitleScreen.tscn")
+			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_TAB:
 			GameState.cycle_perception_preview()
 			if _current_level:
@@ -69,8 +72,15 @@ func _toggle_controls_modal() -> void:
 		GameState.dialogue_active = dialogue_box.is_open()
 
 func load_level(scene_path: String, spawn_tag: String = "default") -> void:
+	if scene_path.find("EndingCredits") != -1:
+		get_tree().change_scene_to_file("res://scenes/menu/EndingCredits.tscn")
+		return
+
+	if dialogue_box != null and is_instance_valid(dialogue_box):
+		dialogue_box.close_dialogue()
 	GameState.spawn_tag = spawn_tag
 	_current_scene_path = scene_path
+	GameState.current_scene_path = scene_path
 	if _current_level != null and is_instance_valid(_current_level):
 		_current_level.queue_free()
 		_current_level = null
@@ -236,10 +246,12 @@ func _update_hud() -> void:
 			place_name = "Rua de Agdangan"
 		elif _current_scene_path.ends_with("FireStation.tscn"):
 			place_name = "Quartel dos Bombeiros"
-		elif _current_scene_path.ends_with("ForestCorridor.tscn"):
+		elif _current_scene_path.ends_with("ForestCorridor.tscn") or _current_scene_path.ends_with("forest_trail.tscn"):
 			place_name = "Trilha da Floresta"
-		elif _current_scene_path.ends_with("ForestClearing.tscn"):
+		elif _current_scene_path.ends_with("ForestClearing.tscn") or _current_scene_path.ends_with("forest_clearing.tscn"):
 			place_name = "Clareira da Lagoa"
+		elif _current_scene_path.find("vhs_memory") != -1:
+			place_name = "Memória / Pesadelo"
 
 		var ato: int = int(GameState.get_var("Ato", 1))
 		var roman := "I"

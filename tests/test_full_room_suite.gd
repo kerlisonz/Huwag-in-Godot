@@ -61,10 +61,10 @@ func _run_full_suite() -> void:
 	print("[PASS] Lateral da cama barrou o jogador com sucesso em x=%f (mínimo seguro >= 234)" % player.position.x)
 
 	# ----------------------------------------------------
-	# TESTE 3: Bloqueio da Mesa de Refeição (antigo bug da imagem 5)
+	# TESTE 3: Bloqueio da Mesa de Refeição (x=485..535, y=240..305)
 	# ----------------------------------------------------
-	print("\n--- TESTE 3: Bloqueio da Mesa de Refeição (x=485..542, y=170..266) ---")
-	player.position = Vector2(460, 220)
+	print("\n--- TESTE 3: Bloqueio da Mesa de Refeição (x=485..535, y=240..305) ---")
+	player.position = Vector2(460, 260)
 	for i in range(40):
 		player.move_and_collide(Vector2(10, 0))
 		await process_frame
@@ -73,14 +73,14 @@ func _run_full_suite() -> void:
 	assert(player.position.x <= 480.0, "ERRO: Player entrou na mesa pela esquerda! x=%f" % player.position.x)
 	print("[PASS] Mesa barrou o jogador pela esquerda em x=%f (máximo seguro <= 480)" % player.position.x)
 
-	player.position = Vector2(510, 290)
+	player.position = Vector2(510, 320)
 	for i in range(40):
 		player.move_and_collide(Vector2(0, -10))
 		await process_frame
 
 	print("Posição após tentar subir na mesa por baixo: %s" % player.position)
-	assert(player.position.y >= 267.0, "ERRO: Player subiu na mesa por baixo! y=%f" % player.position.y)
-	print("[PASS] Mesa barrou o jogador por baixo em y=%f (mínimo seguro >= 267)" % player.position.y)
+	assert(player.position.y >= 305.0, "ERRO: Player subiu na mesa por baixo! y=%f" % player.position.y)
+	print("[PASS] Mesa barrou o jogador por baixo em y=%f (mínimo seguro >= 305)" % player.position.y)
 
 	# ----------------------------------------------------
 	# TESTE 4: Bloqueio da Parede Leste Inferior (antigo bug da imagem 6)
@@ -149,7 +149,7 @@ func _run_full_suite() -> void:
 	print("[PASS] Porta para Agdangan NUNCA é acionada na mesa de refeição! (Item ativo: %s)" % (item_at_table.name if item_at_table else "Nenhum"))
 
 	# 8B: Na soleira da porta, a porta DEVE ser acionada com perfeição
-	player.position = Vector2(540, 255)
+	player.position = Vector2(538, 225)
 	player.facing_dir = Vector2.RIGHT
 	player._update_interaction_offset()
 	for f in range(10):

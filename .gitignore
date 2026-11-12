@@ -10,6 +10,16 @@ docs/logs/*
 *.log
 *.tmp
 
+# Artefatos locais de desenvolvimento (preservados fora do Git)
+scratch/
+.antigravity_bridge/
+assets/_archive/scratch_dev/
+
+# Pacotes externos arquivados e fontes brutas de IA (licenças de terceiros;
+# mantidos apenas localmente para proveniência, conforme docs/recursos-e-licencas.md)
+assets/_archive/loose_external_packs/
+assets/_archive/raw_ai_generations/
+
 # OS metadata
 .DS_Store
 Thumbs.db

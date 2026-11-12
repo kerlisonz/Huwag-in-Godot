@@ -4,6 +4,7 @@
 - [`continuidade-narrativa.md`](continuidade-narrativa.md): elementos que a reimplementação deve preservar.
 - [`direcao-de-arte.md`](direcao-de-arte.md): folha de estilo visual, paletas (Atos 1–2 vs. Ato 3), motivos recorrentes e referências de Agdangan, Quezon.
 - [`recursos-e-licencas.md`](recursos-e-licencas.md): proveniência, termos e política de assets.
+- [`third_party_licenses/`](third_party_licenses/): textos de licença de assets externos arquivados (CC0, Admurin e Morbidember).
 - [`estrutura-do-projeto.md`](estrutura-do-projeto.md): árvore de pastas, convenções e fluxo de cenas.
 - [`screenshots/`](screenshots/): capturas usadas na documentação e no README.
 - [`logs/`](logs/): artefatos de execução e depuração (ignorados pelo Git).

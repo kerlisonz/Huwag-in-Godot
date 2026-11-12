@@ -193,6 +193,9 @@ func apply_hit(damage: int, from_pos: Vector2) -> void:
 	_spawn_combat_fx("hurt", global_position + Vector2(0, -14), "-%d" % damage, Color("#FF595E"))
 	queue_redraw()
 
+func take_damage(amount: int, from_pos: Vector2 = Vector2.ZERO) -> void:
+	apply_hit(amount, from_pos if from_pos != Vector2.ZERO else (global_position - facing_dir * 12.0))
+
 func perform_jump() -> bool:
 	if is_jumping or _attack_anim_timer > 0.0 or GameState.dialogue_active:
 		return false

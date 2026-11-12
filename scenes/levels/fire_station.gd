@@ -152,10 +152,28 @@ func _on_interacted(inter: Interactable) -> void:
 						}
 					], Callable())
 			else:
+				GameState.set_switch("024_Ato3_revelacao_reyes", true)
 				request_dialogue.emit([
 					{
 						"speaker": "Capitão Reyes",
-						"text": "Huwag... seus olhos estão fundos hoje. A sirene não tocou, mas o cheiro de cinza parece nunca sair daqui."
+						"text": "Huwag... Eu vi no seu rosto quando você entrou. Os comprimidos acabaram, não foi?"
+					},
+					{
+						"speaker": "Capitão Reyes",
+						"text": "Desde aquela noite no galpão, quando o teto desabou e perdemos o pelotão... você nunca mais dormiu em paz. Os calmantes foram receitados para amortecer o choque, mas eu vi quando o mundo de mentira tomou conta da sua cabeça."
+					},
+					{
+						"speaker": "Capitão Reyes",
+						"text": "Você passou a enxergar criaturas na água e fagulhas místicas na mata para tentar dar um sentido a uma tragédia terrível. Mas você sobreviveu, Huwag. Sobreviver não é culpa."
+					},
+					{
+						"speaker": "Huwag Matitiis",
+						"expression": "unfiltered",
+						"text": "Capitão... Eu achei que se eu continuasse apagando as chamas, de alguma forma eu salvaria todo mundo que ficou para trás..."
+					},
+					{
+						"speaker": "Capitão Reyes",
+						"text": "Você é o melhor bombeiro deste quartel, anak. Mas para continuar protegendo Agdangan, você precisa aceitar que você também está vivo. Vá até a clareira uma última vez, em paz consigo mesmo."
 					}
 				], Callable())
 

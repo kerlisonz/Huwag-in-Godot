@@ -1,0 +1,125 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scenes/menu/ending_credits.gd" id="1_script"]
+[ext_resource type="FontFile" path="res://assets/fonts/undertale-deltarune-extended-fixed.otf" id="2_font"]
+[ext_resource type="Shader" path="res://shaders/perception_filter.gdshader" id="3_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_dawn"]
+shader = ExtResource("3_shader")
+shader_parameter/afternoon_mix = 0.0
+shader_parameter/night_mix = 0.0
+shader_parameter/unfiltered_mix = 0.35
+shader_parameter/vhs_scanline_alpha = 0.06
+shader_parameter/vhs_noise_intensity = 0.02
+shader_parameter/vhs_chromatic_aberration = 0.15
+shader_parameter/vhs_tracking_jitter = 0.05
+shader_parameter/vhs_crt_vignette = 0.30
+
+[node name="EndingCredits" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.07, 0.1, 1)
+
+[node name="DawnGlow" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.24, 0.18, 0.22, 0.45)
+
+[node name="ShaderLayer" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_dawn")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ScrollContainer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 360.0
+offset_bottom = 360.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="ScrollContainer"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 60.0
+offset_right = -60.0
+offset_bottom = 400.0
+grow_horizontal = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 24
+text = "HUWAG"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.82, 0.65, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 8
+text = "A Revelação de Agdangan"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="ScrollContainer/VBox"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+
+[node name="CreditsLabel" type="Label" parent="ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 8
+text = "Huwag Matitiis — Bombeiro da BFP Agdangan, Quezon
+
+Capitão Reyes · Lola Rosa · Aling Nena · Kuya Ben · Mang Carding
+Ato · Santos · Esquadrão Voluntário de Quezon
+
+\"Sobreviver não é esquecer.
+É escolher continuar protegendo a vida a cada novo amanhecer.\"
+
+FIM DO ATO III"
+horizontal_alignment = 1
+
+[node name="PromptLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -28.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 0.9)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 8
+text = "Pressione [Espaço] ou [Enter] para retornar ao Menu Inicial"
+horizontal_alignment = 1

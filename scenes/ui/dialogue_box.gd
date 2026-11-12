@@ -58,6 +58,11 @@ func _ready() -> void:
 func is_open() -> bool:
 	return _active
 
+func close_dialogue() -> void:
+	_active = false
+	visible = false
+	GameState.dialogue_active = false
+
 func start_dialogue(pages: Array) -> void:
 	if pages.is_empty():
 		dialogue_finished.emit(-1)
@@ -131,7 +136,8 @@ func _change_choice(delta_idx: int) -> void:
 	if _current_choices.is_empty():
 		return
 	_selected_choice = wrapi(_selected_choice + delta_idx, 0, _current_choices.size())
-	CombatSfx.play(self, "swing_miss", -16.0)
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("ui_hover")
 	_refresh_choice_visuals()
 
 func _infer_expression(speaker_id: String, text: String, explicit_expr: String) -> String:
@@ -315,6 +321,8 @@ func _refresh_choice_visuals() -> void:
 			lbl.modulate = Color("#98A4B8")
 
 func _advance_page() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("ui_select" if not _current_choices.is_empty() else "ui_dialogue")
 	var current_page: Dictionary = _pages[_page_index]
 	if _page_index < _pages.size() - 1:
 		_page_index += 1

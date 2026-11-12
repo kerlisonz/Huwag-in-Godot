@@ -15,8 +15,13 @@ var dust_time: float = 0.0
 
 func _ready() -> void:
 	if GameState.spawn_tag == "from_street":
-		player.position = Vector2(535, 275)
+		player.position = Vector2(540, 220)
 		player.facing_dir = Vector2.LEFT
+	elif GameState.spawn_tag == "from_nightmare":
+		player.position = Vector2(250, 205)
+		player.facing_dir = Vector2.DOWN
+		GameState.advance_to_act_3()
+		call_deferred("_trigger_act3_wake_monologue")
 	else:
 		player.position = Vector2(250, 205)
 		player.facing_dir = Vector2.DOWN
@@ -31,7 +36,7 @@ func _ready() -> void:
 
 	_apply_visual_atmosphere()
 
-	if not GameState.get_self_switch("EV_Introducao", "A"):
+	if not GameState.get_self_switch("EV_Introducao", "A") and GameState.spawn_tag != "from_nightmare":
 		GameState.set_self_switch("EV_Introducao", "A", true)
 		call_deferred("_trigger_intro_monologue")
 
@@ -70,6 +75,34 @@ func _apply_visual_atmosphere() -> void:
 		for child in ysort_root.get_children():
 			if child is Sprite2D and child != player:
 				child.modulate = tint
+
+	if has_node("/root/AudioManager"):
+		var am = get_node("/root/AudioManager")
+		if act3:
+			am.play_ambience("act3_ambience")
+		elif night:
+			am.play_ambience("night_ambience")
+		elif GameState.is_afternoon:
+			am.play_ambience("afternoon_ambience")
+		else:
+			am.play_ambience("morning_ambience")
+
+func _trigger_act3_wake_monologue() -> void:
+	var wake_act3: Array[Dictionary] = [
+		{
+			"speaker": "Huwag Matitiis",
+			"expression": "unfiltered",
+			"is_monologue": true,
+			"text": "Acordei empapado de suor... Aquele pesadelo com a fumaça e os gritos do rádio parecia mais real do que qualquer coisa que vi nos últimos meses."
+		},
+		{
+			"speaker": "Huwag Matitiis",
+			"expression": "unfiltered",
+			"is_monologue": true,
+			"text": "Os frascos na mesa de cabeceira estão vazios. As cores sumiram das paredes... Só restou a madeira gasta e o silêncio do quarto.\nO efeito dos remédios passou de vez. Preciso sair e encarar Agdangan de verdade."
+		}
+	]
+	request_dialogue.emit(wake_act3, Callable())
 
 func _trigger_intro_monologue() -> void:
 	var pages: Array[Dictionary] = [
@@ -118,8 +151,8 @@ func _setup_room_collisions() -> void:
 	# 8. Armário/Aparador de cabeceira com remédios e jarro (x=390 a 456, y=150 a 208)
 	_add_box_collision(body, Rect2(390, 150, 66, 58))
 
-	# 9. Mesa de refeição sólida com lamparina e canecas (x=485 a 542, y=170 a 266)
-	_add_box_collision(body, Rect2(485, 170, 57, 96))
+	# 9. Mesa de refeição sólida com lamparina e canecas (x=485 a 535, y=240 a 305)
+	_add_box_collision(body, Rect2(485, 240, 50, 65))
 
 	# 10. Gato dormindo no tapete (colisão circular ajustada na almofada x=509, y=312)
 	var cat_shape := CollisionShape2D.new()
@@ -161,8 +194,8 @@ func _setup_interactables() -> void:
 	_add_interactable("Radio_Quartel", "Rádio Comunicador BFP", "Checar", Vector2(475, 215), Vector2(20, 36))
 	# Jarro de água e provisões (lado esquerdo do armário)
 	_add_interactable("Geladeira", "Jarro de Água e Provisões", "Examinar", Vector2(405, 215), Vector2(24, 20))
-	# Porta de saída para a rua (no limiar da porta - isolada da mesa de refeição)
-	_add_interactable("Porta_Saida", "Porta para Agdangan", "Sair", Vector2(550, 255), Vector2(24, 30))
+	# Porta de saída para a rua (no limiar da porta)
+	_add_interactable("Porta_Saida", "Porta para Agdangan", "Sair", Vector2(548, 225), Vector2(24, 30))
 	# Gatinho de estimação (sobre a almofada)
 	_add_interactable("Gato", "Pusa", "Acariciar", Vector2(509, 305), Vector2(28, 24))
 
@@ -216,22 +249,13 @@ func _on_interactable_triggered(item_name: String) -> void:
 					{
 						"speaker": "Huwag Matitiis",
 						"expression": "tired",
-						"text": "Mais um dia de fumaça e sirenes ficou para trás.\nDeitar e descansar?",
-						"choices": ["Dormir (Avançar para Ato 3 — Sem Filtro)", "Ainda não"]
+						"text": "Mais um dia de fumaça e sirenes ficou para trás.\nO efeito dos remédios da manhã está sumindo rápido hoje... O peito aperta com as lembranças.\nDeitar e descansar?",
+						"choices": ["Dormir (Mergulhar nas memórias reprimidas)", "Ainda não"]
 					}
 				]
 				request_dialogue.emit(pages_sleep2, func(choice: int) -> void:
 					if choice == 0:
-						GameState.advance_to_act_3()
-						_apply_visual_atmosphere()
-						var wake_act3: Array = [
-							{
-								"speaker": "Huwag Matitiis",
-								"expression": "unfiltered",
-								"text": "Acordei antes do despertador. Os frascos na mesa estão vazios.\nAs cores sumiram das paredes... Só restou a madeira gasta e o silêncio do quarto."
-							}
-						]
-						request_dialogue.emit(wake_act3, Callable())
+						request_level_change.emit("res://scenes/levels/vhs_memory_minigame.tscn", "from_bed")
 				)
 				return
 

@@ -1,0 +1,46 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/aquatic_creature.gd" id="1_aquatic_script"]
+[ext_resource type="Texture2D" path="res://assets/characters/aquatic_creature.png" id="2_aquatic_tex"]
+[ext_resource type="Script" path="res://scenes/components/interactable.gd" id="3_interactable"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 18.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_interact"]
+radius = 65.0
+
+[node name="AquaticCreature" type="CharacterBody2D"]
+y_sort_enabled = true
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_aquatic_script")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="AuraParticles" type="CPUParticles2D" parent="."]
+amount = 12
+lifetime = 1.6
+emission_shape = 1
+emission_sphere_radius = 24.0
+gravity = Vector2(0, -12)
+scale_amount_min = 2.0
+scale_amount_max = 3.5
+color = Color(0.4, 0.85, 1, 0.6)
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture_filter = 0
+texture = ExtResource("2_aquatic_tex")
+
+[node name="CreatureInteractable" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 2
+script = ExtResource("3_interactable")
+interaction_id = "water_boss_interaction"
+title = "Guardiã da Lagoa"
+verb = "Observar / Conversar"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CreatureInteractable"]
+shape = SubResource("CircleShape2D_interact")
+debug_color = Color(0.2, 0.8, 0.9, 0.3)

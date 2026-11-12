@@ -7,6 +7,7 @@ signal time_of_day_changed(is_afternoon: bool)
 signal notification_requested(text: String)
 signal hp_changed(current_hp: int, max_hp: int)
 signal outfit_changed(outfit_id: String)
+signal level_load_requested(scene_path: String, spawn_tag: String)
 
 enum PerceptionMode {
 	FILTERED_MORNING = 0,
@@ -14,7 +15,7 @@ enum PerceptionMode {
 	UNFILTERED_ACT3 = 2,
 }
 
-# Switches documentados em docs/producao/switches.md e Sistema de Missões do Ato 2
+# Switches canônicos de Huwag (Atos 1, 2 e 3)
 var switches: Dictionary = {
 	"001_Porta_Bombeiros_1a_vez": false,
 	"002_Chefe_Ato1_apresentado": false,
@@ -37,6 +38,12 @@ var switches: Dictionary = {
 	"019_Ato2_concluido": false,
 	"020_Alguma_missao_completa": false,
 	"021_Recompensa_entregue": false,
+	# Switches do Ato 3
+	"022_Ato3_iniciado": false,
+	"023_Ato3_pesadelo_vhs_concluido": false,
+	"024_Ato3_revelacao_reyes": false,
+	"025_Ato3_confronto_lagoa": false,
+	"026_Jogo_finalizado": false,
 }
 
 var variables: Dictionary = {
@@ -50,13 +57,47 @@ var is_afternoon: bool = false
 var perception_mode: int = PerceptionMode.FILTERED_MORNING
 var dialogue_active: bool = false
 var spawn_tag: String = "default"
+var current_scene_path: String = "res://scenes/levels/RoomHuwag.tscn"
+var saved_player_pos: Vector2 = Vector2.ZERO
 
 var player_hp: int = 100
 var player_max_hp: int = 100
 var water_boss_defeated: bool = false
 var equipped_outfit: String = "casual" # "casual" (Imagem 3) ou "bfp" (Uniforme de Bombeiro)
 
+# Configurações de acessibilidade e preferência
+var setting_flash_reduction: bool = false
+var setting_vhs_effects: bool = true
+var setting_screen_shake: float = 1.0
+
 const SAVE_PATH := "user://huwag_save.json"
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+func reset_to_new_game() -> void:
+	for k in switches.keys():
+		switches[k] = false
+	variables = {
+		"Ato": 1,
+		"Missoes_concluidas": 0,
+	}
+	self_switches.clear()
+	inventory.clear()
+	is_afternoon = false
+	perception_mode = PerceptionMode.FILTERED_MORNING
+	dialogue_active = false
+	spawn_tag = "initial"
+	current_scene_path = "res://scenes/levels/RoomHuwag.tscn"
+	saved_player_pos = Vector2.ZERO
+	player_hp = 100
+	player_max_hp = 100
+	water_boss_defeated = false
+	equipped_outfit = "casual"
+	hp_changed.emit(player_hp, player_max_hp)
+	perception_changed.emit(perception_mode)
+	time_of_day_changed.emit(false)
+	outfit_changed.emit(equipped_outfit)
 
 func set_equipped_outfit(outfit_id: String, notify: bool = true) -> void:
 	var norm := "bfp" if outfit_id.to_lower() == "bfp" else "casual"
@@ -120,7 +161,9 @@ func use_soothing_drop() -> bool:
 		return false
 	add_item("gota_calmante", -1)
 	heal_player(35)
-	notification_requested.emit("Usou Cápsula Doce (+35 HP)")
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("ui_select")
+	notification_requested.emit("Usou Cápsula Calmante (+35 HP)")
 	return true
 
 ## Equivalente ao Common Event "Virar_Tarde" dos documentos (switches 003, 004, 020)
@@ -129,6 +172,8 @@ func trigger_turn_afternoon() -> void:
 	if int(variables.get("Ato", 1)) < 3:
 		set_perception_mode(PerceptionMode.FILTERED_AFTERNOON)
 	time_of_day_changed.emit(true)
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_ambience("afternoon_ambience")
 
 ## Avança para o Ato 2 ao dormir no fim do Ato 1 (switch 006)
 func advance_to_act_2() -> void:
@@ -139,17 +184,23 @@ func advance_to_act_2() -> void:
 	hp_changed.emit(player_hp, player_max_hp)
 	set_perception_mode(PerceptionMode.FILTERED_MORNING)
 	time_of_day_changed.emit(false)
-	notification_requested.emit("Ato 2 Iniciado — Um novo turno em Agdangan")
+	autosave(current_scene_path, "initial")
+	notification_requested.emit("Ato II Iniciado — Um novo turno em Agdangan")
 
 ## Avança para o Ato 3 (Revelação sem filtro) após concluir o Ato 2 e descansar
 func advance_to_act_3() -> void:
+	set_switch("022_Ato3_iniciado", true)
 	set_var("Ato", 3)
 	is_afternoon = false
 	set_perception_mode(PerceptionMode.UNFILTERED_ACT3)
 	time_of_day_changed.emit(false)
-	notification_requested.emit("Ato 3 — O efeito dos comprimidos passou")
+	autosave(current_scene_path, "from_act2")
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_ambience("act3_ambience")
+		get_node("/root/AudioManager").play_sfx("vhs_glitch")
+	notification_requested.emit("Ato III — O efeito dos comprimidos passou")
 
-## Conclui uma das 3 missões opcionais do Ato 2 (Sistema de Missões do Ato 2)
+## Conclui uma das 3 missões opcionais do Ato 2
 func complete_optional_mission(switch_done_key: String) -> void:
 	if get_switch(switch_done_key):
 		return
@@ -160,13 +211,14 @@ func complete_optional_mission(switch_done_key: String) -> void:
 		set_switch("020_Alguma_missao_completa", true)
 		trigger_turn_afternoon()
 		notification_requested.emit("O tempo passou (Fim de Tarde). Retorne ao Quartel.")
+	autosave(current_scene_path, spawn_tag)
 
 func set_perception_mode(mode: int) -> void:
 	perception_mode = clampi(mode, 0, 2)
 	perception_changed.emit(perception_mode)
 
 func is_unfiltered_act3() -> bool:
-	return perception_mode == PerceptionMode.UNFILTERED_ACT3 or int(variables.get("Ato", 1)) == 3
+	return perception_mode == PerceptionMode.UNFILTERED_ACT3 or int(variables.get("Ato", 1)) >= 3
 
 func cycle_perception_preview() -> void:
 	var next_mode: int = (perception_mode + 1) % 3
@@ -178,9 +230,58 @@ func cycle_perception_preview() -> void:
 	]
 	notification_requested.emit(labels[next_mode])
 
+# --- SAVE / LOAD SYSTEM ---
+
+func has_save_file() -> bool:
+	return FileAccess.file_exists(SAVE_PATH)
+
+func get_save_summary() -> Dictionary:
+	if not has_save_file():
+		return {}
+	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if file == null:
+		return {}
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	var data: Dictionary = parsed
+	var ato: int = int(data.get("variables", {}).get("Ato", 1))
+	var scene: String = str(data.get("current_scene", "Quarto"))
+	var place := "Quarto de Huwag"
+	if scene.find("Street") != -1:
+		place = "Rua de Agdangan"
+	elif scene.find("Station") != -1:
+		place = "Quartel BFP"
+	elif scene.find("trail") != -1 or scene.find("Corridor") != -1:
+		place = "Trilha da Floresta"
+	elif scene.find("clearing") != -1 or scene.find("Clearing") != -1:
+		place = "Clareira da Lagoa"
+	elif scene.find("vhs_memory") != -1:
+		place = "Memória / Pesadelo"
+	return {
+		"ato": ato,
+		"place": place,
+		"hp": int(data.get("player_hp", 100)),
+		"date": str(data.get("timestamp", "Recente"))
+	}
+
+func autosave(scene_path: String = "", tag: String = "", pos: Vector2 = Vector2.ZERO) -> bool:
+	if scene_path != "":
+		current_scene_path = scene_path
+	if tag != "":
+		spawn_tag = tag
+	if pos != Vector2.ZERO:
+		saved_player_pos = pos
+	return save_game()
+
 func save_game() -> bool:
 	var data := {
-		"version": 1,
+		"version": 2,
+		"timestamp": Time.get_datetime_string_from_system(),
+		"current_scene": current_scene_path,
+		"spawn_tag": spawn_tag,
+		"player_pos_x": saved_player_pos.x,
+		"player_pos_y": saved_player_pos.y,
 		"switches": switches,
 		"variables": variables,
 		"self_switches": self_switches,
@@ -190,15 +291,23 @@ func save_game() -> bool:
 		"player_hp": player_hp,
 		"water_boss_defeated": water_boss_defeated,
 		"equipped_outfit": equipped_outfit,
+		"settings": {
+			"flash_reduction": setting_flash_reduction,
+			"vhs_effects": setting_vhs_effects,
+			"screen_shake": setting_screen_shake
+		}
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
+		push_error("Erro ao abrir arquivo para salvar: %s" % SAVE_PATH)
 		return false
 	file.store_string(JSON.stringify(data, "\t"))
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("save_chime")
 	return true
 
 func load_game() -> bool:
-	if not FileAccess.file_exists(SAVE_PATH):
+	if not has_save_file():
 		return false
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
 	if file == null:
@@ -207,6 +316,7 @@ func load_game() -> bool:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return false
 	var data: Dictionary = parsed
+
 	if data.has("switches") and typeof(data["switches"]) == TYPE_DICTIONARY:
 		for k in data["switches"].keys():
 			switches[k] = bool(data["switches"][k])
@@ -217,10 +327,24 @@ func load_game() -> bool:
 		self_switches = data["self_switches"].duplicate()
 	if data.has("inventory") and typeof(data["inventory"]) == TYPE_DICTIONARY:
 		inventory = data["inventory"].duplicate()
+
 	is_afternoon = bool(data.get("is_afternoon", false))
 	player_hp = int(data.get("player_hp", 100))
 	water_boss_defeated = bool(data.get("water_boss_defeated", false))
+	current_scene_path = str(data.get("current_scene", "res://scenes/levels/RoomHuwag.tscn"))
+	spawn_tag = str(data.get("spawn_tag", "initial"))
+	var px: float = float(data.get("player_pos_x", 0.0))
+	var py: float = float(data.get("player_pos_y", 0.0))
+	saved_player_pos = Vector2(px, py)
+
 	set_equipped_outfit(str(data.get("equipped_outfit", "casual")), false)
 	set_perception_mode(int(data.get("perception_mode", PerceptionMode.FILTERED_MORNING)))
+
+	if data.has("settings") and typeof(data["settings"]) == TYPE_DICTIONARY:
+		var s: Dictionary = data["settings"]
+		setting_flash_reduction = bool(s.get("flash_reduction", false))
+		setting_vhs_effects = bool(s.get("vhs_effects", true))
+		setting_screen_shake = float(s.get("screen_shake", 1.0))
+
 	hp_changed.emit(player_hp, player_max_hp)
 	return true
