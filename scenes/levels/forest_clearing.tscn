@@ -1,15 +1,11 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/levels/forest_clearing.gd" id="1_clearing_script"]
-[ext_resource type="Texture2D" path="res://assets/environments/forest_clearing_bg.png" id="2_clearing_bg"]
-[ext_resource type="TileSet" path="res://assets/tilesets/forest_natural_tileset.tres" id="3_forest_tileset"]
-[ext_resource type="Texture2D" path="res://assets/environments/pond_organic.png" id="4_pond_texture"]
-[ext_resource type="PackedScene" path="res://scenes/characters/huwag.tscn" id="5_huwag_player"]
-[ext_resource type="PackedScene" path="res://scenes/characters/aquatic_creature.tscn" id="6_aquatic_boss"]
-[ext_resource type="Texture2D" path="res://assets/props/blue_egg_nest.png" id="7_nest_texture"]
-[ext_resource type="PackedScene" path="res://scenes/components/ForestTree.tscn" id="8_forest_tree"]
-[ext_resource type="PackedScene" path="res://scenes/components/ForestRock.tscn" id="9_forest_rock"]
-[ext_resource type="Script" path="res://scenes/components/interactable.gd" id="10_interactable"]
+[ext_resource type="PackedScene" path="res://scenes/characters/huwag.tscn" id="2_huwag_player"]
+[ext_resource type="PackedScene" path="res://scenes/characters/aquatic_creature.tscn" id="3_aquatic_boss"]
+[ext_resource type="Texture2D" path="res://assets/props/blue_egg_nest.png" id="4_nest_texture"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestRock.tscn" id="5_forest_rock"]
+[ext_resource type="Script" path="res://scripts/components/interactable.gd" id="6_interactable"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_pond_col"]
 radius = 48.0
@@ -21,37 +17,35 @@ radius = 12.0
 radius = 36.0
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_exit_trail"]
-size = Vector2(32, 160)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_h"]
-size = Vector2(800, 60)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_v"]
-size = Vector2(40, 160)
+size = Vector2(32, 128)
 
 [node name="ForestClearing" type="Node2D"]
 y_sort_enabled = true
 script = ExtResource("1_clearing_script")
 
-[node name="ClearingBackground" type="Sprite2D" parent="."]
+[node name="CanvasModulate" type="CanvasModulate" parent="."]
+color = Color(0.36, 0.4, 0.48, 1)
+
+[node name="GroundNormal" type="TileMapLayer" parent="."]
 z_index = -3
 texture_filter = 0
-position = Vector2(400, 240)
-texture = ExtResource("2_clearing_bg")
 
-[node name="GroundLayer" type="TileMap" parent="."]
-tile_set = ExtResource("3_forest_tileset")
-format = 2
-layer_0/name = "Grass"
-layer_0/z_index = -2
-layer_1/name = "ShoreDirt"
-layer_1/z_index = -1
-
-[node name="PondSprite" type="Sprite2D" parent="."]
-z_index = -1
+[node name="WallsNormal" type="TileMapLayer" parent="."]
+z_index = -2
 texture_filter = 0
-position = Vector2(490, 240)
-texture = ExtResource("4_pond_texture")
+
+[node name="GroundDistorted" type="TileMapLayer" parent="."]
+visible = false
+z_index = -3
+texture_filter = 0
+
+[node name="WallsDistorted" type="TileMapLayer" parent="."]
+visible = false
+z_index = -2
+texture_filter = 0
+
+[node name="DecalsLayer" type="Node2D" parent="."]
+z_index = -1
 
 [node name="PondWaterBody" type="StaticBody2D" parent="."]
 position = Vector2(495, 240)
@@ -62,54 +56,23 @@ collision_mask = 6
 shape = SubResource("CircleShape2D_pond_col")
 
 [node name="WaterRipples" type="CPUParticles2D" parent="."]
-position = Vector2(490, 240)
-amount = 14
-lifetime = 1.8
+position = Vector2(495, 240)
+amount = 16
+lifetime = 1.9
 emission_shape = 1
-emission_sphere_radius = 55.0
+emission_sphere_radius = 44.0
 gravity = Vector2(0, 0)
 scale_amount_min = 1.5
 scale_amount_max = 2.5
-color = Color(0.7, 0.9, 1, 0.45)
-
-[node name="ClearingBoundaries" type="StaticBody2D" parent="."]
-collision_layer = 1
-collision_mask = 6
-
-[node name="NorthWall" type="CollisionShape2D" parent="ClearingBoundaries"]
-position = Vector2(400, 30)
-shape = SubResource("RectangleShape2D_wall_h")
-
-[node name="SouthWall" type="CollisionShape2D" parent="ClearingBoundaries"]
-position = Vector2(400, 455)
-shape = SubResource("RectangleShape2D_wall_h")
-
-[node name="EastWall" type="CollisionShape2D" parent="ClearingBoundaries"]
-position = Vector2(780, 240)
-shape = SubResource("RectangleShape2D_wall_v")
-
-[node name="WestWallTop" type="CollisionShape2D" parent="ClearingBoundaries"]
-position = Vector2(20, 80)
-shape = SubResource("RectangleShape2D_wall_v")
-
-[node name="WestWallBottom" type="CollisionShape2D" parent="ClearingBoundaries"]
-position = Vector2(20, 400)
-shape = SubResource("RectangleShape2D_wall_v")
+color = Color(0.62, 0.88, 0.96, 0.5)
 
 [node name="ObstaclesYsort" type="Node2D" parent="."]
 y_sort_enabled = true
 
-[node name="PlayerHuwag" parent="ObstaclesYsort" instance=ExtResource("5_huwag_player")]
-position = Vector2(120, 240)
+[node name="PlayerHuwag" parent="ObstaclesYsort" instance=ExtResource("2_huwag_player")]
+position = Vector2(96, 240)
 
-[node name="Camera2D" type="Camera2D" parent="ObstaclesYsort/PlayerHuwag"]
-limit_left = 0
-limit_top = 0
-limit_right = 800
-limit_bottom = 480
-position_smoothing_enabled = true
-
-[node name="AquaticCreature" parent="ObstaclesYsort" instance=ExtResource("6_aquatic_boss")]
+[node name="AquaticCreature" parent="ObstaclesYsort" instance=ExtResource("3_aquatic_boss")]
 position = Vector2(470, 230)
 
 [node name="EggNest" type="StaticBody2D" parent="ObstaclesYsort"]
@@ -119,7 +82,7 @@ collision_mask = 6
 
 [node name="Sprite2D" type="Sprite2D" parent="ObstaclesYsort/EggNest"]
 texture_filter = 0
-texture = ExtResource("7_nest_texture")
+texture = ExtResource("4_nest_texture")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="ObstaclesYsort/EggNest"]
 position = Vector2(0, 4)
@@ -128,7 +91,7 @@ shape = SubResource("CircleShape2D_nest_col")
 [node name="NestInteractable" type="Area2D" parent="ObstaclesYsort/EggNest"]
 collision_layer = 4
 collision_mask = 2
-script = ExtResource("10_interactable")
+script = ExtResource("6_interactable")
 interaction_id = "nest_eggs_interaction"
 title = "Ninho com Ovos Azuis"
 verb = "Examinar / Coletar"
@@ -136,76 +99,18 @@ verb = "Examinar / Coletar"
 [node name="CollisionShape2D" type="CollisionShape2D" parent="ObstaclesYsort/EggNest/NestInteractable"]
 shape = SubResource("CircleShape2D_nest_interact")
 
-[node name="Tree_N1" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(100, 80)
+[node name="Rock_1" parent="ObstaclesYsort" instance=ExtResource("5_forest_rock")]
+position = Vector2(310, 352)
 
-[node name="Tree_N2" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(180, 70)
+[node name="Rock_2" parent="ObstaclesYsort" instance=ExtResource("5_forest_rock")]
+position = Vector2(675, 164)
 
-[node name="Tree_N3" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(280, 65)
-
-[node name="Tree_N4" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(380, 60)
-
-[node name="Tree_N5" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(480, 60)
-
-[node name="Tree_N6" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(580, 65)
-
-[node name="Tree_N7" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(680, 75)
-
-[node name="Tree_E1" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(720, 150)
-
-[node name="Tree_E2" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(735, 230)
-
-[node name="Tree_E3" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(720, 310)
-
-[node name="Tree_S1" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(680, 395)
-
-[node name="Tree_S2" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(580, 410)
-
-[node name="Tree_S3" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(480, 415)
-
-[node name="Tree_S4" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(380, 410)
-
-[node name="Tree_S5" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(280, 400)
-
-[node name="Tree_S6" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(180, 395)
-
-[node name="Tree_S7" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(100, 390)
-
-[node name="Tree_W1" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(50, 110)
-
-[node name="Tree_W2" parent="ObstaclesYsort" instance=ExtResource("8_forest_tree")]
-position = Vector2(50, 360)
-
-[node name="Rock_1" parent="ObstaclesYsort" instance=ExtResource("9_forest_rock")]
-position = Vector2(350, 320)
-
-[node name="Rock_2" parent="ObstaclesYsort" instance=ExtResource("9_forest_rock")]
-position = Vector2(600, 150)
+[node name="LightsLayer" type="Node2D" parent="."]
 
 [node name="ExitToTrailArea" type="Area2D" parent="."]
-position = Vector2(30, 240)
+position = Vector2(18, 240)
 collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="ExitToTrailArea"]
 shape = SubResource("RectangleShape2D_exit_trail")
-
-[node name="CanvasModulate" type="CanvasModulate" parent="."]
-color = Color(0.92, 0.94, 0.88, 1)

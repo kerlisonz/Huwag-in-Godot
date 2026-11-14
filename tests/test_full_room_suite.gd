@@ -61,26 +61,26 @@ func _run_full_suite() -> void:
 	print("[PASS] Lateral da cama barrou o jogador com sucesso em x=%f (mínimo seguro >= 234)" % player.position.x)
 
 	# ----------------------------------------------------
-	# TESTE 3: Bloqueio da Mesa de Refeição (x=485..535, y=240..305)
+	# TESTE 3: Área da Mesa de Refeição LIVRE (colisão de móvel removida a pedido)
 	# ----------------------------------------------------
-	print("\n--- TESTE 3: Bloqueio da Mesa de Refeição (x=485..535, y=240..305) ---")
+	print("\n--- TESTE 3: Área da Mesa de Refeição livre de colisão de móvel ---")
 	player.position = Vector2(460, 260)
 	for i in range(40):
 		player.move_and_collide(Vector2(10, 0))
 		await process_frame
 
-	print("Posição após tentar atravessar mesa pela esquerda: %s" % player.position)
-	assert(player.position.x <= 480.0, "ERRO: Player entrou na mesa pela esquerda! x=%f" % player.position.x)
-	print("[PASS] Mesa barrou o jogador pela esquerda em x=%f (máximo seguro <= 480)" % player.position.x)
+	print("Posição após atravessar a antiga caixa da mesa: %s" % player.position)
+	assert(player.position.x >= 500.0, "ERRO: Ainda há colisão bloqueando a área da mesa! x=%f" % player.position.x)
+	print("[PASS] Área da mesa de refeição liberada; jogador avançou até x=%f" % player.position.x)
 
-	player.position = Vector2(510, 320)
+	player.position = Vector2(470, 320)
 	for i in range(40):
 		player.move_and_collide(Vector2(0, -10))
 		await process_frame
 
-	print("Posição após tentar subir na mesa por baixo: %s" % player.position)
-	assert(player.position.y >= 305.0, "ERRO: Player subiu na mesa por baixo! y=%f" % player.position.y)
-	print("[PASS] Mesa barrou o jogador por baixo em y=%f (mínimo seguro >= 305)" % player.position.y)
+	print("Posição após subir pela antiga caixa da mesa: %s" % player.position)
+	assert(player.position.y <= 250.0, "ERRO: Ainda há colisão bloqueando a área da mesa! y=%f" % player.position.y)
+	print("[PASS] Área inferior da mesa liberada; jogador subiu até y=%f" % player.position.y)
 
 	# ----------------------------------------------------
 	# TESTE 4: Bloqueio da Parede Leste Inferior (antigo bug da imagem 6)

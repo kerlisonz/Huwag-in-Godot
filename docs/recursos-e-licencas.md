@@ -9,9 +9,7 @@ Este projeto segue rigorosamente as diretrizes de integridade, documentação de
 
 ## 1. Inventário de pacotes externos
 
-Pacotes em uso ficam em `res://assets/third_party/`. Pacotes não usados, incompatíveis ou duplicados ficam em `res://assets/_archive/`, que é ignorado pelo Godot via `.gdignore`.
-
-Para não redistribuir material de terceiros nem inflar o repositório, as pastas `assets/_archive/loose_external_packs/` e `assets/_archive/raw_ai_generations/` permanecem **apenas localmente** (ignoradas pelo Git). Os textos de licença correspondentes estão em [`third_party_licenses/`](third_party_licenses/).
+Pacotes em uso permanecem em `res://assets/third_party/`. Pacotes arquivados anteriormente, duplicatas e gerações brutas de prototipagem pré-redesign foram removidos na higienização do repositório para evitar redistribuição indevida de material de terceiros e excesso de peso binário no Git.
 
 ### 1.1 Em uso em runtime
 
@@ -19,28 +17,15 @@ Para não redistribuir material de terceiros nem inflar o repositório, as pasta
 | :--- | :--- | :--- | :--- |
 | **`Modern_Interiors_Free_v2.2`** | **LimeZu** (https://limezu.itch.io) | Gratuito para projetos não-comerciais. Edição de sprites permitida. | Mobiliário contemporâneo, personagens e adereços do quartel e interiores. |
 | **`Pixel Art Top Down - Basic v1.2.3`** | **Cainos** | Uso livre em projetos de jogos. | Grama, plantas, pedras e adereços de exterior. |
-| **`Pixel Crawler - Free Pack (Exterior 0.1)`** | **Pixel Crawler / variados** | Uso livre com termos específicos. | Floresta, props, fogueiras e criaturas. |
-| **`Serene_Village_revamped_v1.9`** | **LimeZu** | Não-comercial livre. | Telhados, pontes e elementos de vilarejo na clareira. |
-| **`Top-Down_Retro_Interior`** | **Pack comunitário** | Uso livre. | Pisos, paredes e móveis do quartel. |
+| **`Pixel Crawler - Free Pack (Exterior 0.1)`** | **Pixel Crawler / variados** | Uso livre com termos específicos. | Pedras (`ForestRock.tscn`) e props da floresta. |
+| **`Serene_Village_revamped_v1.9`** | **LimeZu** | Não-comercial livre. | Telhados, pontes e elementos de vilarejo na rua e clareira. |
+| **`Top-Down_Retro_Interior`** | **Pack comunitário** | Uso livre. | Pisos, paredes e móveis dos tilesets retrô. |
 
-### 1.2 Arquivados (referência, incompatíveis ou duplicata)
+> **Fonte da verdade:** todo novo pacote externo colocado em `assets/third_party/` deve ter licença verificada e registrada nesta tabela antes de ser referenciado em cenas ou scripts.
 
-| Pacote | Autor / Origem | Licença / Termos | Motivo do arquivamento |
-| :--- | :--- | :--- | :--- |
-| **`male_hero_free`** | **Ozzbit Games** (https://ozzbit-games.itch.io) | Gratuito para uso pessoal / não-comercial. Modificações permitidas. Crédito: *"Ozzbit Games"*. | Base anatômica de referência para os spritesheets de Huwag; não usado em runtime. |
-| **`opp-assets`** | **Open Pixel Project** (http://www.openpixelproject.com) | **CC0 1.0 Universal — Domínio Público**. | Não referenciado no código. |
-| **`char free`, `fishing_free`, `free version`, `Interior free`, `nature free`, `town free`, `winter free`** | **Shubibubi** (Sprout Lands) | Uso livre não-comercial. Não redistribuir como asset puro. | Não referenciados no código. |
-| **`Pixel Art Platformer - Village Props v2.3.2`** | **Cainos** | Uso em jogos. | Perspectiva lateral incompatível com o top-down. |
-| **`Tiny Swords (Free Pack)`** | **Pixel Frog** | CC0 / Uso livre. | Perspectiva isométrica e fantasia medieval incompatíveis com Agdangan. |
-| **`[FREE] Mini Dungeon Tileset`** | **Anokolisa** | Uso livre com termos específicos. | Fantasia medieval escura incompatível com o tom. |
-| **`PostApocalypse_AssetPack_v1.1.2`**, **`stringstar fields`** | Variados | Verificar termos antes de usar. | Não referenciados no código. |
-| **`Modern_Interiors_Free_v2.2_duplicate`** | LimeZu | Mesmos termos do pacote original. | Duplicata de `Modern_Interiors_Free_v2.2(1)`. |
-| **`loose_external_packs`**, incluindo **Verdant 00** | csaf / variados | Uso comercial permitido no pacote Verdant 00, sem atribuição; ver termos locais. | Amostras externas não usadas em runtime; mantidas localmente fora do Git. |
-| **`Admurin's Freebies`** | **Admurin** | Uso em projetos permitido; proibida a redistribuição isolada como pacote de assets. | Referência visual não usada em runtime; licença em [`third_party_licenses/Admurin_Freebies_LICENSE.txt`](third_party_licenses/Admurin_Freebies_LICENSE.txt). |
-| **`Pixel Horror Starter Pack`** | **Morbidember** | **MIT License**. | Referência visual não usada em runtime; licença em [`third_party_licenses/Morbidember_Pixel_Horror_MIT.txt`](third_party_licenses/Morbidember_Pixel_Horror_MIT.txt). |
-| **`raw_ai_generations`** | Gerações internas | Fontes brutas de IA usadas para derivar cenários autorais. | Mantidas apenas localmente para proveniência; não versionadas. |
+### 1.2 Arquivados removidos na higienização pré-GitHub
 
-> **Fonte da verdade:** antes de mover um pacote de `_archive/` para `third_party/`, confirme a licença no arquivo original do pacote e registre a decisão aqui.
+Pacotes anteriormente mantidos em `_archive/` que nunca entraram no runtime após o redesign em tilesets 16×16 (`male_hero_free` [usado apenas como referência anatômica anterior], `opp-assets`, `Sprout Lands`, `Village Props v2.3.2`, `Tiny Swords`, `Mini Dungeon`, `PostApocalypse_AssetPack_v1.1.2`, `stringstar fields`, duplicata de `Modern_Interiors_Free_v2.2`, `Verdant 00`, `Admurin's Freebies`, `Pixel Horror Starter Pack` e gerações brutas pré-redesign) foram excluídos do projeto.
 
 ### 1.3 Fonte tipográfica
 
@@ -48,23 +33,16 @@ Para não redistribuir material de terceiros nem inflar o repositório, as pasta
 | :--- | :--- | :--- | :--- |
 | **`undertale-deltarune-extended-fixed.otf`** | Fonte pixelada estendida (Undertale / Deltarune Extended), em `res://assets/fonts/` | Uso em projeto de jogo; importada sem antialiasing (`hinting=0`, `subpixel_positioning=0`). | Fonte padrão global (`gui/theme/custom_font`) da caixa de diálogo, HUD, prompts e notificações. |
 
-### 1.4 Addons de desenvolvimento (`res://addons/`)
+### 1.4 Addons de editor (`res://addons/`)
 
-Ferramentas de editor usadas no desenvolvimento. Apenas `antigravity_bridge` está habilitado por padrão em `project.godot`; os demais podem ser ativados em **Projeto → Configurações do Projeto → Plugins**.
+Em conformidade com `AGENTS.md` (*"Prefira a menor solução completa e recursos nativos do Godot antes de adicionar plugins"*), foi feita auditoria minuciosa nos 11 addons presentes no workspace (`111,56 MB`). Nove foram removidos (`ziva_agent` [proprietário/proibido redistribuir, 49–57 MB], `fennara` [ferramenta externa de captura IA, 29,3 MB], `rmsmartshape` [17,7 MB, incompatível com pixel-art 16×16], `godot_ai` [2,15 MB], `sprite_staticbody_builder` [1,94 MB], `godot_mcp_toolkit` [1,86 MB], `dialogue_manager` [0,69 MB, substituído por `DialogueBox` nativo], `antigravity_bridge` [0,02 MB, ponte pré-redesign dependente de `PIL`] e `Color grading` [0,02 MB, `CompositorEffect` incompatível com `gl_compatibility` e sem licença]).
 
-| Addon | Versão | Licença / Termos | Uso |
+Permanecem apenas **2 addons opcionais leves (0,52 MB ao todo)**, ambos **desativados por padrão** em `project.godot` e utilizáveis no editor caso necessário em expansões futuras:
+
+| Addon | Versão | Licença / Termos | Justificativa de permanência |
 | :--- | :--- | :--- | :--- |
-| **`antigravity_bridge`** | 1.0.0 | MIT (ferramenta autoral) | Ponte de geração e normalização de assets. |
-| **`AsepriteWizard`** | 9.8.0 | MIT | Importação de arquivos Aseprite. |
-| **`better-terrain`** | sem versão declarada | *Unlicense* (domínio público) | Autotile alternativo para TileMap/TileSet. |
-| **`Color grading`** | 1.0 | Termos não incluídos no pacote; verificar antes de redistribuir. | Efeitos de composição e color grading. |
-| **`dialogue_manager`** | 4.2.0 | MIT | Edição de diálogos. |
-| **`fennara`** | sem versão declarada | MIT | Ferramentas auxiliares e captura de jogo. |
-| **`godot_ai`** | 4.3.1 | MIT | Assistente de IA no editor. |
-| **`godot_mcp_toolkit`** | 1.1.2 | MIT | Ponte para ferramentas MCP. |
-| **`rmsmartshape`** | 3.3.2 | MIT | Editor de formas (SmartShape2D). |
-| **`sprite_staticbody_builder`** | 1.0.0 | MIT | Geração de corpos estáticos a partir de sprites. |
-| **`ziva_agent`** | sem versão declarada | **Proprietária (Zivash, Inc.)** — não redistribuir. | Agente integrado ao editor. |
+| **`AsepriteWizard`** | 9.8.0 | MIT | Importador opcional de arquivos `.ase` / `.aseprite` caso novos personagens ou inimigos sejam desenhados no Aseprite. |
+| **`better-terrain`** | — | *Unlicense* (domínio público) | Sistema opcional de *autotiling* para `TileMapLayer`/`TileSet` caso futuros mapas sejam pintados manualmente no editor. |
 
 ---
 
@@ -89,7 +67,7 @@ Ilustrações autorais em alta resolução (`512 × 512` px, RGBA com transparê
 ### 2.4 Cenário e Adereços Remodelados do Quarto de Huwag (`res://assets/environments/room_huwag/`)
 Assets autorais gerados e corrigidos para o Quarto de Huwag na resolução nativa `640 × 360` px com amostragem Nearest Neighbor (`texture_filter = 1`), baseados na referência visual canônica filipina (Bahay Kubo) aprovada pelo usuário:
 - **`room_huwag_bg.png` (`640 × 360` px) e `room_huwag_1080p.png` (`1920 × 1080` px, PNG 24-bit sem compressão destrutiva):** Fundo unificado e limpo com paredes de trança de bambu (*sawali/amakan*), piso contínuo de tábuas de madeira maciça, cama tradicional de bambu com dossel e mosquiteiro (*kulambo*), esteira trançada (*banig*) 100% íntegra (com remoção do defeito de junção/suporte fantasma no assoalho), janela aberta com vista para coqueiros e céu tropical de Agdangan, cabideiro de parede com trajes típicos pendurados (sem retículo/mira sobreposto), altar de canto com imagem sacra e velas acesas, mesa de refeição com lamparina a querosene (*tinghoy*) e canecas, gatinho dormindo (*Pusa*) e chinelos de palha (*tsinelas*). O fundo foi completamente higienizado, eliminando instâncias fantasmas de personagens, barras de HUD no topo e artefatos de fatiamento. A versão Full HD 1080p é rigorosamente ampliada via amostragem de clusters inteiros (*Nearest Neighbor* 3×), assegurando fidelidade absoluta de pixel art sem qualquer desfoque ou filtragem artificial.
-- **Colisões e Interações Físicas:** Ajustadas milimetricamente na cena `scenes/levels/room_huwag.gd` com volumes sólidos para cama de bambu, armário/aparador e mesa de refeição, barreira contínua nas paredes leste e oeste contra vazamento para o vácuo, e gatilho de saída `Porta_Saida` isolado estritamente na soleira leste (impedindo ativação indevida ao redor da mesa).
+- **Colisões e Interações Físicas:** Definidas na cena `scenes/levels/room_huwag.gd`. Paredes/batentes (norte, sul, leste e oeste) formam a barreira contínua contra o vazio, a cama de bambu possui volume sólido e o gato uma colisão circular no tapete; o gatilho de saída `Porta_Saida` fica isolado estritamente na soleira leste. As colisões do aparador de remédios e da mesa de refeição foram **removidas a pedido** por estarem desalinhadas com a arte de fundo (geravam paredes invisíveis no assoalho e deixavam os móveis atravessáveis); a área desses dois móveis agora é livre para caminhar.
 - **Licença / Proveniência:** Elementos autorais do projeto `HuwagGodot`, sem dependência de assets proprietários de terceiros.
 
 ### 2.5 Ferramentas de Automação e Ponte com Antigravity (`addons/antigravity_bridge/`)
@@ -148,13 +126,15 @@ Plugin nativo em GDScript e Python para o editor Godot 4.7 (`Antigravity Art Stu
 - **Capa e Menu Inicial Autoral:**
   - `res://assets/ui/title_cover.png`: Ilustração autoral em pixel art `640 × 360` px representando a noite sobre Agdangan, o resplendor avermelhado do horizonte, silhueta de Huwag Matitiis em farda BFP com faixas refletivas brilhantes, partículas incandescentes de fuligem e silhuetas fantasmagóricas de memórias na fumaça.
   - `res://scenes/menu/TitleScreen.tscn` / `scenes/menu/title_screen.gd`: Menu funcional navegável por teclado, mouse e controle. Opções: *Novo Jogo* (reinicia e abre Ato 1), *Continuar* (detecta e resume o save real com resumo de Ato e local), *Opções & Som* (sliders de volume Master/Música/SFX e alternância de redução de flashes e efeitos VHS) e *Sair do Jogo* (fecha a aplicação com fade-out suave).
+  - **Estética de fita VHS do Menu Inicial (à la FNAF VHS):** OSD de videocassete (`REC` com ponto piscante, `► PLAY`, timecode `HH:MM:SS` em contagem e etiqueta `SP · TAPE 01`), banda de rastreamento rolando, ruído de comutação de cabeça na base da tela, cursor `►` piscante nos botões (sem a caixa de foco padrão do tema) e eventos ocasionais de *glitch* (rasgo horizontal, aberração cromática e estática) com o efeito sonoro `vhs_glitch`, respeitando as opções de acessibilidade (redução de flashes e desligamento dos efeitos VHS). A capa e a tipografia `HUWAG` passam pelo filtro `perception_filter` (com tremida analógica sutil), enquanto menu, OSD e modal permanecem nítidos por serem desenhados acima da camada de filtro.
 - **Sistema de Áudio Procedural Autoral (`scripts/autoload/audio_manager.gd`):**
   - Gerador nativo em GDScript via PCM 16-bit WAV (22.050 Hz) com zero dependências externas ou restrições de licença.
   - Trilhas em loop: `title_theme` (drone analógico e ressonância), `morning_ambience` (brisa tropical matinal e gorjeios sutis), `afternoon_ambience` (calor opressivo e cigarras), `night_ambience` (grilos e tensão noturna), `act3_ambience` (zumbido elétrico de 60Hz e silêncio desolador), `vhs_memory_bgm` (arpejo lo-fi com efeito de wow & flutter de fita) e `fire_hazard` (rugido de labaredas e crepitação).
   - Efeitos sonoros (SFX): `ui_hover`, `ui_select`, `ui_back`, `ui_dialogue`, `save_chime`, `step`, `extinguish`, `santelmo_cry` e `vhs_glitch`.
 - **Shader de Percepção e Estética VHS Controlada (`shaders/perception_filter.gdshader`):**
-  - Uniformes em tempo real: `afternoon_mix`, `night_mix`, `unfiltered_mix`, `vhs_scanline_alpha`, `vhs_noise_intensity`, `vhs_chromatic_aberration` e `vhs_tracking_jitter`.
+  - Uniformes em tempo real: `afternoon_mix`, `night_mix`, `unfiltered_mix`, `vhs_scanline_alpha`, `vhs_noise_intensity`, `vhs_chromatic_aberration`, `vhs_tracking_jitter`, `vhs_tracking_band`, `vhs_head_switch`, `vhs_dropout` e `vhs_tear`.
   - Preserva nitidez absoluta de pixel art via `filter_nearest` com integer scaling em 1920×1080.
+  - `shaders/vhs_glitch_tear.gdshader`: efeito de glitch de tela cheia (rasgo de blocos + estática) disponível para uso futuro em cenas que não usem outra passagem de `hint_screen_texture`; a tela inicial atual usa o rasgo embutido em `perception_filter` (`vhs_tear`) para evitar duas leituras de tela no mesmo frame.
 - **Minigame de Memória / Trauma do Ato 3 (`scenes/levels/vhs_memory_minigame.tscn`):**
   - Sequência retro em estética VHS contextualizando o incêndio da fábrica de 2025 que originou o trauma de Huwag. Desvio de fagulhas com telegrafia justa e coleta de 4 fragmentos de memória que desvendam a verdade sobre os comprimidos.
 - **Sequência Final e Créditos do Ato 3 (`scenes/menu/EndingCredits.tscn`):**
@@ -162,6 +142,40 @@ Plugin nativo em GDScript e Python para o editor Godot 4.7 (`Antigravity Art Stu
 - **Validação Automatizada Integral:**
   - Suíte completa: `tests/test_full_acts_flow.gd` (100% de aprovação em todos os 6 blocos de teste).
   - Capturas reais em GPU gravadas em `docs/screenshots/menu_inicial_capa.png`, `docs/screenshots/ato1_quarto_huwag.png`, `docs/screenshots/ato1_quartel_bfp.png`, `docs/screenshots/ato1_clareira_boss.png`, `docs/screenshots/ato3_minigame_vhs_trauma.png`, `docs/screenshots/ato3_rua_sem_filtro.png` e `docs/screenshots/final_creditos_ato3.png`.
+
+### 2.10 Reestruturação Visual e Narrativa — Identidade FNAF Minigames / Yume Nikki
+
+Reconstrução estética, narrativa e estrutural dos 4 cenários principais seguindo a hierarquia artística **1. FNAF Minigames (identidade visual retrô principal) -> 2. Yume Nikki (surrealismo, vazio e estranheza) -> 3. Chrono Trigger (composição top-down) -> 4. Pokémon Game Boy (leitura espacial e escala)**:
+
+- **Tilesets Retrô Dual-Perception (`assets/tilesets/retro/`):**
+  - Gerados proceduralmente de forma autoral pelo script `scripts/tools/build_retro_tilesets.gd` (licença MIT / autoral do projeto) em grade `16×16` px com variantes `normal` e `distorted` (`TileMapLayer` dual por cena):
+    - `interior_fnaf_normal.png` / `interior_fnaf_normal_tileset.tres` e `interior_fnaf_distorted.png` / `interior_fnaf_distorted_tileset.tres`
+    - `town_fnaf_normal.png` / `town_fnaf_normal_tileset.tres` e `town_fnaf_distorted.png` / `town_fnaf_distorted_tileset.tres`
+    - `forest_fnaf_normal.png` / `forest_fnaf_normal_tileset.tres` e `forest_fnaf_distorted.png` / `forest_fnaf_distorted_tileset.tres`
+- **Spritesheets dos Bombeiros BFP e Versões Distorcidas (`assets/characters/sprites/`):**
+  - Todos padronizados em grades `128×128` (`4×4` quadros de `32×32`, direções Abaixo / Esquerda / Direita / Acima) mantendo a escala de `huwag_bfp_sheet.png`:
+  - **Gerados com ferramenta de geração de imagens (`image-generator`) e normalizados em script autoral:**
+    - `npc_cap_reyes_bfp_sheet.png`, `npc_bombeiro_ato_sheet.png`, `npc_bombeiro_santos_sheet.png`, `npc_enfermeira_maria_sheet.png` (equipe BFP em uniforme de bombeiro/socorrista).
+    - `distorted_aling_nena_sheet.png`, `distorted_bombeiro_sheet.png`, `distorted_kuya_ben_sheet.png` (versões surreais / carbonizadas do Ato 2 em dose alta).
+  - **Síntese pixel art autoral com paleta retrô (fallback de cota da ferramenta de imagem preservando dimensões e proporções de referência):**
+    - `distorted_luningning_sheet.png` (espectro da criança com rosto branco estático e olhos vazios inspirado em FNAF Minigames).
+  - **Derivados dos pacotes de referência LimeZu já licenciados no projeto (ver Seção 1):**
+    - `npc_aling_nena_sheet.png`, `npc_kuya_ben_sheet.png`, `npc_toby_sheet.png`, `npc_feirante_sheet.png`.
+- **Retratos CRT Retrô FNAF (`assets/characters/portraits/`):**
+  - 12 bustos `96×96` px autorais (com scanlines CRT sutis para exibição na `DialogueBox`), sem dependências de terceiros: `fnaf_aling_nena.png`, `fnaf_bombeiro_ato.png`, `fnaf_bombeiro_santos.png`, `fnaf_cap_reyes.png`, `fnaf_enfermeira_maria.png`, `fnaf_feirante.png`, `fnaf_kuya_ben.png`, `fnaf_toby.png`, `fnaf_distorted_aling_nena.png`, `fnaf_distorted_bombeiro.png`, `fnaf_distorted_kuya_ben.png`, `fnaf_distorted_luningning.png`.
+- **Arquitetura de Cenários Reconstruídos e Sistemas de Ato 2:**
+  - `scripts/levels/retro_level_helpers.gd`: construtor compartilhado de piso/paredes duplos (`TileMapLayer`), objetos FNAF/Yume Nikki e iluminação pontual retrô.
+  - Backups integrais das versões anteriores preservados em `scenes/levels/_archive/pre_redesign_backup/` (ignorados por `.gdignore`).
+  - `RoomHuwag.tscn` (`scenes/levels/room_huwag.gd`), `FireStation.tscn` (`scenes/levels/fire_station.gd` — multi-ala com Recepção, Despacho/Rádio, Galpão de Viaturas, Enfermaria e Escritório do Cap. Reyes), `StreetPreview.tscn` (`scenes/levels/street_preview.gd` — avenida estendida `2880×560` conectando moradores, barracas de mercado e quartel ao Ato 3), `forest_trail.tscn` (`scripts/levels/forest_trail.gd` / wrapper `ForestCorridor.tscn` — labirinto estendido `2560×768` com bifurcações Norte/Sul, riacho com pontes de tronco, bacia silenciosa, poço seco, 13 `SantelmoEnemy` com dificuldade crescente até `140` HP sem alterar o sistema de combate, e espectro `NPC_Vulto_Bosque`) e `forest_clearing.tscn` (`scripts/levels/forest_clearing.gd` / wrapper `ForestClearing.tscn` — santuário `960×576` com lagoa, guardiã, resgate do gato e espelho do Ato 3).
+  - `scripts/characters/npc_entity.gd` + `scripts/autoload/game_state.gd` + `scenes/ui/dialogue_box.gd` + `scenes/main/main.gd`: suporte à escolha de dose no Ato 2 (`is_higher_dose()` / `higher_dose_changed` persistido em `save_game()`/`load_game()`), troca dinâmica de spritesheet/luzes/diálogos entre estado normal e distorcido, e escolhas erradas de diálogo (`conflict_choices`) que convertem o NPC em inimigo hostil (`turn_hostile()`) combatível em cena.
+  - **Validação integral adicionada em `tests/test_redesign_comprehensive.gd`** executando junto às demais suítes em `Godot.exe --headless`.
+
+### 2.11 Higienização, Separação `scenes/` × `scripts/` e Preparação para GitHub
+- Remoção dos diretórios `_archive/` (`assets/_archive/` e `scenes/levels/_archive/`), fundos/retratos duplicados e obsoletos pré-redesign (`assets/environments/`, duplicatas `huwag_*.png` sem prefixo de traje, `placeholder_cap_reyes.png`, `placeholder_station_staff.png`) e testes/capturas antigas incompatíveis com a arquitetura atual.
+- Padronização dos scripts `.gd` em `scripts/<domínio>/` (movendo os scripts remanescentes de `scenes/` para `scripts/main/`, `scripts/menu/`, `scripts/ui/`, `scripts/characters/`, `scripts/components/` e `scripts/levels/`), preservando todas as cenas `.tscn` e aliases de compatibilidade em `scenes/`.
+- Remoção do caminho absoluto local em `scripts/tools/build_retro_tilesets.gd` (substituído por `res://docs/logs/retro_tilesets_preview.png`).
+- Regeneração das capturas de tela em `docs/screenshots/` refletindo fielmente o visual atual FNAF Minigames / Yume Nikki.
+
 
 
 

@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3]
 
-[ext_resource type="Script" path="res://scenes/menu/ending_credits.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/menu/ending_credits.gd" id="1_script"]
 [ext_resource type="FontFile" path="res://assets/fonts/undertale-deltarune-extended-fixed.otf" id="2_font"]
 [ext_resource type="Shader" path="res://shaders/perception_filter.gdshader" id="3_shader"]
 

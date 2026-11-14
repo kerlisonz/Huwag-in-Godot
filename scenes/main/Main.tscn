@@ -1,23 +1,33 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://c41yn2v7bfymm"]
 
-[ext_resource type="Script" path="res://scenes/main/main.gd" id="1_main"]
-[ext_resource type="Shader" path="res://shaders/perception_filter.gdshader" id="2_shader"]
+[ext_resource type="Script" uid="uid://glx6m25po6tq" path="res://scripts/main/main.gd" id="1_main"]
+[ext_resource type="Shader" uid="uid://d37woo7mt4kxe" path="res://shaders/perception_filter.gdshader" id="2_shader"]
 [ext_resource type="PackedScene" path="res://scenes/ui/DialogueBox.tscn" id="3_dialogue"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_perception"]
 shader = ExtResource("2_shader")
 shader_parameter/afternoon_mix = 0.0
+shader_parameter/night_mix = 0.0
 shader_parameter/unfiltered_mix = 0.0
+shader_parameter/vhs_scanline_alpha = 0.08
+shader_parameter/vhs_noise_intensity = 0.04
+shader_parameter/vhs_chromatic_aberration = 0.0
+shader_parameter/vhs_tracking_jitter = 0.0
+shader_parameter/vhs_crt_vignette = 0.25
+shader_parameter/vhs_tracking_band = 0.0
+shader_parameter/vhs_head_switch = 0.0
+shader_parameter/vhs_dropout = 0.0
+shader_parameter/vhs_tear = 0.0
 
-[node name="Main" type="Node2D"]
+[node name="Main" type="Node2D" unique_id=1865618440]
 script = ExtResource("1_main")
 
-[node name="LevelContainer" type="Node2D" parent="."]
+[node name="LevelContainer" type="Node2D" parent="." unique_id=2120288980]
 
-[node name="PerceptionLayer" type="CanvasLayer" parent="."]
+[node name="PerceptionLayer" type="CanvasLayer" parent="." unique_id=1310914429]
 layer = 5
 
-[node name="PerceptionRect" type="ColorRect" parent="PerceptionLayer"]
+[node name="PerceptionRect" type="ColorRect" parent="PerceptionLayer" unique_id=902677543]
 material = SubResource("ShaderMaterial_perception")
 anchors_preset = 15
 anchor_right = 1.0
@@ -26,62 +36,61 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=718700717]
 layer = 10
 
-[node name="HudTopLeft" type="PanelContainer" parent="CanvasLayer"]
+[node name="HudTopLeft" type="PanelContainer" parent="CanvasLayer" unique_id=1594838625]
 offset_left = 10.0
 offset_top = 8.0
 offset_right = 188.0
 offset_bottom = 30.0
 mouse_filter = 2
 
-[node name="Margin" type="MarginContainer" parent="CanvasLayer/HudTopLeft"]
+[node name="Margin" type="MarginContainer" parent="CanvasLayer/HudTopLeft" unique_id=12937445]
 layout_mode = 2
 theme_override_constants/margin_left = 8
 theme_override_constants/margin_top = 3
 theme_override_constants/margin_right = 8
 theme_override_constants/margin_bottom = 3
 
-[node name="HBox" type="HBoxContainer" parent="CanvasLayer/HudTopLeft/Margin"]
+[node name="HBox" type="HBoxContainer" parent="CanvasLayer/HudTopLeft/Margin" unique_id=1030715583]
 layout_mode = 2
 theme_override_constants/separation = 7
 
-[node name="BadgeIcon" type="ColorRect" parent="CanvasLayer/HudTopLeft/Margin/HBox"]
+[node name="BadgeIcon" type="ColorRect" parent="CanvasLayer/HudTopLeft/Margin/HBox" unique_id=1381986090]
 custom_minimum_size = Vector2(6, 12)
 layout_mode = 2
 size_flags_vertical = 4
 color = Color(0.96, 0.8, 0.36, 1)
 
-[node name="HpTitle" type="Label" parent="CanvasLayer/HudTopLeft/Margin/HBox"]
+[node name="HpTitle" type="Label" parent="CanvasLayer/HudTopLeft/Margin/HBox" unique_id=338628487]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 9
 text = "VIGOR"
 
-[node name="HpBar" type="ProgressBar" parent="CanvasLayer/HudTopLeft/Margin/HBox"]
+[node name="HpBar" type="ProgressBar" parent="CanvasLayer/HudTopLeft/Margin/HBox" unique_id=283022403]
 custom_minimum_size = Vector2(68, 8)
 layout_mode = 2
 size_flags_vertical = 4
-max_value = 100.0
 step = 1.0
 value = 100.0
 show_percentage = false
 
-[node name="HpValue" type="Label" parent="CanvasLayer/HudTopLeft/Margin/HBox"]
+[node name="HpValue" type="Label" parent="CanvasLayer/HudTopLeft/Margin/HBox" unique_id=891303734]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.94, 0.94, 0.9, 1)
 theme_override_font_sizes/font_size = 9
 text = "100"
 
-[node name="SkillsLabel" type="Label" parent="CanvasLayer/HudTopLeft/Margin/HBox"]
+[node name="SkillsLabel" type="Label" parent="CanvasLayer/HudTopLeft/Margin/HBox" unique_id=1911688586]
 visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.56, 0.88, 0.96, 1)
 theme_override_font_sizes/font_size = 9
 text = "· Água"
 
-[node name="HudTopRight" type="PanelContainer" parent="CanvasLayer"]
+[node name="HudTopRight" type="PanelContainer" parent="CanvasLayer" unique_id=893870892]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -92,18 +101,18 @@ offset_bottom = 30.0
 grow_horizontal = 0
 mouse_filter = 2
 
-[node name="Margin" type="MarginContainer" parent="CanvasLayer/HudTopRight"]
+[node name="Margin" type="MarginContainer" parent="CanvasLayer/HudTopRight" unique_id=1001211324]
 layout_mode = 2
 theme_override_constants/margin_left = 8
 theme_override_constants/margin_top = 3
 theme_override_constants/margin_right = 8
 theme_override_constants/margin_bottom = 3
 
-[node name="HBox" type="HBoxContainer" parent="CanvasLayer/HudTopRight/Margin"]
+[node name="HBox" type="HBoxContainer" parent="CanvasLayer/HudTopRight/Margin" unique_id=1409259417]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="ActPlaceLabel" type="Label" parent="CanvasLayer/HudTopRight/Margin/HBox"]
+[node name="ActPlaceLabel" type="Label" parent="CanvasLayer/HudTopRight/Margin/HBox" unique_id=1712627995]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.94, 0.93, 0.89, 1)
@@ -111,13 +120,13 @@ theme_override_font_sizes/font_size = 9
 text = "Ato I · Quarto de Huwag"
 horizontal_alignment = 2
 
-[node name="HelpHint" type="Label" parent="CanvasLayer/HudTopRight/Margin/HBox"]
+[node name="HelpHint" type="Label" parent="CanvasLayer/HudTopRight/Margin/HBox" unique_id=369954884]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 0.85)
 theme_override_font_sizes/font_size = 8
 text = "[F1]"
 
-[node name="StatusLabel" type="Label" parent="CanvasLayer"]
+[node name="StatusLabel" type="Label" parent="CanvasLayer" unique_id=1132934902]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -130,12 +139,11 @@ theme_override_colors/font_color = Color(0.96, 0.82, 0.4, 1)
 theme_override_colors/font_outline_color = Color(0.06, 0.05, 0.1, 1)
 theme_override_constants/outline_size = 3
 theme_override_font_sizes/font_size = 9
-text = ""
 horizontal_alignment = 2
 
-[node name="DialogueBox" parent="CanvasLayer" instance=ExtResource("3_dialogue")]
+[node name="DialogueBox" parent="CanvasLayer" unique_id=2083547059 instance=ExtResource("3_dialogue")]
 
-[node name="ControlsModal" type="Control" parent="CanvasLayer"]
+[node name="ControlsModal" type="Control" parent="CanvasLayer" unique_id=147776611]
 visible = false
 layout_mode = 3
 anchors_preset = 15
@@ -144,7 +152,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Backdrop" type="ColorRect" parent="CanvasLayer/ControlsModal"]
+[node name="Backdrop" type="ColorRect" parent="CanvasLayer/ControlsModal" unique_id=314367568]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -153,7 +161,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.04, 0.03, 0.08, 0.76)
 
-[node name="Card" type="PanelContainer" parent="CanvasLayer/ControlsModal"]
+[node name="Card" type="PanelContainer" parent="CanvasLayer/ControlsModal" unique_id=1309562298]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -167,157 +175,181 @@ offset_bottom = 112.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Margin" type="MarginContainer" parent="CanvasLayer/ControlsModal/Card"]
+[node name="Margin" type="MarginContainer" parent="CanvasLayer/ControlsModal/Card" unique_id=1795250214]
 layout_mode = 2
 theme_override_constants/margin_left = 18
 theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 18
 theme_override_constants/margin_bottom = 14
 
-[node name="VBox" type="VBoxContainer" parent="CanvasLayer/ControlsModal/Card/Margin"]
+[node name="VBox" type="VBoxContainer" parent="CanvasLayer/ControlsModal/Card/Margin" unique_id=1831726096]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox"]
+[node name="Title" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox" unique_id=1205855838]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 12
 text = "HUWAG — CONTROLES E CAMADAS VISUAIS"
 horizontal_alignment = 1
 
-[node name="Rule" type="ColorRect" parent="CanvasLayer/ControlsModal/Card/Margin/VBox"]
+[node name="Rule" type="ColorRect" parent="CanvasLayer/ControlsModal/Card/Margin/VBox" unique_id=455931463]
 custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
 color = Color(0.96, 0.8, 0.36, 0.35)
 
-[node name="Grid" type="GridContainer" parent="CanvasLayer/ControlsModal/Card/Margin/VBox"]
+[node name="Grid" type="GridContainer" parent="CanvasLayer/ControlsModal/Card/Margin/VBox" unique_id=1709484666]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 5
 columns = 2
 
-[node name="K1" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="K1" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1126915385]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 10
 text = "WASD / Setas"
 
-[node name="D1" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="D1" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1792539326]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
 theme_override_font_sizes/font_size = 10
 text = "Mover Huwag pelo mapa"
 
-[node name="K2" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="K2" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1102940779]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 10
 text = "E / Enter"
 
-[node name="D2" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="D2" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1909891934]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
 theme_override_font_sizes/font_size = 10
 text = "Interagir, Conversar e Avançar Diálogo"
 
-[node name="K3" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="K3" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1596278332]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 10
 text = "A / D"
 
-[node name="D3" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="D3" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1936331950]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
 theme_override_font_sizes/font_size = 10
 text = "Alternar escolhas durante diálogos"
 
-[node name="K4" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="K4" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=858801206]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 10
 text = "J / Espaço"
 
-[node name="D4" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="D4" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1536636145]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
 theme_override_font_sizes/font_size = 10
 text = "Ataque com Machado de Bombeiro (J-ABS)"
 
-[node name="K5" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="K5" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=95279738]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 10
 text = "K / Q"
 
-[node name="D5" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="D5" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1446565519]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
 theme_override_font_sizes/font_size = 10
 text = "Magia de Água (apagar chamas / combate)"
 
-[node name="K6" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="K6" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1126333213]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 10
 text = "H / C"
 
-[node name="D6" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="D6" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1628366152]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
 theme_override_font_sizes/font_size = 10
 text = "Usar Cápsula Calmante (recuperar vigor)"
 
-[node name="K7" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="K7" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1925824259]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 10
 text = "U"
 
-[node name="D7" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="D7" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=500069604]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
 theme_override_font_sizes/font_size = 10
 text = "Alternar Roupa (Casual / Uniforme Bombeiro BFP)"
 
-[node name="K8" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="K8" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=2050720808]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 10
 text = "Tab"
 
-[node name="D8" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="D8" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=442187628]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
 theme_override_font_sizes/font_size = 10
 text = "Alternar Percepção (Manhã / Tarde / Ato 3)"
 
-[node name="K9" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="K9" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1111066978]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 10
 text = "F5 / F9"
 
-[node name="D9" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="D9" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1936171611]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
 theme_override_font_sizes/font_size = 10
 text = "Salvar / Carregar progresso"
 
-[node name="K10" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="K10" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1267638151]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
 theme_override_font_sizes/font_size = 10
 text = "M"
 
-[node name="D10" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid"]
+[node name="D10" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1157156365]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
 theme_override_font_sizes/font_size = 10
 text = "Voltar ao Menu Inicial"
 
-[node name="Footer" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox"]
+[node name="K11" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1310514682]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
+theme_override_font_sizes/font_size = 10
+text = "F10"
+
+[node name="D11" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1425214399]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
+theme_override_font_sizes/font_size = 10
+text = "Avançar entre os Atos (I → II → III)"
+
+[node name="K12" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=396866360]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
+theme_override_font_sizes/font_size = 10
+text = "F11"
+
+[node name="D12" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=367576257]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.92, 0.89, 1)
+theme_override_font_sizes/font_size = 10
+text = "Tela Cheia / Modo Janela"
+
+[node name="Footer" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox" unique_id=1299166537]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.68, 0.73, 0.82, 1)
 theme_override_font_sizes/font_size = 9

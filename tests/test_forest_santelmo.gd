@@ -92,7 +92,7 @@ func _run_forest_suite() -> void:
 	for i in range(5):
 		await process_frame
 	var vp := root.get_viewport()
-	if vp and vp.get_texture():
+	if DisplayServer.get_name() != "headless" and vp and vp.get_texture():
 		var img_trail := vp.get_texture().get_image()
 		if img_trail:
 			DirAccess.make_dir_recursive_absolute("res://docs/screenshots/")
@@ -134,7 +134,7 @@ func _run_forest_suite() -> void:
 	# Salva captura da Clareira
 	for i in range(5):
 		await process_frame
-	if vp and vp.get_texture():
+	if DisplayServer.get_name() != "headless" and vp and vp.get_texture():
 		var img_clearing := vp.get_texture().get_image()
 		if img_clearing:
 			img_clearing.save_png("res://docs/screenshots/forest_clearing_validated.png")

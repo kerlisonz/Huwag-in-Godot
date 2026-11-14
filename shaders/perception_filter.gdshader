@@ -17,6 +17,12 @@ uniform float vhs_chromatic_aberration : hint_range(0.0, 1.0) = 0.0;
 uniform float vhs_tracking_jitter : hint_range(0.0, 1.0) = 0.0;
 uniform float vhs_crt_vignette : hint_range(0.0, 1.0) = 0.25;
 
+// Artefatos adicionais de fita (usados em menus e telas de "gravação")
+uniform float vhs_tracking_band : hint_range(0.0, 1.0) = 0.0; // banda de rastreamento rolando
+uniform float vhs_head_switch : hint_range(0.0, 1.0) = 0.0; // ruído de comutação de cabeça na base
+uniform float vhs_dropout : hint_range(0.0, 1.0) = 0.0;     // linhas de dropout de fita desgastada
+uniform float vhs_tear : hint_range(0.0, 1.0) = 0.0;        // rasgo horizontal de fita (evento de glitch)
+
 float random_noise(vec2 co) {
 	return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
@@ -32,6 +38,27 @@ void fragment() {
 		}
 		// Desvio suave de quadro horizontal
 		uv.x += sin(TIME * 6.0 + uv.y * 20.0) * 0.0015 * vhs_tracking_jitter;
+	}
+
+	// 1b. Banda de rastreamento VHS rolando verticalmente pela tela
+	if (vhs_tracking_band > 0.001) {
+		float band_center = fract(TIME * 0.07);
+		float bd = abs(uv.y - band_center);
+		bd = min(bd, 1.0 - bd);
+		float band = smoothstep(0.08, 0.0, bd);
+		float amp = band * vhs_tracking_band;
+		uv.x += (random_noise(vec2(floor(uv.y * 140.0), floor(TIME * 24.0))) - 0.5) * 0.06 * amp;
+		uv.y += sin(uv.x * 30.0 + TIME * 8.0) * 0.004 * amp;
+	}
+
+	// 1c. Rasgo horizontal de fita (glitch): blocos inteiros deslocados lateralmente
+	if (vhs_tear > 0.001) {
+		float block = floor(uv.y * 26.0);
+		float tframe = floor(TIME * 20.0);
+		float tr = random_noise(vec2(block, tframe));
+		if (tr > 1.0 - vhs_tear * 0.35) {
+			uv.x += (random_noise(vec2(block + 3.1, tframe)) - 0.5) * 0.09 * vhs_tear;
+		}
 	}
 
 	// 2. Amostragem de cor com aberração cromática analógica controlada
@@ -71,6 +98,27 @@ void fragment() {
 	drained_col *= vec3(0.92, 0.95, 0.98);
 
 	vec3 base_col = mix(filtered_col, drained_col, unfiltered_mix);
+
+	// 6b. Ruído de comutação de cabeça na base da fita (head-switching noise)
+	if (vhs_head_switch > 0.001) {
+		float hb = smoothstep(0.90, 1.0, uv.y);
+		float hn = random_noise(vec2(uv.x * 220.0, floor(TIME * 40.0)));
+		base_col = mix(base_col, vec3(hn * 0.9 + 0.05), hb * vhs_head_switch);
+	}
+
+	// 6c. Dropouts aleatórios: linhas brilhantes de fita gasta
+	if (vhs_dropout > 0.001) {
+		float row = floor(uv.y * 180.0);
+		float dr = random_noise(vec2(row, floor(TIME * 18.0)));
+		if (dr > 1.0 - 0.04 * vhs_dropout) {
+			base_col += vec3(0.55) * vhs_dropout;
+		}
+	}
+
+	// 6d. Estática de rasgo durante o glitch da fita
+	if (vhs_tear > 0.001) {
+		base_col += (random_noise(uv + vec2(TIME * 13.0, TIME * 7.0)) - 0.5) * 0.2 * vhs_tear;
+	}
 
 	// 7. Efeito Scanlines CRT / VHS nítido (não desfoca as texturas)
 	if (vhs_scanline_alpha > 0.001) {

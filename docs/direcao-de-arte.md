@@ -50,18 +50,20 @@ O protagonista jogável utiliza os spritesheets canônicos 4-direcionais de Huwa
 
 ## 4. Renovação dos Cenários e Coerência Visual (`scenes/levels/`)
 
-1. **Quarto de Huwag (`scenes/levels/room_huwag.gd`):**
-   - **Piso Unificado:** Taboado de madeira nobre e acolhedora (`#8C6240`) na área social/quarto (`x = 96..440`) com transição clara por soleira de madeira para o piso cerâmico limpo da cozinha (`x = 440..544`), eliminando blocos bege descolados (`k_mat`) e costuras artificiais.
-   - **Remoção de Mobília Duplicada:** Eliminação de sobreposições de móveis esticados (`_draw_tileset_furniture_overlays`), mantendo um único conjunto nítido e proporcional: cama de bambu (*papag*), criado-mudo com mini-Jeepney e frascos de remédio, esteira trançada (*banig* rattan), armário filipino entalhado, exaustor, janela de capiz com luz solar matinal e geladeira com pia integrada.
-2. **Quartel de Bombeiros (`scenes/levels/fire_station.gd`):**
-   - Piso institucional ladrilhado, balcão de comando, armários de equipamentos, rádio BFP e NPCs do esquadrão com o Capitão Reyes.
-3. **Rua de Agdangan (`scenes/levels/street_preview.gd`):**
-   - **Estrada Contínua e Aterrada:** Rua contínua de terra batida e cascalho (`y = 168..334`), eliminando o aspecto de trincheira e a passarela inferior flutuante que dividia a cena.
-   - **Varanda Elevada Norte:** Deck de madeira contínuo (`Rect2(56, 146, 616, 26)`) em frente à quitinete de Huwag, sari-sari store e quartel de bombeiros, com degraus de acesso rústicos descendo para a rua.
-   - **Iluminação Noturna Atmosférica e Fiel:** Substituição dos círculos amarelos gigantes sobrepostos por luzes pontuais sutis e localizadas: halos discretos nas lanternas vermelhas e janelas, poças suaves sob os postes de madeira e feixes cônicos dos faróis do Jeepney iluminando a terra batida à frente.
-   - **Ombro Sul Natural:** Cerca rústica de madeira integrada a tufos de grama, bananeiras, coqueiros e o cantinho de descanso da Lola Rosa com banquinho e vaso de flor.
-4. **Corredor da Floresta e Clareira da Lagoa:**
-   - Trilha de terra batida, vegetação densa, rochas, lagoa de águas serenas, focos de incêndio interativos com a magia de água e ninho de criaturas.
+Hierarquia visual aplicada aos quatro cenários reconstruídos: **(1) FNAF Minigames** (arcade top-down de horror com paleta cinza/preto/branco sujo e acentos pontuais), **(2) Yume Nikki** (vazio, surrealismo e elementos desconfortáveis na dose alta do Ato 2), **(3) Chrono Trigger** (composição espacial estruturada sem corredores genéricos) e **(4) Pokémon Game Boy** (escala clara de edifícios, calçadas, estradas e NPCs). Distorções VHS mais intensas ficam restritas estrategicamente ao Ato 2 (dose maior) e sequências de trauma.
+
+1. **Quarto de Huwag (`scenes/levels/room_huwag.gd` / `RoomHuwag.tscn`):**
+   - Tilesets `interior_fnaf_normal` e `interior_fnaf_distorted` em grade `16×16` com alternância imediata ao escolher dose maior no Ato 2.
+   - Mobília pessoal e narrativa ambiental (cama *papag*, tapete em xadrez arcade, escrivaninha com rádio/notas de turno, frascos de pílulas, prateleira com capacete/mini-Jeepney e pia/geladeira), com objetos que exibem pistas de culpa e estranheza sem poluir a leitura retrô.
+2. **Quartel de Bombeiros (`scenes/levels/fire_station.gd` / `FireStation.tscn`):**
+   - Planta multi-ala estruturada: Recepção/Espera, Sala de Despacho/Rádio, Galpão de Viaturas, Enfermaria e Escritório do Capitão Reyes.
+   - NPCs do esquadrão em spritesheets dedicados de bombeiro (`Cap. Reyes`, `Bombeiro Ato`, `Bombeiro Santos`, `Enfermeira Maria`) com versões distorcidas no Ato 2 e confrontos hostis opcionais por escolhas de diálogo.
+3. **Rua de Agdangan (`scenes/levels/street_preview.gd` / `StreetPreview.tscn`):**
+   - Avenida estendida (`2880×560`) reinterpretando estrutura de cidade RPG clássica em paleta sombria FNAF: quarteirão da quitinete de Huwag, Central BFP de Agdangan destacada, calçadas, postes de iluminação com poças de luz/sombra, viatura/Jeepney, beco silencioso e mercado/esquina leste (`Barangay`).
+   - NPCs distribuídos ao longo de toda a rua (`Aling Nena`, `Kuya Ben`, `Toby`, `Feirante` e aparições de `Luningning` / espectros na dose alta) com diálogos informativos e rotas narrativas até o Ato 3.
+4. **Trilha da Floresta e Clareira da Lagoa (`scripts/levels/forest_trail.gd` e `scripts/levels/forest_clearing.gd`):**
+   - **Trilha (`forest_trail.tscn` / `ForestCorridor.tscn`, `2560×768`):** percurso longo com bifurcações (Serra das Cinzas ao norte vs. Riacho da Cruz com duas pontes de tronco e ilha de suprimento ao sul), Bacia Silenciosa central estilo Yume Nikki, Poço Seco e Desfiladeiro em Brasas. Combate escalonado com 13 `SantelmoEnemy` crescentes (60 a 140 HP) + espectro `NPC_Vulto_Bosque` sem alterar a mecânica base de combate.
+   - **Clareira (`forest_clearing.tscn` / `ForestClearing.tscn`, `960×576`):** anel de pedra retrô cercando a lagoa luminescente, ninho com ovos azuis, resgate do gato e espelho real da água no Ato 3.
 
 ---
 

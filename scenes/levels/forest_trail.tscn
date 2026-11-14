@@ -1,177 +1,239 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/levels/forest_trail.gd" id="1_trail_script"]
-[ext_resource type="Texture2D" path="res://assets/environments/forest_trail_bg.png" id="2_trail_bg"]
-[ext_resource type="TileSet" path="res://assets/tilesets/forest_natural_tileset.tres" id="3_forest_tileset"]
-[ext_resource type="PackedScene" path="res://scenes/characters/huwag.tscn" id="4_huwag_player"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/santelmo.tscn" id="5_santelmo_enemy"]
-[ext_resource type="PackedScene" path="res://scenes/components/ForestTree.tscn" id="6_forest_tree"]
-[ext_resource type="PackedScene" path="res://scenes/components/ForestRock.tscn" id="7_forest_rock"]
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_exit_right"]
-size = Vector2(32, 180)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_exit_left"]
-size = Vector2(32, 180)
+[ext_resource type="PackedScene" path="res://scenes/characters/huwag.tscn" id="2_huwag_player"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/santelmo.tscn" id="3_santelmo_enemy"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestRock.tscn" id="4_forest_rock"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_h"]
-size = Vector2(1400, 60)
+size = Vector2(2560, 58)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_v"]
-size = Vector2(30, 140)
+size = Vector2(32, 336)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_exit_right"]
+size = Vector2(32, 128)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_exit_left"]
+size = Vector2(32, 128)
 
 [node name="ForestTrail" type="Node2D"]
 y_sort_enabled = true
 script = ExtResource("1_trail_script")
 
-[node name="TrailBackground" type="Sprite2D" parent="."]
+[node name="CanvasModulate" type="CanvasModulate" parent="."]
+color = Color(0.32, 0.36, 0.44, 1)
+
+[node name="GroundNormal" type="TileMapLayer" parent="."]
 z_index = -3
 texture_filter = 0
-position = Vector2(700, 225)
-texture = ExtResource("2_trail_bg")
 
-[node name="GroundLayer" type="TileMap" parent="."]
-tile_set = ExtResource("3_forest_tileset")
-format = 2
-layer_0/name = "GrassBase"
-layer_0/z_index = -2
-layer_1/name = "DirtTrail"
-layer_1/z_index = -1
+[node name="WallsNormal" type="TileMapLayer" parent="."]
+z_index = -2
+texture_filter = 0
+
+[node name="GroundDistorted" type="TileMapLayer" parent="."]
+visible = false
+z_index = -3
+texture_filter = 0
+
+[node name="WallsDistorted" type="TileMapLayer" parent="."]
+visible = false
+z_index = -2
+texture_filter = 0
+
+[node name="DecalsLayer" type="Node2D" parent="."]
+z_index = -1
 
 [node name="TrailBoundaries" type="StaticBody2D" parent="."]
 collision_layer = 1
 collision_mask = 6
 
 [node name="NorthWall" type="CollisionShape2D" parent="TrailBoundaries"]
-position = Vector2(700, 30)
+position = Vector2(1280, 29)
 shape = SubResource("RectangleShape2D_wall_h")
 
 [node name="SouthWall" type="CollisionShape2D" parent="TrailBoundaries"]
-position = Vector2(700, 420)
+position = Vector2(1280, 744)
 shape = SubResource("RectangleShape2D_wall_h")
 
 [node name="WestWallTop" type="CollisionShape2D" parent="TrailBoundaries"]
-position = Vector2(15, 70)
+position = Vector2(16, 168)
 shape = SubResource("RectangleShape2D_wall_v")
 
 [node name="WestWallBottom" type="CollisionShape2D" parent="TrailBoundaries"]
-position = Vector2(15, 360)
+position = Vector2(16, 600)
 shape = SubResource("RectangleShape2D_wall_v")
 
 [node name="EastWallTop" type="CollisionShape2D" parent="TrailBoundaries"]
-position = Vector2(1385, 70)
+position = Vector2(2544, 168)
 shape = SubResource("RectangleShape2D_wall_v")
 
 [node name="EastWallBottom" type="CollisionShape2D" parent="TrailBoundaries"]
-position = Vector2(1385, 360)
+position = Vector2(2544, 600)
 shape = SubResource("RectangleShape2D_wall_v")
+
+[node name="Interactables" type="Node2D" parent="."]
 
 [node name="ObstaclesYsort" type="Node2D" parent="."]
 y_sort_enabled = true
 
-[node name="PlayerHuwag" parent="ObstaclesYsort" instance=ExtResource("4_huwag_player")]
-position = Vector2(80, 190)
+[node name="PlayerHuwag" parent="ObstaclesYsort" instance=ExtResource("2_huwag_player")]
+position = Vector2(96, 384)
 
-[node name="Camera2D" type="Camera2D" parent="ObstaclesYsort/PlayerHuwag"]
-limit_left = 0
-limit_top = 0
-limit_right = 1400
-limit_bottom = 450
-position_smoothing_enabled = true
+[node name="Santelmo1" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(380, 340)
 
-[node name="Santelmo1" parent="ObstaclesYsort" instance=ExtResource("5_santelmo_enemy")]
-position = Vector2(380, 160)
+[node name="Santelmo2" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(760, 176)
+max_health = 75
+current_health = 75
+move_speed = 70.0
+chase_speed = 102.0
+attack_damage = 14
+detection_radius = 150.0
 
-[node name="Santelmo2" parent="ObstaclesYsort" instance=ExtResource("5_santelmo_enemy")]
-position = Vector2(740, 240)
+[node name="Santelmo3" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(1680, 544)
+max_health = 95
+current_health = 95
+move_speed = 74.0
+chase_speed = 110.0
+attack_damage = 15
+detection_radius = 155.0
 
-[node name="Santelmo3" parent="ObstaclesYsort" instance=ExtResource("5_santelmo_enemy")]
-position = Vector2(1080, 180)
+[node name="Santelmo4" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(992, 160)
+max_health = 80
+current_health = 80
+move_speed = 72.0
+chase_speed = 106.0
+attack_damage = 14
+detection_radius = 150.0
 
-[node name="TreeCluster1_A" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(140, 105)
+[node name="Santelmo5" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(1232, 176)
+max_health = 90
+current_health = 90
+move_speed = 74.0
+chase_speed = 108.0
+attack_damage = 15
+detection_radius = 155.0
 
-[node name="TreeCluster1_B" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(200, 90)
+[node name="Santelmo6" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(720, 560)
+max_health = 80
+current_health = 80
+move_speed = 70.0
+chase_speed = 102.0
+attack_damage = 14
+detection_radius = 150.0
 
-[node name="TreeCluster1_C" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(260, 115)
+[node name="Santelmo7" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(976, 544)
+max_health = 95
+current_health = 95
+move_speed = 72.0
+chase_speed = 108.0
+attack_damage = 15
+detection_radius = 155.0
 
-[node name="TreeCluster1_D" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(170, 70)
+[node name="Santelmo8" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(1248, 560)
+max_health = 95
+current_health = 95
+move_speed = 75.0
+chase_speed = 110.0
+attack_damage = 15
+detection_radius = 160.0
 
-[node name="TreeCluster2_A" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(490, 100)
+[node name="Santelmo9" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(1728, 176)
+max_health = 105
+current_health = 105
+move_speed = 76.0
+chase_speed = 114.0
+attack_damage = 16
+detection_radius = 160.0
 
-[node name="TreeCluster2_B" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(550, 85)
+[node name="Santelmo10" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(2048, 176)
+max_health = 110
+current_health = 110
+move_speed = 78.0
+chase_speed = 116.0
+attack_damage = 16
+detection_radius = 165.0
 
-[node name="TreeCluster2_C" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(610, 110)
+[node name="Santelmo11" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(1952, 544)
+max_health = 115
+current_health = 115
+move_speed = 78.0
+chase_speed = 116.0
+attack_damage = 16
+detection_radius = 165.0
 
-[node name="TreeCluster2_D" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(520, 65)
+[node name="Santelmo12" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(2192, 464)
+max_health = 120
+current_health = 120
+move_speed = 80.0
+chase_speed = 120.0
+attack_damage = 17
+detection_radius = 170.0
 
-[node name="TreeCluster3_A" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(710, 360)
+[node name="Santelmo13" parent="ObstaclesYsort" instance=ExtResource("3_santelmo_enemy")]
+position = Vector2(2384, 384)
+scale = Vector2(1.25, 1.25)
+max_health = 140
+current_health = 140
+move_speed = 82.0
+chase_speed = 122.0
+attack_damage = 18
+detection_radius = 180.0
 
-[node name="TreeCluster3_B" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(770, 380)
+[node name="RockNorthPass" parent="ObstaclesYsort" instance=ExtResource("4_forest_rock")]
+position = Vector2(816, 176)
 
-[node name="TreeCluster3_C" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(830, 350)
+[node name="RockCreekWest" parent="ObstaclesYsort" instance=ExtResource("4_forest_rock")]
+position = Vector2(800, 520)
 
-[node name="TreeCluster3_D" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(890, 370)
+[node name="RockDeadPit" parent="ObstaclesYsort" instance=ExtResource("4_forest_rock")]
+position = Vector2(1896, 168)
 
-[node name="TreeCluster4_A" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(1150, 105)
+[node name="RockGorgeEast" parent="ObstaclesYsort" instance=ExtResource("4_forest_rock")]
+position = Vector2(1840, 544)
 
-[node name="TreeCluster4_B" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(1210, 90)
+[node name="LightsLayer" type="Node2D" parent="."]
 
-[node name="TreeCluster4_C" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(1270, 115)
-
-[node name="SouthTrees_1" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(180, 370)
-
-[node name="SouthTrees_2" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(340, 380)
-
-[node name="SouthTrees_3" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(500, 365)
-
-[node name="SouthTrees_4" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(1040, 375)
-
-[node name="SouthTrees_5" parent="ObstaclesYsort" instance=ExtResource("6_forest_tree")]
-position = Vector2(1200, 385)
-
-[node name="Rock_1" parent="ObstaclesYsort" instance=ExtResource("7_forest_rock")]
-position = Vector2(310, 230)
-
-[node name="Rock_2" parent="ObstaclesYsort" instance=ExtResource("7_forest_rock")]
-position = Vector2(610, 260)
-
-[node name="Rock_3" parent="ObstaclesYsort" instance=ExtResource("7_forest_rock")]
-position = Vector2(930, 140)
-
-[node name="ExitToClearingArea" type="Area2D" parent="."]
-position = Vector2(1380, 200)
-collision_layer = 0
-collision_mask = 2
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="ExitToClearingArea"]
-shape = SubResource("RectangleShape2D_exit_right")
+[node name="FireEmbers" type="CPUParticles2D" parent="."]
+position = Vector2(1280, 384)
+emitting = false
+amount = 90
+lifetime = 3.2
+emission_shape = 3
+emission_rect_extents = Vector2(1200, 340)
+direction = Vector2(-0.5, -1)
+gravity = Vector2(0, -18)
+initial_velocity_min = 12.0
+initial_velocity_max = 36.0
+scale_amount_min = 2.0
+scale_amount_max = 4.0
+color = Color(1, 0.52, 0.14, 0.78)
 
 [node name="ExitToCityArea" type="Area2D" parent="."]
-position = Vector2(20, 190)
+position = Vector2(14, 384)
 collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="ExitToCityArea"]
 shape = SubResource("RectangleShape2D_exit_left")
 
-[node name="CanvasModulate" type="CanvasModulate" parent="."]
-color = Color(0.92, 0.94, 0.88, 1)
+[node name="ExitToClearingArea" type="Area2D" parent="."]
+position = Vector2(2546, 384)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ExitToClearingArea"]
+shape = SubResource("RectangleShape2D_exit_right")

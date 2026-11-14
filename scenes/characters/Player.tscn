@@ -1,7 +1,8 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
-[ext_resource type="Script" path="res://scenes/characters/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/characters/player.gd" id="1_player"]
 [ext_resource type="FontFile" path="res://assets/fonts/undertale-deltarune-extended-fixed.otf" id="2_font"]
+[ext_resource type="Script" path="res://scripts/components/rotate_towards_mouse.gd" id="3_rotate_mouse"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(14, 12)
@@ -51,3 +52,7 @@ horizontal_alignment = 1
 [node name="Camera2D" type="Camera2D" parent="."]
 position_smoothing_enabled = true
 position_smoothing_speed = 6.0
+
+[node name="AimPivot" type="Node2D" parent="."]
+script = ExtResource("3_rotate_mouse")
+update_parent_facing = true

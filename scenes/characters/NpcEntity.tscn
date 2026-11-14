@@ -1,0 +1,40 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/npc_entity.gd" id="1_npc_script"]
+[ext_resource type="Script" path="res://scripts/components/interactable.gd" id="2_interactable"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(14, 12)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_interact"]
+radius = 24.0
+
+[node name="NpcEntity" type="CharacterBody2D"]
+collision_layer = 1
+collision_mask = 1
+script = ExtResource("1_npc_script")
+
+[node name="Shadow" type="Polygon2D" parent="."]
+position = Vector2(0, 6)
+color = Color(0.02, 0.02, 0.04, 0.55)
+polygon = PackedVector2Array(-8, -2, -5, -4, 5, -4, 8, -2, 8, 2, 5, 4, -5, 4, -8, 2)
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(0, -10)
+hframes = 10
+vframes = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, 4)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="InteractArea" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 2
+script = ExtResource("2_interactable")
+verb = "Conversar"
+title = "Pessoa"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractArea"]
+shape = SubResource("CircleShape2D_interact")

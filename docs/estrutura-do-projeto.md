@@ -1,66 +1,65 @@
 # Estrutura do projeto
 
-Organização de pastas do `HuwagGodot` e convenções para manter o projeto previsível.
+Organização padronizada de pastas do `Huwag-in-Godot` separando cenas (`.tscn`), scripts (`.gd`), recursos (`assets/`), shaders, testes e documentação.
 
 ## Árvore
 
 ```text
-HuwagGodot/
-├── addons/                  # Plugins de desenvolvimento (AsepriteWizard, better-terrain,
-│                            # dialogue_manager, Fennara, Godot AI, godot_mcp_toolkit,
-│                            # rmsmartshape, sprite_staticbody_builder, Ziva, antigravity_bridge)
+Huwag-in-Godot/
+├── addons/                       # Plugins opcionais de editor (AsepriteWizard, better-terrain)
 ├── assets/
-│   ├── _archive/            # Pacotes não usados/incompatíveis/duplicados (ignorado pelo Godot)
-│   │   ├── loose_external_packs/  # Preservação local; fora do Git por licença de terceiros
-│   │   ├── raw_ai_generations/    # Fontes brutas de IA; fora do Git
-│   │   └── scratch_dev/           # Pré-visualizações temporárias; fora do Git
-│   ├── characters/          # Retratos, spritesheets e criatura aquática
-│   ├── enemies/             # Santelmo
-│   ├── environments/        # Quarto, rua, floresta e lagoa
-│   ├── fonts/               # Fonte pixelada da UI
-│   ├── props/               # Adereços de cena
-│   ├── third_party/         # Pacotes externos usados em runtime
-│   ├── tilesets/            # Tilesets nativos do Godot
-│   └── ui/                  # Capa e elementos de interface
-├── docs/                    # Continuidade, direção de arte, licenças, estrutura
-│   ├── logs/                # Artefatos de execução (ignorados pelo Git)
-│   ├── screenshots/         # Capturas usadas na documentação
-│   └── third_party_licenses/ # Termos de licença de assets externos arquivados
-├── scenes/
-│   ├── characters/          # Player, Huwag e criatura aquática
-│   ├── components/          # Interactable, árvores e pedras
-│   ├── enemies/             # Santelmo
-│   ├── levels/              # Cenários jogáveis
-│   │   └── _archive/        # Cenas e scripts substituídos (ignorados pelo Godot)
-│   ├── main/                # Main.tscn e orquestração de cenas
-│   ├── menu/                # TitleScreen e EndingCredits
-│   └── ui/                  # DialogueBox e HUD
-├── scripts/
-│   ├── audio/               # Síntese procedural de SFX
-│   ├── autoload/            # GameState e AudioManager
-│   ├── characters/          # Lógica de criaturas
-│   ├── dialogue/            # Perfis de personagem e retratos
-│   ├── enemies/             # IA do Santelmo
-│   ├── levels/              # Lógica de floresta e clareira
-│   └── utils/               # Geração procedural de assets
-├── shaders/                 # perception_filter.gdshader
-├── tests/                   # Runners headless e capturas
+│   ├── characters/
+│   │   ├── portraits/            # Retratos de diálogo (Huwag Casual/BFP + bustos CRT FNAF/Distorcidos)
+│   │   ├── sprites/              # Spritesheets top-down (Huwag, moradores, bombeiros e formas distorcidas)
+│   │   └── aquatic_creature.png  # Guardiã da lagoa
+│   ├── enemies/                  # Santelmo (santelmo.png)
+│   ├── fonts/                    # Fonte pixelada global (undertale-deltarune-extended-fixed.otf)
+│   ├── props/                    # Adereços da clareira (blue_egg_nest.png)
+│   ├── third_party/              # Pacotes externos usados em runtime para tilesets/adereços
+│   ├── tilesets/retro/           # Atlases 16×16 e TileSets .tres (normal / distorted)
+│   └── ui/                       # Capa da tela inicial (title_cover.png)
+├── docs/                         # Continuidade, direção de arte, licenças, estrutura
+│   ├── logs/                     # Artefatos locais de execução (ignorados pelo Git)
+│   └── screenshots/              # Capturas atuais usadas no README (com .gdignore)
+├── scenes/                       # Apenas arquivos .tscn organizados por domínio
+│   ├── characters/               # Player.tscn, huwag.tscn, NpcEntity.tscn, aquatic_creature.tscn
+│   ├── components/               # RotateTowardsMouse.tscn, ForestRock.tscn
+│   ├── enemies/                  # santelmo.tscn
+│   ├── levels/                   # RoomHuwag, StreetPreview, FireStation, forest_trail, forest_clearing, vhs_memory_minigame
+│   ├── main/                     # Main.tscn
+│   ├── menu/                     # TitleScreen.tscn, EndingCredits.tscn
+│   └── ui/                       # DialogueBox.tscn
+├── scripts/                      # Todos os scripts .gd do projeto organizados por domínio
+│   ├── audio/                    # combat_sfx.gd
+│   ├── autoload/                 # audio_manager.gd, game_state.gd
+│   ├── characters/               # player.gd, npc_entity.gd, aquatic_creature.gd
+│   ├── components/               # interactable.gd, rotate_towards_mouse.gd
+│   ├── dialogue/                 # character_profiles.gd
+│   ├── enemies/                  # santelmo.gd
+│   ├── levels/                   # retro_level_helpers.gd e scripts de cada nível
+│   ├── main/                     # main.gd
+│   ├── menu/                     # title_screen.gd, ending_credits.gd
+│   ├── tools/                    # build_retro_tilesets.gd
+│   └── ui/                       # dialogue_box.gd
+├── shaders/                      # perception_filter.gdshader e vhs_glitch_tear.gdshader
+├── tests/                        # Suítes headless (test_*.gd) e capturador GPU (capture_acts_and_menu.gd)
 ├── AGENTS.md
+├── .gitattributes
+├── .gitignore
 ├── project.godot
 └── README.md
 ```
 
 ## Convenções
 
+- **Separação estrita `scenes/` vs `scripts/`:** todas as cenas `.tscn` ficam em `scenes/<domínio>/` e todo código `.gd` vive no espelho `scripts/<domínio>/`.
 - **Assets autorais** ficam fora de `third_party/` e usam `snake_case`.
-- **Pacotes externos** ficam em `assets/third_party/<nome original>/` para preservar a proveniência.
-- **Conteúdo arquivado** fica em `assets/_archive/`, com `.gdignore` para não entrar no pipeline de importação.
-- **Pacotes externos arquivados e fontes brutas de IA** permanecem apenas localmente (ignorados pelo Git) para preservar proveniência sem redistribuir material de terceiros; os termos ficam em `docs/third_party_licenses/`.
-- **Cenas** seguem `PascalCase.tscn`; scripts seguem `snake_case.gd`.
+- **Pacotes externos** ficam em `assets/third_party/<nome original>/` para preservar a proveniência e licenças.
+- **Cenas** seguem `PascalCase.tscn` (mantendo aliases `ForestCorridor.tscn` e `ForestClearing.tscn` para compatibilidade de saves); scripts seguem `snake_case.gd`.
 - **Estado narrativo** vive no autoload `GameState`, nunca na UI.
-- **Comunicação entre cena e UI** acontece por sinais (`request_level_change`, `request_dialogue`).
-- **Caminhos de recurso** usam `res://` e são relativos à raiz do projeto.
-- **Screenshots** de documentação ficam em `docs/screenshots/` e são ignorados pelo Godot.
+- **Comunicação entre cena e UI** acontece por sinais (`request_level_change`, `request_dialogue`, `conflict_triggered`).
+- **Caminhos de recurso** usam `res://` relativos à raiz do projeto.
+- **Screenshots** de documentação ficam em `docs/screenshots/` com `.gdignore` para não entrar no import do Godot.
 
 ## Fluxo de cenas
 
@@ -78,7 +77,7 @@ TitleScreen.tscn
 EndingCredits.tscn
 ```
 
-`Main.gd` instancia o nível atual, conecta `request_level_change` e `request_dialogue`, e mantém o HUD e a caixa de diálogo em `CanvasLayer`. As cenas `ForestCorridor.tscn` e `ForestClearing.tscn` são invólucros finos mantidos para que saves antigos continuem carregando; o fluxo novo usa `forest_trail.tscn` e `forest_clearing.tscn`.
+`scripts/main/main.gd` instancia o nível atual, conecta `request_level_change` e `request_dialogue`, e mantém o HUD e a caixa de diálogo em `CanvasLayer`. As cenas `ForestCorridor.tscn` e `ForestClearing.tscn` são invólucros finos mantidos para preservar compatibilidade com saves anteriores.
 
 ## Pipeline de percepção
 
@@ -86,6 +85,8 @@ EndingCredits.tscn
 
 | Modo | Uniforme | Efeito |
 | :--- | :--- | :--- |
-| `FILTERED_MORNING` | `afternoon_mix = 0`, `unfiltered_mix = 0` | Cores levemente realçadas. |
-| `FILTERED_AFTERNOON` | `afternoon_mix = 1`, `unfiltered_mix = 0` | Banho âmbar e sombras arroxeadas. |
+| `FILTERED_MORNING` | `afternoon_mix = 0`, `unfiltered_mix = 0` | Paleta matinal com saturação controlada. |
+| `FILTERED_AFTERNOON` | `afternoon_mix = 1`, `unfiltered_mix = 0` | Banho âmbar vespertino e sombras arroxeadas. |
 | `UNFILTERED_ACT3` | `afternoon_mix = 0`, `unfiltered_mix = 1` | Dessaturação, contraste árido e vinheta fria. |
+
+Em paralelo, a escolha de dose maior no Ato 2 (`GameState.is_higher_dose()` / sinal `higher_dose_changed`) ativa realidade distorcida (tilesets e NPCs surreais, interferência VHS contínua com bursts e confrontos hostis via `conflict_choices` / `NpcEntity.turn_hostile()`).

@@ -9,6 +9,8 @@ signal hp_changed(current_hp: int, max_hp: int)
 signal outfit_changed(outfit_id: String)
 signal level_load_requested(scene_path: String, spawn_tag: String)
 
+signal higher_dose_changed(active: bool)
+
 enum PerceptionMode {
 	FILTERED_MORNING = 0,
 	FILTERED_AFTERNOON = 1,
@@ -69,6 +71,21 @@ var equipped_outfit: String = "casual" # "casual" (Imagem 3) ou "bfp" (Uniforme 
 var setting_flash_reduction: bool = false
 var setting_vhs_effects: bool = true
 var setting_screen_shake: float = 1.0
+
+signal window_mode_changed(is_fullscreen: bool)
+
+func is_fullscreen() -> bool:
+	return DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
+
+func toggle_fullscreen() -> void:
+	set_fullscreen(not is_fullscreen())
+
+func set_fullscreen(fullscreen: bool) -> void:
+	if fullscreen:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	window_mode_changed.emit(fullscreen)
 
 const SAVE_PATH := "user://huwag_save.json"
 
@@ -176,13 +193,27 @@ func trigger_turn_afternoon() -> void:
 		get_node("/root/AudioManager").play_ambience("afternoon_ambience")
 
 ## Avança para o Ato 2 ao dormir no fim do Ato 1 (switch 006)
+func is_higher_dose() -> bool:
+	return int(get_var("Ato", 1)) == 2 and get_switch("006b_Dose_maior_pilulas")
+
+
+func set_higher_dose(active: bool) -> void:
+	set_switch("006c_Dose_escolhida_Ato2", true)
+	set_switch("006b_Dose_maior_pilulas", active)
+	higher_dose_changed.emit(active)
+	perception_changed.emit(perception_mode)
+
+
 func advance_to_act_2() -> void:
 	set_switch("006_Dormir_avancou_para_Ato2", true)
+	set_switch("006b_Dose_maior_pilulas", false)
+	set_switch("006c_Dose_escolhida_Ato2", false)
 	set_var("Ato", 2)
 	is_afternoon = false
 	player_hp = player_max_hp
 	hp_changed.emit(player_hp, player_max_hp)
 	set_perception_mode(PerceptionMode.FILTERED_MORNING)
+	higher_dose_changed.emit(false)
 	time_of_day_changed.emit(false)
 	autosave(current_scene_path, "initial")
 	notification_requested.emit("Ato II Iniciado — Um novo turno em Agdangan")
@@ -199,6 +230,41 @@ func advance_to_act_3() -> void:
 		get_node("/root/AudioManager").play_ambience("act3_ambience")
 		get_node("/root/AudioManager").play_sfx("vhs_glitch")
 	notification_requested.emit("Ato III — O efeito dos comprimidos passou")
+
+## Avança ciclicamente entre os Atos (Ato 1 -> Ato 2 -> Ato 3 -> Ato 1) via atalho F10 ou depuração
+func advance_act() -> int:
+	var current_act: int = int(variables.get("Ato", 1))
+	match current_act:
+		1:
+			advance_to_act_2()
+			return 2
+		2:
+			advance_to_act_3()
+			return 3
+		_:
+			set_switch("006_Dormir_avancou_para_Ato2", false)
+			set_switch("007_Chefe_Ato2_apresentado", false)
+			set_switch("014_Floresta_liberada", false)
+			set_switch("015_Floresta_em_chamas", false)
+			set_switch("019_Ato2_concluido", false)
+			set_switch("022_Ato3_iniciado", false)
+			set_switch("023_Ato3_pesadelo_vhs_concluido", false)
+			set_switch("024_Ato3_revelacao_reyes", false)
+			set_switch("025_Ato3_confronto_lagoa", false)
+			set_switch("026_Jogo_finalizado", false)
+			set_var("Ato", 1)
+			set_var("Missoes_concluidas", 0)
+			is_afternoon = false
+			player_hp = player_max_hp
+			hp_changed.emit(player_hp, player_max_hp)
+			set_perception_mode(PerceptionMode.FILTERED_MORNING)
+			time_of_day_changed.emit(false)
+			autosave(current_scene_path, "initial")
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").play_ambience("day_ambience")
+				get_node("/root/AudioManager").play_bgm("day_theme", 1.0)
+			notification_requested.emit("Ato I Iniciado — Manhã Filtrada")
+			return 1
 
 ## Conclui uma das 3 missões opcionais do Ato 2
 func complete_optional_mission(switch_done_key: String) -> void:
@@ -339,6 +405,7 @@ func load_game() -> bool:
 
 	set_equipped_outfit(str(data.get("equipped_outfit", "casual")), false)
 	set_perception_mode(int(data.get("perception_mode", PerceptionMode.FILTERED_MORNING)))
+	higher_dose_changed.emit(is_higher_dose())
 
 	if data.has("settings") and typeof(data["settings"]) == TYPE_DICTIONARY:
 		var s: Dictionary = data["settings"]

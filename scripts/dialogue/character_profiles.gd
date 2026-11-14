@@ -38,36 +38,40 @@ const PROFILES: Dictionary = {
 		"display_name": "Capitão Reyes",
 		"role_subtitle": "Comandante · Agdangan Fire Station",
 		"accent_color": Color("#F5CB5C"),
-		"is_placeholder": true,
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_cap_reyes.png"
+			"default": "res://assets/characters/portraits/fnaf_cap_reyes.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_bombeiro.png"
 		}
 	},
 	"ato": {
 		"display_name": "Bombeiro Ato",
 		"role_subtitle": "Equipe do Quartel (BFP)",
 		"accent_color": Color("#4ECDC4"),
-		"is_placeholder": true,
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_station_staff.png"
+			"default": "res://assets/characters/portraits/fnaf_bombeiro_ato.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_bombeiro.png"
 		}
 	},
 	"santos": {
 		"display_name": "Bombeiro Santos",
 		"role_subtitle": "Equipe do Quartel (BFP)",
 		"accent_color": Color("#4ECDC4"),
-		"is_placeholder": true,
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_station_staff.png"
+			"default": "res://assets/characters/portraits/fnaf_bombeiro_santos.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_bombeiro.png"
 		}
 	},
 	"enfermeira_maria": {
 		"display_name": "Enfermeira Maria",
 		"role_subtitle": "Saúde Ocupacional (BFP)",
 		"accent_color": Color("#90E0EF"),
-		"is_placeholder": true,
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_station_staff.png"
+			"default": "res://assets/characters/portraits/fnaf_enfermeira_maria.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_luningning.png"
 		}
 	},
 	"senhora_luningning": {
@@ -76,34 +80,38 @@ const PROFILES: Dictionary = {
 		"accent_color": Color("#C77DFF"),
 		"is_placeholder": true,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_npc_barangay.png"
+			"default": "res://assets/characters/portraits/placeholder_npc_barangay.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_luningning.png"
 		}
 	},
 	"aling_nena": {
 		"display_name": "Aling Nena",
 		"role_subtitle": "Sari-Sari Store",
 		"accent_color": Color("#4ECDC4"),
-		"is_placeholder": true,
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_npc_barangay.png"
+			"default": "res://assets/characters/portraits/fnaf_aling_nena.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_aling_nena.png"
 		}
 	},
 	"kuya_ben": {
 		"display_name": "Kuya Ben",
 		"role_subtitle": "Motorista de Jeepney",
 		"accent_color": Color("#FFCA3A"),
-		"is_placeholder": true,
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_npc_barangay.png"
+			"default": "res://assets/characters/portraits/fnaf_kuya_ben.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_kuya_ben.png"
 		}
 	},
 	"feirante": {
 		"display_name": "Feirante do Barangay",
 		"role_subtitle": "Feirinha ao lado do Quartel",
 		"accent_color": Color("#8AC926"),
-		"is_placeholder": true,
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_npc_barangay.png"
+			"default": "res://assets/characters/portraits/fnaf_feirante.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_bombeiro.png"
 		}
 	},
 	"lola_rosa": {
@@ -119,9 +127,10 @@ const PROFILES: Dictionary = {
 		"display_name": "Toby",
 		"role_subtitle": "Criança da Rua",
 		"accent_color": Color("#4ECDC4"),
-		"is_placeholder": true,
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_npc_barangay.png"
+			"default": "res://assets/characters/portraits/fnaf_toby.png",
+			"distorted": "res://assets/characters/portraits/fnaf_toby.png"
 		}
 	},
 	"criatura_lagoa": {
@@ -181,12 +190,16 @@ static func get_profile_data(raw_speaker: String, expression: String = "default"
 	if display_name == "Huwag":
 		display_name = "Huwag Matitiis"
 
+	var is_ph: bool = bool(base.get("is_placeholder", false))
+	if chosen_expr == "distorted" and portraits.has("distorted"):
+		is_ph = false
+
 	return {
 		"id": speaker_id,
 		"display_name": display_name,
 		"role_subtitle": str(base.get("role_subtitle", "")),
 		"accent_color": base.get("accent_color", Color("#F5CB5C")),
-		"is_placeholder": bool(base.get("is_placeholder", false)),
+		"is_placeholder": is_ph,
 		"portrait_path": portrait_path,
 		"expression": chosen_expr
 	}

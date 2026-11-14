@@ -1,34 +1,69 @@
-# Godot 4
-.godot/
-export/
-build/
-*.translation
+# ==============================================================================
+# .gitignore — Huwag (Godot 4.7 / GDScript)
+# ==============================================================================
+# Nota sobre Godot 4:
+#   - .godot/ é cache local gerado pela engine (sempre ignorado).
+#   - Arquivos *.import e *.uid permanecem versionados para preservar presets
+#     pixel-perfect (Nearest), tipografia e referências de cenas entre clones.
 
-# Runtime / debug artifacts
+# Godot 4: cache local e exportações
+.godot/
+*.translation
+export/
+exports/
+build/
+builds/
+*.exe
+*.pck
+*.apk
+*.aab
+*.app/
+*.dmg
+*.zip
+*.tar.gz
+override.cfg
+
+# Godot C# / Mono (caso habilitado no futuro)
+.mono/
+data_*/
+mono_crash.*.json
+
+# Logs, backups e arquivos temporários
 docs/logs/*
 !docs/logs/README.md
 *.log
 *.tmp
+*.bak
+*.orig
+*.swp
+*~
 
-# Artefatos locais de desenvolvimento (preservados fora do Git)
-scratch/
+# Saves locais de teste
+*.sav
+*huwag_save.json
+
+# Ferramentas de desenvolvimento local / habilidades de IA (fora do repositório)
+.agents/
 .antigravity_bridge/
-assets/_archive/scratch_dev/
+scratch/
 
-# Pacotes externos arquivados e fontes brutas de IA (licenças de terceiros;
-# mantidos apenas localmente para proveniência, conforme docs/recursos-e-licencas.md)
-assets/_archive/loose_external_packs/
-assets/_archive/raw_ai_generations/
+# Python / scripts auxiliares locais
+__pycache__/
+*.py[cod]
+.venv/
+venv/
 
-# OS metadata
+# Metadados de Sistema Operacional
 .DS_Store
+._*
 Thumbs.db
+ehthumbs.db
 desktop.ini
 __MACOSX/
-._*
 
-# IDEs
+# IDEs e editores
 .vscode/
 .idea/
 *.suo
 *.user
+*.sln.docstates

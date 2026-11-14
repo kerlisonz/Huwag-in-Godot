@@ -1,10 +1,9 @@
 # Documentos do projeto
 
-- [`auditoria-original.md`](auditoria-original.md): o que foi encontrado no repositório público e o que precisa de auditoria integral.
-- [`continuidade-narrativa.md`](continuidade-narrativa.md): elementos que a reimplementação deve preservar.
-- [`direcao-de-arte.md`](direcao-de-arte.md): folha de estilo visual, paletas (Atos 1–2 vs. Ato 3), motivos recorrentes e referências de Agdangan, Quezon.
-- [`recursos-e-licencas.md`](recursos-e-licencas.md): proveniência, termos e política de assets.
-- [`third_party_licenses/`](third_party_licenses/): textos de licença de assets externos arquivados (CC0, Admurin e Morbidember).
+- [`auditoria-original.md`](auditoria-original.md): o que foi encontrado na versão original e o que orienta a auditoria narrativa.
+- [`continuidade-narrativa.md`](continuidade-narrativa.md): invariantes narrativas que devem ser sempre preservadas.
+- [`direcao-de-arte.md`](direcao-de-arte.md): hierarquia estética (FNAF Minigames / Yume Nikki / Chrono Trigger / Pokémon GB), paletas e referências de Agdangan, Quezon.
+- [`recursos-e-licencas.md`](recursos-e-licencas.md): proveniência, termos, política de assets e histórico de decisões.
 - [`estrutura-do-projeto.md`](estrutura-do-projeto.md): árvore de pastas, convenções e fluxo de cenas.
-- [`screenshots/`](screenshots/): capturas usadas na documentação e no README.
-- [`logs/`](logs/): artefatos de execução e depuração (ignorados pelo Git).
+- [`screenshots/`](screenshots/): capturas atuais da engine usadas no README (ignoradas pelo pipeline de importação do Godot via `.gdignore`).
+- [`logs/`](logs/): artefatos locais de execução e depuração (ignorados pelo Git).

@@ -1,10 +1,9 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene format=3 uid="uid://chx8vflsstkmd"]
 
-[ext_resource type="Script" path="res://scripts/enemies/santelmo.gd" id="1_santelmo_script"]
-[ext_resource type="Texture2D" path="res://assets/enemies/santelmo.png" id="2_santelmo_tex"]
+[ext_resource type="Script" uid="uid://c5a6ht6o1ibwi" path="res://scripts/enemies/santelmo.gd" id="1_santelmo_script"]
+[ext_resource type="Texture2D" uid="uid://ckt066u32l1oh" path="res://assets/enemies/santelmo.png" id="2_santelmo_tex"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
-radius = 10.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_hurt"]
 radius = 14.0
@@ -26,17 +25,17 @@ corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
-[node name="Santelmo" type="CharacterBody2D" groups=["combat_target", "enemies", "water_target"]]
+[node name="Santelmo" type="CharacterBody2D" unique_id=823153748 groups=["combat_target", "enemies", "water_target"]]
 y_sort_enabled = true
 collision_layer = 4
 collision_mask = 3
 script = ExtResource("1_santelmo_script")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=470050785]
 position = Vector2(0, 4)
 shape = SubResource("CircleShape2D_body")
 
-[node name="FireParticles" type="CPUParticles2D" parent="."]
+[node name="FireParticles" type="CPUParticles2D" parent="." unique_id=746255968]
 position = Vector2(0, 2)
 amount = 18
 lifetime = 0.55
@@ -50,27 +49,27 @@ scale_amount_min = 2.0
 scale_amount_max = 3.5
 color = Color(1, 0.65, 0.2, 0.7)
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
-texture_filter = 0
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1655094793]
 texture = ExtResource("2_santelmo_tex")
 
-[node name="Hurtbox" type="Area2D" parent="." groups=["enemy_hurtbox"]]
+[node name="Hurtbox" type="Area2D" parent="." unique_id=1668304685 groups=["enemy_hurtbox"]]
 collision_layer = 4
 collision_mask = 8
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox" unique_id=2070964984]
 shape = SubResource("CircleShape2D_hurt")
 debug_color = Color(0.95, 0.1, 0.1, 0.42)
 
-[node name="Hitbox" type="Area2D" parent="." groups=["enemy_hitbox"]]
+[node name="Hitbox" type="Area2D" parent="." unique_id=736545883 groups=["enemy_hitbox"]]
 collision_layer = 4
 collision_mask = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox" unique_id=1439614682]
+position = Vector2(-1, 1)
 shape = SubResource("CircleShape2D_hit")
 debug_color = Color(1, 0.8, 0.2, 0.42)
 
-[node name="HealthBar" type="ProgressBar" parent="."]
+[node name="HealthBar" type="ProgressBar" parent="." unique_id=2022696161]
 visible = false
 offset_left = -16.0
 offset_top = -24.0
