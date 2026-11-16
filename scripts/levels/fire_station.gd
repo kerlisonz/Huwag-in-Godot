@@ -272,8 +272,8 @@ func _spawn_firefighter_npcs() -> void:
 	# 1. Capitão Reyes (Comando Norte)
 	_spawn_npc(
 		"Cap_Reyes", "Capitão Reyes",
-		"res://assets/characters/sprites/npc_cap_reyes_bfp_sheet.png",
-		"res://assets/characters/sprites/distorted_bombeiro_sheet.png",
+		"res://assets/sprites/npcs/cap_reyes/cap_reyes_normal_spriteframes.tres",
+		"res://assets/sprites/npcs/cap_reyes/cap_reyes_distorted_spriteframes.tres",
 		Vector2(480, 196), "down", []
 	)
 
@@ -281,32 +281,32 @@ func _spawn_firefighter_npcs() -> void:
 	var ato_patrol: Array[Vector2] = [Vector2(174, 212), Vector2(236, 212)]
 	_spawn_npc(
 		"Bombeiro_Ato", "Bombeiro Ato",
-		"res://assets/characters/sprites/npc_bombeiro_ato_sheet.png",
-		"res://assets/characters/sprites/distorted_bombeiro_sheet.png",
+		"res://assets/sprites/npcs/bombeiro_ato/bombeiro_ato_normal_spriteframes.tres",
+		"res://assets/sprites/npcs/bombeiro_ato/bombeiro_ato_distorted_spriteframes.tres",
 		Vector2(174, 212), "down", ato_patrol
 	)
 
 	# 3. Bombeiro Santos (Ala Oeste Sul - Mesa de Descanso)
 	_spawn_npc(
 		"Bombeiro_Santos", "Bombeiro Santos",
-		"res://assets/characters/sprites/npc_bombeiro_santos_sheet.png",
-		"res://assets/characters/sprites/distorted_bombeiro_sheet.png",
+		"res://assets/sprites/npcs/bombeiro_santos/bombeiro_santos_normal_spriteframes.tres",
+		"res://assets/sprites/npcs/bombeiro_santos/bombeiro_santos_distorted_spriteframes.tres",
 		Vector2(214, 456), "left", []
 	)
 
 	# 4. Enfermeira Maria (Ala Leste - Enfermaria)
 	_spawn_npc(
 		"Enfermeira_Maria", "Enfermeira Maria",
-		"res://assets/characters/sprites/npc_enfermeira_maria_sheet.png",
-		"res://assets/characters/sprites/distorted_luningning_sheet.png",
+		"res://assets/sprites/npcs/enfermeira_maria/enfermeira_maria_normal_spriteframes.tres",
+		"res://assets/sprites/npcs/enfermeira_maria/enfermeira_maria_distorted_spriteframes.tres",
 		Vector2(752, 216), "left", []
 	)
 
 	# 5. Senhora Luningning / Espera (visível principalmente no Ato 2 na Recepção)
 	_spawn_npc(
 		"Velhinha_Espera", "Senhora Luningning",
-		"res://assets/characters/sprites/distorted_luningning_sheet.png",
-		"res://assets/characters/sprites/distorted_luningning_sheet.png",
+		"res://assets/sprites/npcs/senhora_luningning/senhora_luningning_normal_spriteframes.tres",
+		"res://assets/sprites/npcs/senhora_luningning/senhora_luningning_distorted_spriteframes.tres",
 		Vector2(368, 464), "up", []
 	)
 
@@ -317,8 +317,14 @@ func _spawn_npc(id: String, prompt: String, norm_path: String, dist_path: String
 	npc.npc_id = id
 	npc.interact_verb = "Conversar"
 	npc.interact_prompt = prompt
-	npc.normal_sheet_path = norm_path
-	npc.distorted_sheet_path = dist_path
+	if norm_path.ends_with(".tres"):
+		npc.normal_frames_path = norm_path
+	else:
+		npc.normal_sheet_path = norm_path
+	if dist_path.ends_with(".tres"):
+		npc.distorted_frames_path = dist_path
+	else:
+		npc.distorted_sheet_path = dist_path
 	npc.facing_dir = dir
 	npc.patrol_points = patrol
 	npc.position = pos

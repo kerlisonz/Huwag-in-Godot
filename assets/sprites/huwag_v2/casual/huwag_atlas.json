@@ -1,0 +1,67 @@
+{
+  "animations": {
+    "idle_down": {
+      "file": "huwag_idle_down.png",
+      "fps": 8,
+      "frames": 1,
+      "loop": false
+    },
+    "idle_left": {
+      "file": "huwag_idle_left.png",
+      "fps": 8,
+      "frames": 1,
+      "loop": false
+    },
+    "idle_right": {
+      "file": "huwag_idle_right.png",
+      "fps": 8,
+      "frames": 1,
+      "loop": false
+    },
+    "idle_up": {
+      "file": "huwag_idle_up.png",
+      "fps": 8,
+      "frames": 1,
+      "loop": false
+    },
+    "walk_down": {
+      "file": "huwag_walk_down.png",
+      "fps": 8,
+      "frames": 4,
+      "loop": true
+    },
+    "walk_left": {
+      "file": "huwag_walk_left.png",
+      "fps": 8,
+      "frames": 4,
+      "loop": true
+    },
+    "walk_right": {
+      "file": "huwag_walk_right.png",
+      "fps": 8,
+      "frames": 4,
+      "loop": true
+    },
+    "walk_up": {
+      "file": "huwag_walk_up.png",
+      "fps": 8,
+      "frames": 4,
+      "loop": true
+    }
+  },
+  "cell_size": [
+    96,
+    96
+  ],
+  "character": "Huwag",
+  "foot_anchor": [
+    48,
+    90
+  ],
+  "measured_standing_bbox_height_px": 80,
+  "outfit": "casual",
+  "scale_from_raw": 0.333333,
+  "sheet_file": "huwag_casual_sheet_96x96.png",
+  "target_height_px": 80,
+  "unique_palette_colors": 180
+}

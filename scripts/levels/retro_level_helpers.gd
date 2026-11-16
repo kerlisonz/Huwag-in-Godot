@@ -5,8 +5,23 @@ extends RefCounted
 ## Gera sprites Y-sorted pixel-sharp em cache, luzes PointLight2D sem texturas nulas,
 ## decals ambientais e helpers de construção para TileMapLayer duplo (Normal vs Distorcido).
 
+const WIND_SWAY_SHADER: Shader = preload("res://shaders/wind_sway.gdshader")
+
 static var _tex_cache: Dictionary = {}
 static var _light_tex_cache: Dictionary = {}
+
+
+static func apply_wind_sway(spr: CanvasItem, phase: float = 0.0, strength: float = 1.5, speed: float = 1.8, jitter: float = 0.0, vertical_anchor: float = 0.82) -> void:
+	if spr == null:
+		return
+	var mat := ShaderMaterial.new()
+	mat.shader = WIND_SWAY_SHADER
+	mat.set_shader_parameter("phase_offset", fmod(absf(phase), TAU))
+	mat.set_shader_parameter("wind_strength", strength)
+	mat.set_shader_parameter("wind_speed", speed)
+	mat.set_shader_parameter("distortion_jitter", jitter)
+	mat.set_shader_parameter("vertical_anchor", vertical_anchor)
+	spr.material = mat
 
 
 static func get_radial_light_texture(diameter: int = 128) -> ImageTexture:
@@ -327,6 +342,148 @@ static func _build_prop_image(kind: String, dist: bool) -> Image:
 			_outline_rect(img, 2, 4, 20, 11, wood_mid, ink)
 			_px_rect(img, 5, 7, 14, 2, Color(0.76, 0.72, 0.62) if not dist else Color(0.70, 0.12, 0.15))
 			_px_rect(img, 5, 11, 10, 2, Color(0.76, 0.72, 0.62) if not dist else Color(0.70, 0.12, 0.15))
+			return img
+
+		"trash_pile":
+			var img := Image.create_empty(28, 20, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			var bag := Color(0.11, 0.12, 0.15) if not dist else Color(0.14, 0.06, 0.09)
+			var box_col := Color(0.36, 0.28, 0.19) if not dist else Color(0.22, 0.11, 0.13)
+			_px_rect(img, 2, 15, 24, 4, Color(0.02, 0.02, 0.03, 0.55))
+			# Amassado de papelão e sacos rasgados
+			_outline_rect(img, 14, 7, 10, 9, box_col, ink)
+			_outline_rect(img, 4, 8, 10, 8, bag, ink)
+			_outline_rect(img, 9, 4, 9, 8, bag, ink)
+			_px_rect(img, 12, 2, 3, 2, Color(0.26, 0.28, 0.34)) # nó do saco
+			# Detritos/latas caídas
+			_px_rect(img, 2, 13, 3, 2, Color(0.56, 0.58, 0.62))
+			_px_rect(img, 22, 14, 4, 2, Color(0.68, 0.24, 0.20) if not dist else Color(0.48, 0.05, 0.08))
+			if dist:
+				_px_rect(img, 7, 15, 9, 3, Color(0.48, 0.04, 0.08, 0.85))
+				_px_rect(img, 12, 7, 2, 2, eye_glow)
+			return img
+
+		"market_crates":
+			var img := Image.create_empty(36, 24, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			var tarp := Color(0.20, 0.34, 0.48) if not dist else Color(0.28, 0.06, 0.10)
+			_px_rect(img, 3, 18, 30, 4, Color(0.02, 0.02, 0.03, 0.55))
+			# Caixotes revirados e ripas
+			_outline_rect(img, 4, 8, 12, 11, wood_mid, ink)
+			_px_rect(img, 5, 11, 10, 1, wood_dark)
+			_px_rect(img, 5, 15, 10, 1, wood_dark)
+			_outline_rect(img, 17, 10, 11, 9, wood_dark, ink)
+			# Lona rasgada por cima + garrafão caído
+			_outline_rect(img, 8, 4, 14, 6, tarp, ink)
+			_outline_rect(img, 27, 13, 6, 5, Color(0.26, 0.48, 0.58) if not dist else Color(0.32, 0.08, 0.12), ink)
+			if dist:
+				_px_rect(img, 12, 16, 12, 4, Color(0.46, 0.04, 0.08, 0.85))
+				_px_rect(img, 19, 13, 2, 2, eye_glow)
+			return img
+
+		"abandoned_tricycle":
+			var img := Image.create_empty(44, 28, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			var rust_cab := Color(0.24, 0.27, 0.33) if not dist else Color(0.20, 0.08, 0.11)
+			var roof_col := Color(0.38, 0.22, 0.18) if not dist else Color(0.30, 0.06, 0.09)
+			_px_rect(img, 4, 21, 36, 5, Color(0.02, 0.02, 0.03, 0.62))
+			# Pneu traseiro + eixo frontal sem roda apoiado em tijolo
+			_outline_rect(img, 8, 17, 9, 8, Color(0.09, 0.09, 0.11), ink)
+			_outline_rect(img, 30, 19, 7, 5, Color(0.36, 0.22, 0.20), ink) # tijolo de apoio
+			# Sidecar enferrujado inclinado e moto
+			_outline_rect(img, 6, 9, 20, 12, rust_cab, ink)
+			_outline_rect(img, 8, 3, 18, 7, roof_col, ink)
+			_px_rect(img, 14, 11, 8, 5, Color(0.12, 0.14, 0.18)) # janela rasgada
+			_outline_rect(img, 26, 12, 11, 8, steel, ink) # guidão/tanque enferrujado
+			_px_rect(img, 29, 9, 4, 3, Color(0.45, 0.24, 0.14)) # ferrugem
+			if dist:
+				_px_rect(img, 35, 14, 2, 2, eye_glow)
+				_px_rect(img, 10, 19, 12, 3, Color(0.50, 0.04, 0.08))
+			return img
+
+		"abandoned_car_wreck":
+			var img := Image.create_empty(76, 36, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			var body_col := Color(0.25, 0.26, 0.29) if not dist else Color(0.14, 0.09, 0.11)
+			var rust_col := Color(0.38, 0.21, 0.15) if not dist else Color(0.42, 0.06, 0.09)
+			_px_rect(img, 4, 27, 68, 6, Color(0.02, 0.02, 0.03, 0.68))
+			# Cavaletes / blocos sem pneus (arcos vazios)
+			_outline_rect(img, 12, 23, 9, 6, Color(0.32, 0.32, 0.35), ink)
+			_outline_rect(img, 54, 23, 9, 6, Color(0.32, 0.32, 0.35), ink)
+			# Carroceria + capô entreaberto + teto amassado
+			_outline_rect(img, 6, 13, 64, 12, body_col, ink)
+			_outline_rect(img, 18, 5, 32, 9, body_col, ink)
+			_px_rect(img, 22, 7, 10, 5, Color(0.08, 0.09, 0.12)) # vidro lateral quebrado
+			_px_rect(img, 36, 7, 10, 5, Color(0.08, 0.09, 0.12))
+			# Manchas de ferrugem e capô torto
+			_px_rect(img, 52, 11, 14, 3, rust_col)
+			_px_rect(img, 10, 17, 18, 4, rust_col)
+			_px_rect(img, 38, 15, 12, 3, rust_col)
+			if dist:
+				_px_rect(img, 38, 8, 2, 2, eye_glow)
+				_px_rect(img, 43, 8, 2, 2, eye_glow)
+				_px_rect(img, 24, 22, 24, 4, Color(0.48, 0.04, 0.07, 0.88))
+			return img
+
+		"utility_box":
+			var img := Image.create_empty(20, 32, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			_px_rect(img, 4, 27, 12, 3, Color(0.02, 0.02, 0.03, 0.55))
+			_outline_rect(img, 4, 4, 12, 24, steel, ink)
+			_px_rect(img, 6, 7, 8, 6, Color(0.20, 0.22, 0.26))
+			_px_rect(img, 8, 9, 4, 3, Color(0.76, 0.62, 0.18) if not dist else Color(0.68, 0.09, 0.12))
+			_px_rect(img, 13, 16, 2, 4, Color(0.08, 0.08, 0.10))
+			# Fios soltos saindo da base
+			_px_rect(img, 2, 10, 2, 10, Color(0.10, 0.10, 0.13))
+			_px_rect(img, 16, 13, 2, 11, Color(0.10, 0.10, 0.13))
+			if dist:
+				_px_rect(img, 7, 18, 6, 7, Color(0.50, 0.05, 0.09))
+			return img
+
+		"overgrown_weeds":
+			var img := Image.create_empty(32, 20, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			var leaf_a := Color(0.10, 0.18, 0.11) if not dist else Color(0.14, 0.06, 0.11)
+			var leaf_b := Color(0.17, 0.28, 0.16) if not dist else Color(0.24, 0.09, 0.14)
+			var spore := Color(0.32, 0.36, 0.20) if not dist else Color(0.66, 0.10, 0.15)
+			_outline_rect(img, 4, 11, 24, 7, leaf_a, ink)
+			_outline_rect(img, 6, 6, 8, 10, leaf_b, ink)
+			_outline_rect(img, 13, 3, 7, 12, leaf_b, ink)
+			_outline_rect(img, 19, 7, 8, 9, leaf_a, ink)
+			_px_rect(img, 8, 4, 2, 4, spore)
+			_px_rect(img, 22, 5, 2, 3, spore)
+			return img
+
+		"corner_shrub":
+			var img := Image.create_empty(28, 28, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			var dark_leaf := Color(0.07, 0.13, 0.09) if not dist else Color(0.10, 0.04, 0.08)
+			var mid_leaf := Color(0.13, 0.22, 0.14) if not dist else Color(0.20, 0.07, 0.11)
+			_px_rect(img, 4, 23, 20, 3, Color(0.02, 0.02, 0.03, 0.50))
+			_outline_rect(img, 3, 11, 22, 13, dark_leaf, ink)
+			_outline_rect(img, 6, 5, 16, 12, mid_leaf, ink)
+			_outline_rect(img, 9, 2, 10, 7, mid_leaf, ink)
+			if dist:
+				_px_rect(img, 11, 11, 2, 2, eye_glow)
+				_px_rect(img, 16, 11, 2, 2, eye_glow)
+			return img
+
+		"clothesline_post":
+			var img := Image.create_empty(48, 36, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			var cloth_a := Color(0.56, 0.56, 0.58) if not dist else Color(0.22, 0.16, 0.18)
+			var cloth_b := Color(0.26, 0.34, 0.44) if not dist else Color(0.38, 0.07, 0.10)
+			# Hastes de bambu nas extremidades + corda superior
+			_outline_rect(img, 3, 4, 4, 28, wood_dark, ink)
+			_outline_rect(img, 41, 4, 4, 28, wood_dark, ink)
+			_px_rect(img, 6, 7, 36, 1, Color(0.46, 0.44, 0.40))
+			# Panos/camisas pendurados
+			_outline_rect(img, 10, 8, 9, 13, cloth_a, ink)
+			_outline_rect(img, 21, 8, 8, 15, cloth_b, ink)
+			_outline_rect(img, 31, 8, 7, 11, cloth_a, ink)
+			if dist:
+				_px_rect(img, 13, 13, 3, 5, Color(0.48, 0.05, 0.09))
+				_px_rect(img, 23, 14, 4, 5, Color(0.06, 0.04, 0.06))
 			return img
 
 		_:

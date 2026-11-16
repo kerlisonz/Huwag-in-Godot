@@ -3,11 +3,13 @@ extends Node2D
 @onready var level_container: Node2D = $LevelContainer
 @onready var perception_rect: ColorRect = $PerceptionLayer/PerceptionRect
 @onready var hud_top_left: PanelContainer = $CanvasLayer/HudTopLeft
-@onready var badge_icon: ColorRect = $CanvasLayer/HudTopLeft/Margin/HBox/BadgeIcon
-@onready var hp_title: Label = $CanvasLayer/HudTopLeft/Margin/HBox/HpTitle
-@onready var hp_bar: ProgressBar = $CanvasLayer/HudTopLeft/Margin/HBox/HpBar
-@onready var hp_value: Label = $CanvasLayer/HudTopLeft/Margin/HBox/HpValue
-@onready var skills_label: Label = $CanvasLayer/HudTopLeft/Margin/HBox/SkillsLabel
+@onready var heart_1: TextureRect = $CanvasLayer/HudTopLeft/Margin/VBox/TopRow/HeartsRow/Heart1
+@onready var heart_2: TextureRect = $CanvasLayer/HudTopLeft/Margin/VBox/TopRow/HeartsRow/Heart2
+@onready var heart_3: TextureRect = $CanvasLayer/HudTopLeft/Margin/VBox/TopRow/HeartsRow/Heart3
+@onready var skills_label: Label = $CanvasLayer/HudTopLeft/Margin/VBox/TopRow/SkillsLabel
+@onready var stamina_bar: Control = $CanvasLayer/HudTopLeft/Margin/VBox/StaminaBar
+@onready var stamina_bg: Panel = $CanvasLayer/HudTopLeft/Margin/VBox/StaminaBar/StaminaBg
+@onready var stamina_fill: ColorRect = $CanvasLayer/HudTopLeft/Margin/VBox/StaminaBar/StaminaFill
 @onready var hud_top_right: PanelContainer = $CanvasLayer/HudTopRight
 @onready var act_place_label: Label = $CanvasLayer/HudTopRight/Margin/HBox/ActPlaceLabel
 @onready var help_hint: Label = $CanvasLayer/HudTopRight/Margin/HBox/HelpHint
@@ -15,19 +17,40 @@ extends Node2D
 @onready var dialogue_box: DialogueBox = $CanvasLayer/DialogueBox
 @onready var controls_modal: Control = $CanvasLayer/ControlsModal
 @onready var controls_card: PanelContainer = $CanvasLayer/ControlsModal/Card
+@onready var controls_title: Label = $CanvasLayer/ControlsModal/Card/Margin/VBox/Title
+@onready var controls_rule: ColorRect = $CanvasLayer/ControlsModal/Card/Margin/VBox/Rule
+@onready var controls_grid: GridContainer = $CanvasLayer/ControlsModal/Card/Margin/VBox/Grid
+@onready var controls_footer: Label = $CanvasLayer/ControlsModal/Card/Margin/VBox/Footer
+@onready var outfit_button: Button = get_node_or_null("CanvasLayer/ControlsModal/Card/Margin/VBox/OutfitButton") as Button
 
 var _current_level: Node2D = null
 var _pending_dialogue_callback: Callable = Callable()
 var _current_scene_path: String = "res://scenes/levels/RoomHuwag.tscn"
 var _toast_timer: float = 0.0
+var _heart_textures: Dictionary = {}
+var _heart_pulse_time: float = 0.0
+var _hp_segments: int = 6
+var _ui_mode: String = "normal"
 
 func _ready() -> void:
+	_heart_textures = HuwagUiTheme.build_heart_textures()
+	for h in _get_heart_nodes():
+		h.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	if status_label:
+		status_label.visible = false
+
 	GameState.perception_changed.connect(_on_perception_changed)
 	GameState.switch_changed.connect(func(_k: String, _v: bool) -> void: _update_hud())
 	GameState.variable_changed.connect(func(_k: String, _v: Variant) -> void: _update_hud())
 	GameState.hp_changed.connect(func(_c: int, _m: int) -> void: _update_hud())
+	if GameState.has_signal("stamina_changed"):
+		GameState.stamina_changed.connect(func(_c: float, _m: float) -> void: _update_stamina_hud())
+	GameState.outfit_changed.connect(func(_o: String) -> void: _refresh_outfit_button())
 	GameState.notification_requested.connect(_on_notification_requested)
 	dialogue_box.dialogue_finished.connect(_on_dialogue_finished)
+	if outfit_button:
+		outfit_button.pressed.connect(func() -> void: GameState.toggle_outfit())
+		_refresh_outfit_button()
 	if GameState.has_signal("higher_dose_changed"):
 		GameState.higher_dose_changed.connect(_on_higher_dose_changed)
 	if dialogue_box.has_signal("conflict_triggered"):
@@ -38,10 +61,26 @@ func _ready() -> void:
 	load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
 
 func _process(delta: float) -> void:
-	if _toast_timer > 0.0:
-		_toast_timer -= delta
-		if _toast_timer <= 0.0 and status_label:
-			status_label.text = ""
+	if status_label:
+		if _toast_timer > 0.0:
+			_toast_timer -= delta
+			if _toast_timer <= 0.0:
+				status_label.text = ""
+				status_label.visible = false
+		elif status_label.visible and status_label.text.is_empty():
+			status_label.visible = false
+
+	if _hp_segments > 0 and _hp_segments <= 2:
+		_heart_pulse_time += delta * 7.5
+		var pulse := 0.5 + 0.5 * sin(_heart_pulse_time)
+		if heart_1:
+			heart_1.modulate = Color(1.0, 0.55 + 0.45 * pulse, 0.55 + 0.45 * pulse, 1.0)
+			heart_1.position.y = -1.0 if sin(_heart_pulse_time * 1.5) > 0.35 else 0.0
+	else:
+		_heart_pulse_time = 0.0
+		if heart_1:
+			heart_1.modulate = Color.WHITE
+			heart_1.position.y = 0.0
 
 	if perception_rect == null or perception_rect.material == null:
 		return
@@ -99,9 +138,15 @@ func _toggle_controls_modal() -> void:
 	var next_vis := not controls_modal.visible
 	controls_modal.visible = next_vis
 	if next_vis:
+		_refresh_outfit_button()
 		GameState.dialogue_active = true
 	else:
 		GameState.dialogue_active = dialogue_box.is_open()
+
+func _refresh_outfit_button() -> void:
+	if outfit_button == null:
+		return
+	outfit_button.text = "Trocar Traje (Atual: %s)" % GameState.get_equipped_outfit_label()
 
 func load_level(scene_path: String, spawn_tag: String = "default") -> void:
 	if scene_path.find("EndingCredits") != -1:
@@ -171,6 +216,8 @@ func trigger_vhs_glitch(duration: float = 0.35, strength: float = 1.0) -> void:
 
 func _on_higher_dose_changed(active: bool) -> void:
 	_apply_shader_mode(GameState.perception_mode)
+	_apply_hud_style(GameState.perception_mode)
+	_update_hud()
 	if _current_level != null and is_instance_valid(_current_level) and _current_level.has_method("apply_higher_dose_world"):
 		_current_level.call("apply_higher_dose_world", active)
 	if active:
@@ -233,103 +280,139 @@ func _apply_shader_mode(mode: int) -> void:
 		mat.set_shader_parameter("vhs_tear", 0.0)
 		mat.set_shader_parameter("vhs_crt_vignette", 0.38 if mode == GameState.PerceptionMode.UNFILTERED_ACT3 else 0.16)
 
-func _apply_hud_style(mode: int) -> void:
-	var act3 := (mode == GameState.PerceptionMode.UNFILTERED_ACT3)
-	var accent := Color("#7C858E") if act3 else Color("#F5CB5C")
-	var bg := Color(0.08, 0.09, 0.11, 0.86) if act3 else Color(0.07, 0.08, 0.11, 0.86)
-	var border_light := Color(0.76, 0.79, 0.84, 0.55)
+func _get_heart_nodes() -> Array[TextureRect]:
+	var arr: Array[TextureRect] = []
+	for h in [heart_1, heart_2, heart_3]:
+		if h != null:
+			arr.append(h)
+	return arr
 
-	var left_sb := StyleBoxFlat.new()
-	left_sb.corner_detail = 1
-	left_sb.corner_radius_top_left = 0
-	left_sb.corner_radius_bottom_left = 0
-	left_sb.corner_radius_top_right = 4
-	left_sb.corner_radius_bottom_right = 6
-	left_sb.border_width_left = 3
-	left_sb.border_width_top = 1
-	left_sb.border_width_right = 1
-	left_sb.border_width_bottom = 1
-	left_sb.bg_color = bg
-	left_sb.border_color = border_light
-	left_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.65)
-	left_sb.shadow_size = 2
+func _resolve_hud_theme_mode(mode: int) -> String:
+	if mode == GameState.PerceptionMode.UNFILTERED_ACT3:
+		return "act3"
+	var higher_dose: bool = GameState.has_method("is_higher_dose") and bool(GameState.is_higher_dose())
+	if higher_dose:
+		return "distorted"
+	return "normal"
+
+func _apply_hud_style(mode: int) -> void:
+	_ui_mode = _resolve_hud_theme_mode(mode)
+	var pal: Dictionary = HuwagUiTheme.get_palette(_ui_mode)
+
+	var left_sb := HuwagUiTheme.make_box_style(pal["bg_soft"], pal["border"], 1)
 	if hud_top_left:
 		hud_top_left.add_theme_stylebox_override("panel", left_sb)
 
-	var right_sb := StyleBoxFlat.new()
-	right_sb.corner_detail = 1
-	right_sb.corner_radius_top_left = 4
-	right_sb.corner_radius_bottom_left = 6
-	right_sb.corner_radius_top_right = 0
-	right_sb.corner_radius_bottom_right = 0
-	right_sb.border_width_left = 1
-	right_sb.border_width_top = 1
-	right_sb.border_width_right = 3
-	right_sb.border_width_bottom = 1
-	right_sb.bg_color = bg
-	right_sb.border_color = border_light
-	right_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.65)
-	right_sb.shadow_size = 2
+	var right_sb := HuwagUiTheme.make_box_style(pal["bg_soft"], pal["border"], 1)
 	if hud_top_right:
 		hud_top_right.add_theme_stylebox_override("panel", right_sb)
 
+	if stamina_bg:
+		stamina_bg.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["bg_inner"], pal["border"], 1))
+
+	if status_label:
+		var toast_sb := HuwagUiTheme.make_box_style(pal["bg"], pal["border"], 1, 7, 3)
+		status_label.add_theme_stylebox_override("normal", toast_sb)
+		status_label.add_theme_color_override("font_color", pal["accent"])
+		status_label.add_theme_color_override("font_shadow_color", pal["text_shadow"])
+
 	if controls_card:
-		var modal_sb := StyleBoxFlat.new()
-		modal_sb.corner_detail = 1
-		modal_sb.set_corner_radius_all(6)
-		modal_sb.set_border_width_all(1)
-		modal_sb.bg_color = Color(0.07, 0.08, 0.11, 0.94) if not act3 else Color(0.09, 0.10, 0.12, 0.94)
-		modal_sb.border_color = border_light
-		modal_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.78)
-		modal_sb.shadow_size = 4
-		controls_card.add_theme_stylebox_override("panel", modal_sb)
+		controls_card.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["bg"], pal["trim"], 1))
+	if controls_title:
+		controls_title.add_theme_color_override("font_color", pal["accent"])
+		controls_title.add_theme_color_override("font_shadow_color", pal["text_shadow"])
+	if controls_rule:
+		controls_rule.color = pal["trim"]
+	if controls_grid:
+		for child in controls_grid.get_children():
+			if child is Label:
+				var lbl := child as Label
+				if lbl.name.begins_with("K"):
+					lbl.add_theme_color_override("font_color", pal["accent"])
+				else:
+					lbl.add_theme_color_override("font_color", pal["text"])
+	if controls_footer:
+		controls_footer.add_theme_color_override("font_color", pal["text_muted"])
+	if outfit_button:
+		var btn_norm := HuwagUiTheme.make_box_style(pal["choice_bg"], pal["trim"], 1, 8, 5)
+		var btn_hov := HuwagUiTheme.make_box_style(pal["choice_sel_bg"], pal["choice_sel_border"], 1, 8, 5)
+		outfit_button.add_theme_stylebox_override("normal", btn_norm)
+		outfit_button.add_theme_stylebox_override("hover", btn_hov)
+		outfit_button.add_theme_stylebox_override("pressed", btn_hov)
+		outfit_button.add_theme_stylebox_override("focus", btn_hov)
+		outfit_button.add_theme_color_override("font_color", pal["accent"])
+		outfit_button.add_theme_color_override("font_hover_color", pal["text"])
+		outfit_button.add_theme_color_override("font_focus_color", pal["text"])
 
-	if hp_bar:
-		var bar_bg := StyleBoxFlat.new()
-		bar_bg.set_corner_radius_all(2)
-		bar_bg.bg_color = Color(0.16, 0.15, 0.24, 1.0) if not act3 else Color(0.18, 0.19, 0.21, 1.0)
-		var bar_fill := StyleBoxFlat.new()
-		bar_fill.set_corner_radius_all(2)
-		bar_fill.bg_color = Color("#E85D56") if not act3 else Color("#8A7968")
-		hp_bar.add_theme_stylebox_override("background", bar_bg)
-		hp_bar.add_theme_stylebox_override("fill", bar_fill)
-
-	if badge_icon:
-		badge_icon.color = accent
-	if hp_title:
-		hp_title.add_theme_color_override("font_color", accent)
+	if act_place_label:
+		act_place_label.add_theme_color_override("font_color", pal["text"])
+		act_place_label.add_theme_color_override("font_shadow_color", pal["text_shadow"])
 	if help_hint:
-		help_hint.add_theme_color_override("font_color", accent)
+		help_hint.add_theme_color_override("font_color", pal["accent"])
+		help_hint.add_theme_color_override("font_shadow_color", pal["text_shadow"])
+	_update_stamina_hud()
 
 func _on_notification_requested(text: String) -> void:
 	if status_label:
 		status_label.text = text
-		_toast_timer = 3.5
+		status_label.visible = not text.is_empty()
+		_toast_timer = 3.5 if status_label.visible else 0.0
 
 func _update_hud_visibility() -> void:
 	var hide_hud := (dialogue_box != null and dialogue_box.is_open())
 	if hud_top_left:
-		hud_top_left.modulate.a = 0.65 if hide_hud else 1.0
+		hud_top_left.modulate.a = 0.72 if hide_hud else 1.0
 	if hud_top_right:
-		hud_top_right.modulate.a = 0.65 if hide_hud else 1.0
+		hud_top_right.modulate.a = 0.72 if hide_hud else 1.0
+
+func _update_stamina_hud() -> void:
+	if stamina_fill == null:
+		return
+	var st_max: float = maxf(1.0, float(GameState.player_max_stamina))
+	var st_cur: float = clampf(float(GameState.player_stamina), 0.0, st_max)
+	var ratio: float = st_cur / st_max
+	var inner_w: float = maxf(10.0, (stamina_bar.custom_minimum_size.x - 2.0) if stamina_bar else 43.0)
+	stamina_fill.size.x = 0.0 if st_cur <= 0.5 else maxf(1.0, roundf(inner_w * ratio))
+	if ratio < 0.20:
+		stamina_fill.color = Color("#E64C5A")
+	elif ratio < 0.45:
+		stamina_fill.color = Color("#E8B84B")
+	elif _ui_mode == "act3":
+		stamina_fill.color = Color("#B8C4D4")
+	elif _ui_mode == "distorted":
+		stamina_fill.color = Color("#E86A78")
+	else:
+		stamina_fill.color = Color("#5CC8E8")
 
 func _update_hud() -> void:
 	_update_hud_visibility()
-	if hp_bar:
-		hp_bar.max_value = float(maxi(1, GameState.player_max_hp))
-		hp_bar.value = float(clampi(GameState.player_hp, 0, GameState.player_max_hp))
-	if hp_value:
-		hp_value.text = "%d/%d" % [GameState.player_hp, GameState.player_max_hp]
+	if _heart_textures.is_empty():
+		_heart_textures = HuwagUiTheme.build_heart_textures()
+	var hp: int = clampi(GameState.player_hp, 0, maxi(1, GameState.player_max_hp))
+	var max_hp: int = maxi(1, GameState.player_max_hp)
+	var segments: int = 0 if hp <= 0 else clampi(int(ceil(float(hp) * 6.0 / float(max_hp))), 1, 6)
+	_hp_segments = segments
+	var hearts := _get_heart_nodes()
+	for i in range(hearts.size()):
+		var h := hearts[i]
+		var seg_start := i * 2
+		if segments >= seg_start + 2:
+			h.texture = _heart_textures["full"]
+		elif segments == seg_start + 1:
+			h.texture = _heart_textures["half"]
+		else:
+			h.texture = _heart_textures["empty"]
+	_update_stamina_hud()
 
 	if skills_label:
 		var tags: PackedStringArray = []
 		if GameState.get_switch("016_Magia_de_agua_obtida"):
-			tags.append("Água")
+			tags.append("H2O")
 		var heal_count: int = GameState.get_item_count("gota_calmante")
 		if heal_count > 0:
 			tags.append("Cura×%d" % heal_count)
 		skills_label.visible = not tags.is_empty()
-		skills_label.text = "· " + " · ".join(tags)
+		skills_label.text = " · ".join(tags)
 
 	if act_place_label:
 		var place_name := "Quarto de Huwag"

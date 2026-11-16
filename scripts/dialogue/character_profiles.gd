@@ -1,11 +1,14 @@
-extends RefCounted
 class_name CharacterProfiles
+extends RefCounted
+
+## Banco central de perfis visuais de personagens para a caixa de diálogo de HUWAG.
+## Utiliza os retratos 96x96 (Anime Pixel Art / Terror Psicologico) integrados na Etapa 1.
 
 const PROFILES: Dictionary = {
 	"huwag": {
 		"display_name": "Huwag Matitiis",
-		"role_subtitle": "Bombeiro Municipal · 23 anos",
-		"accent_color": Color("#F5CB5C"),
+		"role": "Bombeiro Voluntário",
+		"accent": Color("#F5C84B"),
 		"is_placeholder": false,
 		"portraits": {
 			"default": "res://assets/characters/portraits/huwag_casual_neutral.png",
@@ -18,7 +21,8 @@ const PROFILES: Dictionary = {
 			"scared": "res://assets/characters/portraits/huwag_casual_scared.png",
 			"uneasy_smile": "res://assets/characters/portraits/huwag_casual_uneasy_smile.png",
 			"smile": "res://assets/characters/portraits/huwag_casual_uneasy_smile.png",
-			"unfiltered": "res://assets/characters/portraits/huwag_casual_unfiltered.png"
+			"unfiltered": "res://assets/characters/portraits/huwag_casual_unfiltered.png",
+			"distorted": "res://assets/characters/portraits/huwag_casual_distorted.png"
 		},
 		"portraits_bfp": {
 			"default": "res://assets/characters/portraits/huwag_bfp_neutral.png",
@@ -31,63 +35,64 @@ const PROFILES: Dictionary = {
 			"scared": "res://assets/characters/portraits/huwag_bfp_scared.png",
 			"uneasy_smile": "res://assets/characters/portraits/huwag_bfp_uneasy_smile.png",
 			"smile": "res://assets/characters/portraits/huwag_bfp_uneasy_smile.png",
-			"unfiltered": "res://assets/characters/portraits/huwag_bfp_unfiltered.png"
+			"unfiltered": "res://assets/characters/portraits/huwag_bfp_unfiltered.png",
+			"distorted": "res://assets/characters/portraits/huwag_bfp_distorted.png"
 		}
 	},
 	"cap_reyes": {
 		"display_name": "Capitão Reyes",
-		"role_subtitle": "Comandante · Agdangan Fire Station",
-		"accent_color": Color("#F5CB5C"),
+		"role": "Comandante da BFP Agdangan",
+		"accent": Color("#F5C445"),
 		"is_placeholder": false,
 		"portraits": {
 			"default": "res://assets/characters/portraits/fnaf_cap_reyes.png",
-			"distorted": "res://assets/characters/portraits/fnaf_distorted_bombeiro.png"
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_cap_reyes.png"
 		}
 	},
-	"ato": {
+	"bombeiro_ato": {
 		"display_name": "Bombeiro Ato",
-		"role_subtitle": "Equipe do Quartel (BFP)",
-		"accent_color": Color("#4ECDC4"),
+		"role": "Equipe de Resgate BFP",
+		"accent": Color("#FF9E44"),
 		"is_placeholder": false,
 		"portraits": {
 			"default": "res://assets/characters/portraits/fnaf_bombeiro_ato.png",
-			"distorted": "res://assets/characters/portraits/fnaf_distorted_bombeiro.png"
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_bombeiro_ato.png"
 		}
 	},
-	"santos": {
+	"bombeiro_santos": {
 		"display_name": "Bombeiro Santos",
-		"role_subtitle": "Equipe do Quartel (BFP)",
-		"accent_color": Color("#4ECDC4"),
+		"role": "Combatente BFP",
+		"accent": Color("#64D2FF"),
 		"is_placeholder": false,
 		"portraits": {
 			"default": "res://assets/characters/portraits/fnaf_bombeiro_santos.png",
-			"distorted": "res://assets/characters/portraits/fnaf_distorted_bombeiro.png"
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_bombeiro_santos.png"
 		}
 	},
 	"enfermeira_maria": {
 		"display_name": "Enfermeira Maria",
-		"role_subtitle": "Saúde Ocupacional (BFP)",
-		"accent_color": Color("#90E0EF"),
+		"role": "Posto Clínico de Agdangan",
+		"accent": Color("#70E0D0"),
 		"is_placeholder": false,
 		"portraits": {
 			"default": "res://assets/characters/portraits/fnaf_enfermeira_maria.png",
-			"distorted": "res://assets/characters/portraits/fnaf_distorted_luningning.png"
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_enfermeira_maria.png"
 		}
 	},
 	"senhora_luningning": {
 		"display_name": "Senhora Luningning",
-		"role_subtitle": "Moradora de Agdangan",
-		"accent_color": Color("#C77DFF"),
-		"is_placeholder": true,
+		"role": "Moradora de Agdangan",
+		"accent": Color("#C792EA"),
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_npc_barangay.png",
+			"default": "res://assets/characters/portraits/fnaf_luningning.png",
 			"distorted": "res://assets/characters/portraits/fnaf_distorted_luningning.png"
 		}
 	},
 	"aling_nena": {
 		"display_name": "Aling Nena",
-		"role_subtitle": "Sari-Sari Store",
-		"accent_color": Color("#4ECDC4"),
+		"role": "Dona da Sari-Sari",
+		"accent": Color("#F48FB1"),
 		"is_placeholder": false,
 		"portraits": {
 			"default": "res://assets/characters/portraits/fnaf_aling_nena.png",
@@ -96,8 +101,8 @@ const PROFILES: Dictionary = {
 	},
 	"kuya_ben": {
 		"display_name": "Kuya Ben",
-		"role_subtitle": "Motorista de Jeepney",
-		"accent_color": Color("#FFCA3A"),
+		"role": "Motorista de Jeepney",
+		"accent": Color("#F2C94C"),
 		"is_placeholder": false,
 		"portraits": {
 			"default": "res://assets/characters/portraits/fnaf_kuya_ben.png",
@@ -105,72 +110,129 @@ const PROFILES: Dictionary = {
 		}
 	},
 	"feirante": {
-		"display_name": "Feirante do Barangay",
-		"role_subtitle": "Feirinha ao lado do Quartel",
-		"accent_color": Color("#8AC926"),
+		"display_name": "Mang Tomas",
+		"role": "Feirante do Barangay",
+		"accent": Color("#9CCC65"),
 		"is_placeholder": false,
 		"portraits": {
 			"default": "res://assets/characters/portraits/fnaf_feirante.png",
-			"distorted": "res://assets/characters/portraits/fnaf_distorted_bombeiro.png"
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_feirante.png"
+		}
+	},
+	"mang_carding": {
+		"display_name": "Mang Carding",
+		"role": "Pescador do Píer",
+		"accent": Color("#56CCF2"),
+		"is_placeholder": false,
+		"portraits": {
+			"default": "res://assets/characters/portraits/fnaf_mang_carding.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_mang_carding.png"
 		}
 	},
 	"lola_rosa": {
 		"display_name": "Lola Rosa",
-		"role_subtitle": "Vizinha",
-		"accent_color": Color("#C77DFF"),
-		"is_placeholder": true,
+		"role": "Anciã Erborista",
+		"accent": Color("#B8A4E6"),
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_npc_barangay.png"
+			"default": "res://assets/characters/portraits/fnaf_lola_rosa.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_lola_rosa.png"
 		}
 	},
 	"toby": {
 		"display_name": "Toby",
-		"role_subtitle": "Criança da Rua",
-		"accent_color": Color("#4ECDC4"),
+		"role": "Criança do Barangay",
+		"accent": Color("#8CE99A"),
 		"is_placeholder": false,
 		"portraits": {
 			"default": "res://assets/characters/portraits/fnaf_toby.png",
-			"distorted": "res://assets/characters/portraits/fnaf_toby.png"
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_toby.png"
 		}
 	},
 	"criatura_lagoa": {
-		"display_name": "Criatura da Lagoa",
-		"role_subtitle": "Clareira da Floresta",
-		"accent_color": Color("#48CAE4"),
-		"is_placeholder": true,
+		"display_name": "Guardiã da Lagoa",
+		"role": "Espírito das Águas",
+		"accent": Color("#56D4C8"),
+		"is_placeholder": false,
 		"portraits": {
-			"default": "res://assets/characters/portraits/placeholder_creature.png"
+			"default": "res://assets/characters/portraits/fnaf_criatura_lagoa.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_criatura_lagoa.png"
+		}
+	},
+	"vulto_bosque": {
+		"display_name": "Vulto Calcinado",
+		"role": "Eco da Brigada na Fumaça",
+		"accent": Color("#E63946"),
+		"is_placeholder": false,
+		"portraits": {
+			"default": "res://assets/characters/portraits/fnaf_vulto_bosque.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_vulto_bosque.png"
+		}
+	},
+	"santelmo": {
+		"display_name": "Santelmo",
+		"role": "Fogo-Fátuo da Mata",
+		"accent": Color("#FF7B29"),
+		"is_placeholder": false,
+		"portraits": {
+			"default": "res://assets/characters/portraits/fnaf_santelmo.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_santelmo.png"
+		}
+	},
+	"vhs_radio": {
+		"display_name": "Rádio BFP / Fita VHS",
+		"role": "Transmissão & Registro de Chamada",
+		"accent": Color("#7BC4D4"),
+		"is_placeholder": false,
+		"portraits": {
+			"default": "res://assets/characters/portraits/fnaf_vhs_radio.png",
+			"distorted": "res://assets/characters/portraits/fnaf_distorted_vhs_radio.png"
 		}
 	}
 }
 
+
 static func resolve_speaker_id(raw_speaker: String) -> String:
 	var s := raw_speaker.strip_edges().to_lower()
-	if s.is_empty() or s.begins_with("huwag"):
+	if s.is_empty():
 		return "huwag"
-	if s.find("reyes") != -1 or s.find("capit") != -1 or s.find("chefe") != -1:
+	# Identificadores específicos antes de prefixos genéricos (como "bombeiro" ou "memória")
+	if "reyes" in s or "cap." in s or "capit" in s:
 		return "cap_reyes"
-	if s.find("nena") != -1 or s.find("sari") != -1:
-		return "aling_nena"
-	if s.find("ben") != -1 or s.find("jeepney") != -1:
-		return "kuya_ben"
-	if s.find("feirante") != -1 or s.find("feirinha") != -1:
-		return "feirante"
-	if s.find("rosa") != -1:
-		return "lola_rosa"
-	if s.find("toby") != -1:
-		return "toby"
-	if s.find("luningning") != -1 or s.find("senhora") != -1 or s.find("velhinha") != -1:
-		return "senhora_luningning"
-	if s == "ato" or s.find("bombeiro ato") != -1:
-		return "ato"
-	if s.find("santos") != -1:
-		return "santos"
-	if s.find("maria") != -1 or s.find("enfermeira") != -1:
+	if "ato" in s:
+		return "bombeiro_ato"
+	if "santos" in s:
+		return "bombeiro_santos"
+	if "maria" in s or "enferm" in s:
 		return "enfermeira_maria"
-	if s.find("criatura") != -1 or s.find("monstro") != -1:
+	if "luningning" in s or "velhinha" in s:
+		return "senhora_luningning"
+	if "nena" in s:
+		return "aling_nena"
+	if "ben" in s:
+		return "kuya_ben"
+	if "tomas" in s or "feirante" in s or "barangay" in s:
+		return "feirante"
+	if "carding" in s or "pescador" in s:
+		return "mang_carding"
+	if "rosa" in s or "lola" in s:
+		return "lola_rosa"
+	if "toby" in s:
+		return "toby"
+	if "lagoa" in s or "criatura" in s or "guardi" in s:
 		return "criatura_lagoa"
-	return "aling_nena"
+	if "santelmo" in s or "espirito" in s or "espírito" in s:
+		return "santelmo"
+	if "vulto" in s or "calcinado" in s or "sombra" in s:
+		return "vulto_bosque"
+	if "radio" in s or "rádio" in s or "vhs" in s or "voz do passado" in s or "revelação" in s or "sistema" in s:
+		return "vhs_radio"
+	if "huwag" in s or "matitiis" in s:
+		return "huwag"
+	if "bombeiro" in s:
+		return "bombeiro_ato"
+	return "huwag"
+
 
 static func get_profile_data(raw_speaker: String, expression: String = "default", is_act3: bool = false, outfit_id: String = "casual") -> Dictionary:
 	var speaker_id := resolve_speaker_id(raw_speaker)
@@ -182,25 +244,20 @@ static func get_profile_data(raw_speaker: String, expression: String = "default"
 	var chosen_expr := expression.strip_edges().to_lower()
 	if chosen_expr.is_empty():
 		chosen_expr = "default"
-	if is_act3 and speaker_id == "huwag" and portraits.has("unfiltered"):
+	if is_act3 and speaker_id == "huwag" and chosen_expr in ["default", "neutral", "determined", "uneasy_smile", "smile"]:
 		chosen_expr = "unfiltered"
+	if not portraits.has(chosen_expr):
+		chosen_expr = "default"
 
 	var portrait_path: String = str(portraits.get(chosen_expr, portraits.get("default", "res://assets/characters/portraits/huwag_casual_neutral.png")))
-	var display_name: String = raw_speaker if not raw_speaker.is_empty() else str(base.get("display_name", "Huwag Matitiis"))
-	if display_name == "Huwag":
-		display_name = "Huwag Matitiis"
-
-	var is_ph: bool = bool(base.get("is_placeholder", false))
-	if chosen_expr == "distorted" and portraits.has("distorted"):
-		is_ph = false
-
+	var is_dist := (chosen_expr == "distorted")
 	return {
 		"id": speaker_id,
-		"display_name": display_name,
-		"role_subtitle": str(base.get("role_subtitle", "")),
-		"accent_color": base.get("accent_color", Color("#F5CB5C")),
-		"is_placeholder": is_ph,
+		"display_name": str(base.get("display_name", raw_speaker)),
+		"role_subtitle": str(base.get("role", "")),
+		"accent_color": base.get("accent", Color("#F5C84B")) if not is_dist else Color("#D9414E"),
+		"is_placeholder": bool(base.get("is_placeholder", false)),
+		"is_distorted": is_dist,
 		"portrait_path": portrait_path,
 		"expression": chosen_expr
 	}
-

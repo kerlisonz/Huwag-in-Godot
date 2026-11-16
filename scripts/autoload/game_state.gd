@@ -6,6 +6,7 @@ signal perception_changed(mode: int)
 signal time_of_day_changed(is_afternoon: bool)
 signal notification_requested(text: String)
 signal hp_changed(current_hp: int, max_hp: int)
+signal stamina_changed(current_stamina: float, max_stamina: float)
 signal outfit_changed(outfit_id: String)
 signal level_load_requested(scene_path: String, spawn_tag: String)
 
@@ -51,6 +52,7 @@ var switches: Dictionary = {
 var variables: Dictionary = {
 	"Ato": 1,
 	"Missoes_concluidas": 0,
+	"Intoxicacao": 0,
 }
 
 var self_switches: Dictionary = {}
@@ -64,6 +66,8 @@ var saved_player_pos: Vector2 = Vector2.ZERO
 
 var player_hp: int = 100
 var player_max_hp: int = 100
+var player_stamina: float = 100.0
+var player_max_stamina: float = 100.0
 var water_boss_defeated: bool = false
 var equipped_outfit: String = "casual" # "casual" (Imagem 3) ou "bfp" (Uniforme de Bombeiro)
 
@@ -98,6 +102,7 @@ func reset_to_new_game() -> void:
 	variables = {
 		"Ato": 1,
 		"Missoes_concluidas": 0,
+		"Intoxicacao": 0,
 	}
 	self_switches.clear()
 	inventory.clear()
@@ -109,22 +114,28 @@ func reset_to_new_game() -> void:
 	saved_player_pos = Vector2.ZERO
 	player_hp = 100
 	player_max_hp = 100
+	player_stamina = 100.0
+	player_max_stamina = 100.0
 	water_boss_defeated = false
 	equipped_outfit = "casual"
 	hp_changed.emit(player_hp, player_max_hp)
+	stamina_changed.emit(player_stamina, player_max_stamina)
 	perception_changed.emit(perception_mode)
 	time_of_day_changed.emit(false)
 	outfit_changed.emit(equipped_outfit)
 
+func get_equipped_outfit_label() -> String:
+	return "Uniforme de Bombeiro (BFP)" if equipped_outfit == "bfp" else "Roupa Casual (Jaqueta Escura)"
+
 func set_equipped_outfit(outfit_id: String, notify: bool = true) -> void:
-	var norm := "bfp" if outfit_id.to_lower() == "bfp" else "casual"
+	var low := outfit_id.to_lower().strip_edges()
+	var norm := "bfp" if (low == "bfp" or low == "bombeiro") else "casual"
 	if equipped_outfit == norm:
 		return
 	equipped_outfit = norm
 	outfit_changed.emit(equipped_outfit)
 	if notify:
-		var label := "Uniforme de Bombeiro (BFP)" if equipped_outfit == "bfp" else "Roupa Casual (Jaqueta Escura)"
-		notification_requested.emit("Roupa equipada: " + label)
+		notification_requested.emit("Roupa equipada: " + get_equipped_outfit_label())
 
 func toggle_outfit() -> void:
 	set_equipped_outfit("bfp" if equipped_outfit == "casual" else "casual", true)
@@ -172,6 +183,25 @@ func heal_player(amount: int) -> void:
 	player_hp = clampi(player_hp + amount, 1, player_max_hp)
 	hp_changed.emit(player_hp, player_max_hp)
 
+func consume_stamina(amount: float) -> void:
+	var prev := player_stamina
+	player_stamina = clampf(player_stamina - maxf(0.0, amount), 0.0, player_max_stamina)
+	if not is_equal_approx(prev, player_stamina):
+		stamina_changed.emit(player_stamina, player_max_stamina)
+
+func recover_stamina(amount: float) -> void:
+	var prev := player_stamina
+	player_stamina = clampf(player_stamina + maxf(0.0, amount), 0.0, player_max_stamina)
+	if not is_equal_approx(prev, player_stamina):
+		stamina_changed.emit(player_stamina, player_max_stamina)
+
+func has_stamina(minimum: float = 1.0) -> bool:
+	return player_stamina >= minimum
+
+func reset_stamina() -> void:
+	player_stamina = player_max_stamina
+	stamina_changed.emit(player_stamina, player_max_stamina)
+
 func use_soothing_drop() -> bool:
 	var count := get_item_count("gota_calmante")
 	if count <= 0 or player_hp >= player_max_hp:
@@ -197,18 +227,51 @@ func is_higher_dose() -> bool:
 	return int(get_var("Ato", 1)) == 2 and get_switch("006b_Dose_maior_pilulas")
 
 
+func get_intoxication_level() -> int:
+	return int(variables.get("Intoxicacao", 2 if is_higher_dose() else 0))
+
+
+func set_intoxication_level(level: int) -> void:
+	var clamped := clampi(level, 0, 3)
+	variables["Intoxicacao"] = clamped
+	if clamped >= 2:
+		switches["006c_Dose_escolhida_Ato2"] = true
+		set_switch("006b_Dose_maior_pilulas", true)
+		variable_changed.emit("Intoxicacao", clamped)
+		higher_dose_changed.emit(true)
+		perception_changed.emit(perception_mode)
+	else:
+		set_higher_dose(false)
+		variables["Intoxicacao"] = clamped
+		variable_changed.emit("Intoxicacao", clamped)
+
+
+func set_act(act_number: int) -> void:
+	var tox := (2 if is_higher_dose() else 1) if act_number == 2 else 0
+	variables["Intoxicacao"] = tox
+	set_var("Ato", act_number)
+	variable_changed.emit("Intoxicacao", tox)
+
+
 func set_higher_dose(active: bool) -> void:
+	var act_num: int = int(variables.get("Ato", 1))
+	var tox: int = 2 if active else (1 if act_num == 2 else 0)
+	variables["Intoxicacao"] = tox
 	set_switch("006c_Dose_escolhida_Ato2", true)
 	set_switch("006b_Dose_maior_pilulas", active)
+	variable_changed.emit("Intoxicacao", tox)
 	higher_dose_changed.emit(active)
 	perception_changed.emit(perception_mode)
 
 
 func advance_to_act_2() -> void:
+	variables["Ato"] = 2
+	variables["Intoxicacao"] = 1
 	set_switch("006_Dormir_avancou_para_Ato2", true)
 	set_switch("006b_Dose_maior_pilulas", false)
 	set_switch("006c_Dose_escolhida_Ato2", false)
-	set_var("Ato", 2)
+	variable_changed.emit("Ato", 2)
+	variable_changed.emit("Intoxicacao", 1)
 	is_afternoon = false
 	player_hp = player_max_hp
 	hp_changed.emit(player_hp, player_max_hp)
@@ -220,10 +283,14 @@ func advance_to_act_2() -> void:
 
 ## Avança para o Ato 3 (Revelação sem filtro) após concluir o Ato 2 e descansar
 func advance_to_act_3() -> void:
+	variables["Ato"] = 3
+	variables["Intoxicacao"] = 0
 	set_switch("022_Ato3_iniciado", true)
-	set_var("Ato", 3)
+	variable_changed.emit("Ato", 3)
+	variable_changed.emit("Intoxicacao", 0)
 	is_afternoon = false
 	set_perception_mode(PerceptionMode.UNFILTERED_ACT3)
+	higher_dose_changed.emit(false)
 	time_of_day_changed.emit(false)
 	autosave(current_scene_path, "from_act2")
 	if has_node("/root/AudioManager"):
@@ -254,10 +321,12 @@ func advance_act() -> int:
 			set_switch("026_Jogo_finalizado", false)
 			set_var("Ato", 1)
 			set_var("Missoes_concluidas", 0)
+			set_var("Intoxicacao", 0)
 			is_afternoon = false
 			player_hp = player_max_hp
 			hp_changed.emit(player_hp, player_max_hp)
 			set_perception_mode(PerceptionMode.FILTERED_MORNING)
+			higher_dose_changed.emit(false)
 			time_of_day_changed.emit(false)
 			autosave(current_scene_path, "initial")
 			if has_node("/root/AudioManager"):
@@ -405,7 +474,10 @@ func load_game() -> bool:
 
 	set_equipped_outfit(str(data.get("equipped_outfit", "casual")), false)
 	set_perception_mode(int(data.get("perception_mode", PerceptionMode.FILTERED_MORNING)))
+	if not variables.has("Intoxicacao"):
+		variables["Intoxicacao"] = 2 if is_higher_dose() else (1 if int(variables.get("Ato", 1)) == 2 else 0)
 	higher_dose_changed.emit(is_higher_dose())
+	variable_changed.emit("Intoxicacao", variables["Intoxicacao"])
 
 	if data.has("settings") and typeof(data["settings"]) == TYPE_DICTIONARY:
 		var s: Dictionary = data["settings"]
@@ -413,5 +485,7 @@ func load_game() -> bool:
 		setting_vhs_effects = bool(s.get("vhs_effects", true))
 		setting_screen_shake = float(s.get("screen_shake", 1.0))
 
+	player_stamina = player_max_stamina
 	hp_changed.emit(player_hp, player_max_hp)
+	stamina_changed.emit(player_stamina, player_max_stamina)
 	return true

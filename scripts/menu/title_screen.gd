@@ -26,6 +26,8 @@ extends Control
 
 # Modal de Opções / Acessibilidade
 @onready var options_modal: Control = $OptionsModal
+@onready var options_card: PanelContainer = $OptionsModal/Card
+@onready var options_title: Label = $OptionsModal/Card/Margin/VBox/Title
 @onready var chk_flashes: CheckBox = $OptionsModal/Card/Margin/VBox/ChkFlashes
 @onready var chk_vhs: CheckBox = $OptionsModal/Card/Margin/VBox/ChkVHS
 @onready var chk_fullscreen: CheckBox = get_node_or_null("OptionsModal/Card/Margin/VBox/ChkFullscreen") as CheckBox
@@ -115,6 +117,7 @@ func _ready() -> void:
 	if perception_layer and perception_layer.material is ShaderMaterial:
 		_shader_mat = perception_layer.material
 
+	_apply_options_modal_style()
 	_apply_vhs_setting()
 	_check_save_state()
 	_update_selection_visuals()
@@ -366,6 +369,30 @@ func _start_game_transition(target_scene: String, target_tag: String) -> void:
 	tw.tween_callback(func():
 		get_tree().change_scene_to_file(main_scene)
 	)
+
+func _apply_options_modal_style() -> void:
+	var pal: Dictionary = HuwagUiTheme.get_palette("normal")
+	if options_card:
+		options_card.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["bg"], pal["trim"], 1))
+	if options_title:
+		options_title.add_theme_color_override("font_color", pal["accent"])
+		options_title.add_theme_color_override("font_shadow_color", pal["text_shadow"])
+	for chk in [chk_flashes, chk_vhs, chk_fullscreen]:
+		if chk:
+			chk.add_theme_color_override("font_color", pal["text"])
+			chk.add_theme_color_override("font_hover_color", pal["accent"])
+			chk.add_theme_color_override("font_focus_color", pal["accent"])
+	if btn_close_options:
+		var btn_norm := HuwagUiTheme.make_box_style(pal["choice_bg"], pal["trim"], 1, 8, 5)
+		var btn_hov := HuwagUiTheme.make_box_style(pal["choice_sel_bg"], pal["choice_sel_border"], 1, 8, 5)
+		btn_close_options.add_theme_stylebox_override("normal", btn_norm)
+		btn_close_options.add_theme_stylebox_override("hover", btn_hov)
+		btn_close_options.add_theme_stylebox_override("pressed", btn_hov)
+		btn_close_options.add_theme_stylebox_override("focus", btn_hov)
+		btn_close_options.add_theme_color_override("font_color", pal["accent"])
+		btn_close_options.add_theme_color_override("font_hover_color", pal["text"])
+		btn_close_options.add_theme_color_override("font_focus_color", pal["text"])
+
 
 func _on_options_pressed() -> void:
 	_play_sfx("ui_select")

@@ -1,0 +1,702 @@
+{
+	"animations": {
+		"attack_down": {
+			"animation": "attack",
+			"direction": "down",
+			"file": "huwag_attack_down.png",
+			"fps": 14,
+			"frames": 6,
+			"gif_file": "gifs/huwag_attack_down.gif",
+			"impact_frame": 2,
+			"loop": false,
+			"phases": {
+				"anticipation": [
+					0,
+					1
+				],
+				"impact_follow": [
+					2,
+					3
+				],
+				"recovery": [
+					4,
+					5
+				]
+			},
+			"vfx_file": "vfx/huwag_vfx_attack_down.png"
+		},
+		"attack_down_left": {
+			"animation": "attack",
+			"direction": "down_left",
+			"file": "huwag_attack_down_left.png",
+			"fps": 14,
+			"frames": 6,
+			"gif_file": "gifs/huwag_attack_down_left.gif",
+			"impact_frame": 2,
+			"loop": false,
+			"phases": {
+				"anticipation": [
+					0,
+					1
+				],
+				"impact_follow": [
+					2,
+					3
+				],
+				"recovery": [
+					4,
+					5
+				]
+			},
+			"vfx_file": "vfx/huwag_vfx_attack_down_left.png"
+		},
+		"attack_down_right": {
+			"animation": "attack",
+			"direction": "down_right",
+			"file": "huwag_attack_down_right.png",
+			"fps": 14,
+			"frames": 6,
+			"gif_file": "gifs/huwag_attack_down_right.gif",
+			"impact_frame": 2,
+			"loop": false,
+			"phases": {
+				"anticipation": [
+					0,
+					1
+				],
+				"impact_follow": [
+					2,
+					3
+				],
+				"recovery": [
+					4,
+					5
+				]
+			},
+			"vfx_file": "vfx/huwag_vfx_attack_down_right.png"
+		},
+		"attack_left": {
+			"animation": "attack",
+			"direction": "left",
+			"file": "huwag_attack_left.png",
+			"fps": 14,
+			"frames": 6,
+			"gif_file": "gifs/huwag_attack_left.gif",
+			"impact_frame": 2,
+			"loop": false,
+			"phases": {
+				"anticipation": [
+					0,
+					1
+				],
+				"impact_follow": [
+					2,
+					3
+				],
+				"recovery": [
+					4,
+					5
+				]
+			},
+			"vfx_file": "vfx/huwag_vfx_attack_left.png"
+		},
+		"attack_right": {
+			"animation": "attack",
+			"direction": "right",
+			"file": "huwag_attack_right.png",
+			"fps": 14,
+			"frames": 6,
+			"gif_file": "gifs/huwag_attack_right.gif",
+			"impact_frame": 2,
+			"loop": false,
+			"phases": {
+				"anticipation": [
+					0,
+					1
+				],
+				"impact_follow": [
+					2,
+					3
+				],
+				"recovery": [
+					4,
+					5
+				]
+			},
+			"vfx_file": "vfx/huwag_vfx_attack_right.png"
+		},
+		"attack_up": {
+			"animation": "attack",
+			"direction": "up",
+			"file": "huwag_attack_up.png",
+			"fps": 14,
+			"frames": 6,
+			"gif_file": "gifs/huwag_attack_up.gif",
+			"impact_frame": 2,
+			"loop": false,
+			"phases": {
+				"anticipation": [
+					0,
+					1
+				],
+				"impact_follow": [
+					2,
+					3
+				],
+				"recovery": [
+					4,
+					5
+				]
+			},
+			"vfx_file": "vfx/huwag_vfx_attack_up.png"
+		},
+		"attack_up_left": {
+			"animation": "attack",
+			"direction": "up_left",
+			"file": "huwag_attack_up_left.png",
+			"fps": 14,
+			"frames": 6,
+			"gif_file": "gifs/huwag_attack_up_left.gif",
+			"impact_frame": 2,
+			"loop": false,
+			"phases": {
+				"anticipation": [
+					0,
+					1
+				],
+				"impact_follow": [
+					2,
+					3
+				],
+				"recovery": [
+					4,
+					5
+				]
+			},
+			"vfx_file": "vfx/huwag_vfx_attack_up_left.png"
+		},
+		"attack_up_right": {
+			"animation": "attack",
+			"direction": "up_right",
+			"file": "huwag_attack_up_right.png",
+			"fps": 14,
+			"frames": 6,
+			"gif_file": "gifs/huwag_attack_up_right.gif",
+			"impact_frame": 2,
+			"loop": false,
+			"phases": {
+				"anticipation": [
+					0,
+					1
+				],
+				"impact_follow": [
+					2,
+					3
+				],
+				"recovery": [
+					4,
+					5
+				]
+			},
+			"vfx_file": "vfx/huwag_vfx_attack_up_right.png"
+		},
+		"defeat_down": {
+			"animation": "defeat",
+			"direction": "down",
+			"file": "huwag_defeat_down.png",
+			"fps": 10,
+			"frames": 6,
+			"gif_file": "gifs/huwag_defeat_down.gif",
+			"loop": false,
+			"phases": {
+				"collapse": [
+					2,
+					3
+				],
+				"grounded": [
+					4,
+					5
+				],
+				"stagger": [
+					0,
+					1
+				]
+			}
+		},
+		"defeat_down_left": {
+			"animation": "defeat",
+			"direction": "down_left",
+			"file": "huwag_defeat_down_left.png",
+			"fps": 10,
+			"frames": 6,
+			"gif_file": "gifs/huwag_defeat_down_left.gif",
+			"loop": false,
+			"phases": {
+				"collapse": [
+					2,
+					3
+				],
+				"grounded": [
+					4,
+					5
+				],
+				"stagger": [
+					0,
+					1
+				]
+			}
+		},
+		"defeat_down_right": {
+			"animation": "defeat",
+			"direction": "down_right",
+			"file": "huwag_defeat_down_right.png",
+			"fps": 10,
+			"frames": 6,
+			"gif_file": "gifs/huwag_defeat_down_right.gif",
+			"loop": false,
+			"phases": {
+				"collapse": [
+					2,
+					3
+				],
+				"grounded": [
+					4,
+					5
+				],
+				"stagger": [
+					0,
+					1
+				]
+			}
+		},
+		"defeat_left": {
+			"animation": "defeat",
+			"direction": "left",
+			"file": "huwag_defeat_left.png",
+			"fps": 10,
+			"frames": 6,
+			"gif_file": "gifs/huwag_defeat_left.gif",
+			"loop": false,
+			"phases": {
+				"collapse": [
+					2,
+					3
+				],
+				"grounded": [
+					4,
+					5
+				],
+				"stagger": [
+					0,
+					1
+				]
+			}
+		},
+		"defeat_right": {
+			"animation": "defeat",
+			"direction": "right",
+			"file": "huwag_defeat_right.png",
+			"fps": 10,
+			"frames": 6,
+			"gif_file": "gifs/huwag_defeat_right.gif",
+			"loop": false,
+			"phases": {
+				"collapse": [
+					2,
+					3
+				],
+				"grounded": [
+					4,
+					5
+				],
+				"stagger": [
+					0,
+					1
+				]
+			}
+		},
+		"defeat_up": {
+			"animation": "defeat",
+			"direction": "up",
+			"file": "huwag_defeat_up.png",
+			"fps": 10,
+			"frames": 6,
+			"gif_file": "gifs/huwag_defeat_up.gif",
+			"loop": false,
+			"phases": {
+				"collapse": [
+					2,
+					3
+				],
+				"grounded": [
+					4,
+					5
+				],
+				"stagger": [
+					0,
+					1
+				]
+			}
+		},
+		"defeat_up_left": {
+			"animation": "defeat",
+			"direction": "up_left",
+			"file": "huwag_defeat_up_left.png",
+			"fps": 10,
+			"frames": 6,
+			"gif_file": "gifs/huwag_defeat_up_left.gif",
+			"loop": false,
+			"phases": {
+				"collapse": [
+					2,
+					3
+				],
+				"grounded": [
+					4,
+					5
+				],
+				"stagger": [
+					0,
+					1
+				]
+			}
+		},
+		"defeat_up_right": {
+			"animation": "defeat",
+			"direction": "up_right",
+			"file": "huwag_defeat_up_right.png",
+			"fps": 10,
+			"frames": 6,
+			"gif_file": "gifs/huwag_defeat_up_right.gif",
+			"loop": false,
+			"phases": {
+				"collapse": [
+					2,
+					3
+				],
+				"grounded": [
+					4,
+					5
+				],
+				"stagger": [
+					0,
+					1
+				]
+			}
+		},
+		"hurt_down": {
+			"animation": "hurt",
+			"direction": "down",
+			"file": "huwag_hurt_down.png",
+			"fps": 12,
+			"frames": 4,
+			"gif_file": "gifs/huwag_hurt_down.gif",
+			"loop": false
+		},
+		"hurt_down_left": {
+			"animation": "hurt",
+			"direction": "down_left",
+			"file": "huwag_hurt_down_left.png",
+			"fps": 12,
+			"frames": 4,
+			"gif_file": "gifs/huwag_hurt_down_left.gif",
+			"loop": false
+		},
+		"hurt_down_right": {
+			"animation": "hurt",
+			"direction": "down_right",
+			"file": "huwag_hurt_down_right.png",
+			"fps": 12,
+			"frames": 4,
+			"gif_file": "gifs/huwag_hurt_down_right.gif",
+			"loop": false
+		},
+		"hurt_left": {
+			"animation": "hurt",
+			"direction": "left",
+			"file": "huwag_hurt_left.png",
+			"fps": 12,
+			"frames": 4,
+			"gif_file": "gifs/huwag_hurt_left.gif",
+			"loop": false
+		},
+		"hurt_right": {
+			"animation": "hurt",
+			"direction": "right",
+			"file": "huwag_hurt_right.png",
+			"fps": 12,
+			"frames": 4,
+			"gif_file": "gifs/huwag_hurt_right.gif",
+			"loop": false
+		},
+		"hurt_up": {
+			"animation": "hurt",
+			"direction": "up",
+			"file": "huwag_hurt_up.png",
+			"fps": 12,
+			"frames": 4,
+			"gif_file": "gifs/huwag_hurt_up.gif",
+			"loop": false
+		},
+		"hurt_up_left": {
+			"animation": "hurt",
+			"direction": "up_left",
+			"file": "huwag_hurt_up_left.png",
+			"fps": 12,
+			"frames": 4,
+			"gif_file": "gifs/huwag_hurt_up_left.gif",
+			"loop": false
+		},
+		"hurt_up_right": {
+			"animation": "hurt",
+			"direction": "up_right",
+			"file": "huwag_hurt_up_right.png",
+			"fps": 12,
+			"frames": 4,
+			"gif_file": "gifs/huwag_hurt_up_right.gif",
+			"loop": false
+		},
+		"idle_down": {
+			"animation": "idle",
+			"direction": "down",
+			"file": "huwag_idle_down.png",
+			"fps": 8,
+			"frames": 6,
+			"gif_file": "gifs/huwag_idle_down.gif",
+			"loop": true
+		},
+		"idle_down_left": {
+			"animation": "idle",
+			"direction": "down_left",
+			"file": "huwag_idle_down_left.png",
+			"fps": 8,
+			"frames": 6,
+			"gif_file": "gifs/huwag_idle_down_left.gif",
+			"loop": true
+		},
+		"idle_down_right": {
+			"animation": "idle",
+			"direction": "down_right",
+			"file": "huwag_idle_down_right.png",
+			"fps": 8,
+			"frames": 6,
+			"gif_file": "gifs/huwag_idle_down_right.gif",
+			"loop": true
+		},
+		"idle_left": {
+			"animation": "idle",
+			"direction": "left",
+			"file": "huwag_idle_left.png",
+			"fps": 8,
+			"frames": 6,
+			"gif_file": "gifs/huwag_idle_left.gif",
+			"loop": true
+		},
+		"idle_right": {
+			"animation": "idle",
+			"direction": "right",
+			"file": "huwag_idle_right.png",
+			"fps": 8,
+			"frames": 6,
+			"gif_file": "gifs/huwag_idle_right.gif",
+			"loop": true
+		},
+		"idle_up": {
+			"animation": "idle",
+			"direction": "up",
+			"file": "huwag_idle_up.png",
+			"fps": 8,
+			"frames": 6,
+			"gif_file": "gifs/huwag_idle_up.gif",
+			"loop": true
+		},
+		"idle_up_left": {
+			"animation": "idle",
+			"direction": "up_left",
+			"file": "huwag_idle_up_left.png",
+			"fps": 8,
+			"frames": 6,
+			"gif_file": "gifs/huwag_idle_up_left.gif",
+			"loop": true
+		},
+		"idle_up_right": {
+			"animation": "idle",
+			"direction": "up_right",
+			"file": "huwag_idle_up_right.png",
+			"fps": 8,
+			"frames": 6,
+			"gif_file": "gifs/huwag_idle_up_right.gif",
+			"loop": true
+		},
+		"run_down": {
+			"animation": "run",
+			"direction": "down",
+			"file": "huwag_run_down.png",
+			"fps": 14,
+			"frames": 8,
+			"gif_file": "gifs/huwag_run_down.gif",
+			"loop": true
+		},
+		"run_down_left": {
+			"animation": "run",
+			"direction": "down_left",
+			"file": "huwag_run_down_left.png",
+			"fps": 14,
+			"frames": 8,
+			"gif_file": "gifs/huwag_run_down_left.gif",
+			"loop": true
+		},
+		"run_down_right": {
+			"animation": "run",
+			"direction": "down_right",
+			"file": "huwag_run_down_right.png",
+			"fps": 14,
+			"frames": 8,
+			"gif_file": "gifs/huwag_run_down_right.gif",
+			"loop": true
+		},
+		"run_left": {
+			"animation": "run",
+			"direction": "left",
+			"file": "huwag_run_left.png",
+			"fps": 14,
+			"frames": 8,
+			"gif_file": "gifs/huwag_run_left.gif",
+			"loop": true
+		},
+		"run_right": {
+			"animation": "run",
+			"direction": "right",
+			"file": "huwag_run_right.png",
+			"fps": 14,
+			"frames": 8,
+			"gif_file": "gifs/huwag_run_right.gif",
+			"loop": true
+		},
+		"run_up": {
+			"animation": "run",
+			"direction": "up",
+			"file": "huwag_run_up.png",
+			"fps": 14,
+			"frames": 8,
+			"gif_file": "gifs/huwag_run_up.gif",
+			"loop": true
+		},
+		"run_up_left": {
+			"animation": "run",
+			"direction": "up_left",
+			"file": "huwag_run_up_left.png",
+			"fps": 14,
+			"frames": 8,
+			"gif_file": "gifs/huwag_run_up_left.gif",
+			"loop": true
+		},
+		"run_up_right": {
+			"animation": "run",
+			"direction": "up_right",
+			"file": "huwag_run_up_right.png",
+			"fps": 14,
+			"frames": 8,
+			"gif_file": "gifs/huwag_run_up_right.gif",
+			"loop": true
+		},
+		"walk_down": {
+			"animation": "walk",
+			"direction": "down",
+			"file": "huwag_walk_down.png",
+			"fps": 11,
+			"frames": 8,
+			"gif_file": "gifs/huwag_walk_down.gif",
+			"loop": true
+		},
+		"walk_down_left": {
+			"animation": "walk",
+			"direction": "down_left",
+			"file": "huwag_walk_down_left.png",
+			"fps": 11,
+			"frames": 8,
+			"gif_file": "gifs/huwag_walk_down_left.gif",
+			"loop": true
+		},
+		"walk_down_right": {
+			"animation": "walk",
+			"direction": "down_right",
+			"file": "huwag_walk_down_right.png",
+			"fps": 11,
+			"frames": 8,
+			"gif_file": "gifs/huwag_walk_down_right.gif",
+			"loop": true
+		},
+		"walk_left": {
+			"animation": "walk",
+			"direction": "left",
+			"file": "huwag_walk_left.png",
+			"fps": 11,
+			"frames": 8,
+			"gif_file": "gifs/huwag_walk_left.gif",
+			"loop": true
+		},
+		"walk_right": {
+			"animation": "walk",
+			"direction": "right",
+			"file": "huwag_walk_right.png",
+			"fps": 11,
+			"frames": 8,
+			"gif_file": "gifs/huwag_walk_right.gif",
+			"loop": true
+		},
+		"walk_up": {
+			"animation": "walk",
+			"direction": "up",
+			"file": "huwag_walk_up.png",
+			"fps": 11,
+			"frames": 8,
+			"gif_file": "gifs/huwag_walk_up.gif",
+			"loop": true
+		},
+		"walk_up_left": {
+			"animation": "walk",
+			"direction": "up_left",
+			"file": "huwag_walk_up_left.png",
+			"fps": 11,
+			"frames": 8,
+			"gif_file": "gifs/huwag_walk_up_left.gif",
+			"loop": true
+		},
+		"walk_up_right": {
+			"animation": "walk",
+			"direction": "up_right",
+			"file": "huwag_walk_up_right.png",
+			"fps": 11,
+			"frames": 8,
+			"gif_file": "gifs/huwag_walk_up_right.gif",
+			"loop": true
+		}
+	},
+	"character": "huwag",
+	"directions": [
+		"down",
+		"down_right",
+		"right",
+		"up_right",
+		"up",
+		"up_left",
+		"left",
+		"down_left"
+	],
+	"foot_anchor": [
+		48,
+		84
+	],
+	"frame_size": [
+		96,
+		96
+	],
+	"gif_scale": 2,
+	"variant": "bfp_dark",
+	"weapon": {
+		"attack_weapon": "firefighter_axe",
+		"handle_length_px": 22.0,
+		"idle_walk_run_equipped": false
+	}
+}

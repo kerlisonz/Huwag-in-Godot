@@ -530,16 +530,16 @@ func _on_interactable_triggered(item_name: String) -> void:
 				], Callable())
 
 		"Armario_Uniforme":
-			var cur_outfit := GameState.equipped_outfit
-			var status_txt := "Uniforme BFP" if cur_outfit == "bfp" else "Roupa Casual"
+			var status_txt := GameState.get_equipped_outfit_label()
+			var current_id := GameState.equipped_outfit
 			request_dialogue.emit([
 				{
 					"speaker": "Huwag Matitiis",
 					"expression": "neutral",
-					"text": "Armário de serviço (%s)." % status_txt,
+					"text": "Armário do quarto (equipado: %s).\nEscolha o traje para Agdangan:" % status_txt,
 					"choices": [
-						"Vestir Uniforme de Bombeiro (BFP)",
-						"Vestir Roupa Casual",
+						"Vestir Uniforme de Bombeiro (BFP)" + (" [Atual]" if current_id == "bfp" else ""),
+						"Vestir Roupa Casual (Jaqueta Escura)" + (" [Atual]" if current_id == "casual" else ""),
 						"Fechar"
 					]
 				}
@@ -573,12 +573,16 @@ func _on_interactable_triggered(item_name: String) -> void:
 		"Radio_Quartel":
 			if higher:
 				request_dialogue.emit([{
-					"speaker": "Huwag Matitiis",
-					"expression": "scared",
+					"speaker": "Rádio BFP",
+					"expression": "distorted",
 					"text": "[Chiado contínuo no alto-falante] ...não acenda os faróis... não olhe para as janelas da rua... a fumaça ainda lembra o teu nome..."
 				}], Callable())
 			else:
 				request_dialogue.emit([
+					{
+						"speaker": "Rádio BFP",
+						"text": "[Estática chiada na faixa de emergência de Agdangan...]"
+					},
 					{
 						"speaker": "Capitão Reyes",
 						"text": "[Chiado de rádio] \"Estação BFP Agdangan na escuta. Compareça ao quartel na rua principal assim que estiver pronto.\""

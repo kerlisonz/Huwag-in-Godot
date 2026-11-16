@@ -36,6 +36,7 @@ var _distorted_decals: Array[Node2D] = []
 var _lights: Array[PointLight2D] = []
 var _santelmos: Array[Node] = []
 var _stalker_npc: NpcEntity = null
+var _ambient_dust: CPUParticles2D = null
 var _time_acc: float = 0.0
 
 
@@ -251,6 +252,41 @@ func _build_forest_props_and_lights() -> void:
 	for pos in dead_spots:
 		_add_dual_prop("dead_gnarled_tree", pos, ysort_obstacles, Vector2(0, -20))
 
+	# Vegetação invasiva e arbustos nas bordas da trilha (balançando com o shader de vento)
+	for shrub_pos in [
+		Vector2(180, 340), Vector2(310, 444), Vector2(590, 224), Vector2(960, 224),
+		Vector2(1420, 310), Vector2(1560, 442), Vector2(1840, 224), Vector2(2160, 442),
+		Vector2(2310, 336), Vector2(720, 620), Vector2(1240, 620)
+	]:
+		_add_dual_prop("corner_shrub", shrub_pos, ysort_obstacles, Vector2(0, -10))
+
+	for weed_pos in [
+		Vector2(250, 424), Vector2(490, 220), Vector2(760, 145), Vector2(920, 520),
+		Vector2(1140, 520), Vector2(1480, 460), Vector2(1740, 145), Vector2(2060, 215),
+		Vector2(2260, 424), Vector2(2420, 424)
+	]:
+		_add_dual_prop("overgrown_weeds", weed_pos, ysort_obstacles, Vector2(0, -6))
+
+	# Poeira e esporos flutuantes contínuos na floresta
+	_ambient_dust = CPUParticles2D.new()
+	_ambient_dust.name = "ForestAmbientDust"
+	_ambient_dust.position = Vector2(1280, 384)
+	_ambient_dust.z_index = 4
+	_ambient_dust.amount = 90
+	_ambient_dust.lifetime = 5.0
+	_ambient_dust.preprocess = 2.0
+	_ambient_dust.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	_ambient_dust.emission_rect_extents = Vector2(1240, 340)
+	_ambient_dust.direction = Vector2(0.7, -0.3)
+	_ambient_dust.spread = 45.0
+	_ambient_dust.gravity = Vector2(1.5, -3.5)
+	_ambient_dust.initial_velocity_min = 5.0
+	_ambient_dust.initial_velocity_max = 15.0
+	_ambient_dust.scale_amount_min = 1.5
+	_ambient_dust.scale_amount_max = 2.5
+	_ambient_dust.color = Color(0.75, 0.85, 0.78, 0.30)
+	add_child(_ambient_dust)
+
 	# Manchas ambientais no piso (Ato 2 Dose Maior destaca sangue/cinzas & olhos Yume Nikki)
 	var stain_spots := [
 		Vector2(450, 384), Vector2(880, 180), Vector2(1488, 384),
@@ -312,6 +348,13 @@ func _add_dual_prop(kind: String, pos: Vector2, parent_node: Node2D, offset_px: 
 	parent_node.add_child(d)
 	_distorted_props.append(d)
 
+	if kind in ["pine_canopy_cluster", "dead_gnarled_tree", "overgrown_weeds", "corner_shrub"]:
+		var phase := pos.x * 0.05 + pos.y * 0.02
+		var strength := 1.0 if kind == "dead_gnarled_tree" else 1.75
+		var speed := 1.4 if kind == "dead_gnarled_tree" else 1.9
+		RetroLevelHelpers.apply_wind_sway(n, phase, strength, speed, 0.0)
+		RetroLevelHelpers.apply_wind_sway(d, phase, strength * 1.15, speed * 1.25, 0.7)
+
 
 func _setup_interactables_and_pickups() -> void:
 	var signs := [
@@ -342,6 +385,11 @@ func _setup_interactables_and_pickups() -> void:
 
 	_create_calm_pickup("pickup_trail_creek", Vector2(976, 628))
 	_create_calm_pickup("pickup_trail_pit", Vector2(2016, 224))
+
+	if not GameState.is_unfiltered_act3():
+		_create_interactable("Vestigios_Santelmo", "Brasas de Santelmo", "Observar", Vector2(308, 392), 26.0, func() -> void:
+			_on_sign_interacted("Vestigios_Santelmo")
+		)
 
 
 func _create_calm_pickup(pickup_key: String, pos: Vector2) -> void:
@@ -440,6 +488,23 @@ func _on_sign_interacted(id: String) -> void:
 			)
 			request_dialogue.emit([{"speaker": "Huwag Matitiis", "expression": "scared" if higher else "worried", "text": txt}], Callable())
 
+		"Vestigios_Santelmo":
+			if higher:
+				request_dialogue.emit([
+					{
+						"speaker": "Santelmo",
+						"expression": "distorted",
+						"text": "As línguas de fogo crepitam em voz aguda entre os galhos secos:\n\"Corre na frente, Huwag... deixa a brasa alcançar o resto da equipe outra vez.\""
+					}
+				], Callable())
+			else:
+				request_dialogue.emit([
+					{
+						"speaker": "Santelmo",
+						"text": "(Uma chama errante paira sobre as folhas úmidas sem queimá-las. O clarão zune como rádio fora de sintonia — água e golpes precisos podem apagá-lo.)"
+					}
+				], Callable())
+
 
 func _collect_santelmos() -> void:
 	_santelmos.clear()
@@ -465,14 +530,14 @@ func _spawn_higher_dose_stalker() -> void:
 	npc.hostile_move_speed = 92.0
 	npc.hostile_max_hp = 130
 	npc.hostile_attack_damage = 16
-	npc.normal_sheet_path = "res://assets/characters/sprites/distorted_bombeiro_sheet.png"
-	npc.distorted_sheet_path = "res://assets/characters/sprites/distorted_bombeiro_sheet.png"
+	npc.normal_frames_path = "res://assets/sprites/npcs/vulto_bosque/vulto_bosque_normal_spriteframes.tres"
+	npc.distorted_frames_path = "res://assets/sprites/npcs/vulto_bosque/vulto_bosque_distorted_spriteframes.tres"
 	npc.npc_interacted.connect(func(_id: String) -> void:
 		if npc.is_hostile or npc.is_defeated:
 			return
 		request_dialogue.emit([
 			{
-				"speaker": "Bombeiro",
+				"speaker": "Vulto Calcinado",
 				"expression": "distorted",
 				"text": "O vulto sem rosto cheira a querosene e papel queimado no meio da trilha.\n\"As chamas daqui são todas suas, Huwag. Vai passar por cima de nós outra vez para fingir que salvou o lago?\"",
 				"choices": [
@@ -542,6 +607,16 @@ func _sync_forest_atmosphere() -> void:
 	if fire_embers:
 		fire_embers.emitting = not act3 and (fire_active or higher)
 		fire_embers.color = Color(0.95, 0.18, 0.22, 0.85) if higher else Color(1.0, 0.52, 0.14, 0.78)
+
+	if _ambient_dust:
+		if act3:
+			_ambient_dust.color = Color(0.76, 0.78, 0.82, 0.22)
+		elif higher:
+			_ambient_dust.color = Color(0.90, 0.24, 0.26, 0.40)
+		elif fire_active:
+			_ambient_dust.color = Color(0.95, 0.60, 0.32, 0.36)
+		else:
+			_ambient_dust.color = Color(0.75, 0.85, 0.78, 0.30)
 
 	# Espiritos de fogo desaparecem no Ato 3 (revelação sem ilusões sobrenaturais)
 	for s in _santelmos:

@@ -176,6 +176,112 @@ Reconstrução estética, narrativa e estrutural dos 4 cenários principais segu
 - Remoção do caminho absoluto local em `scripts/tools/build_retro_tilesets.gd` (substituído por `res://docs/logs/retro_tilesets_preview.png`).
 - Regeneração das capturas de tela em `docs/screenshots/` refletindo fielmente o visual atual FNAF Minigames / Yume Nikki.
 
+### 2.12 Revitalização Urbana, Shader de Vento e Ambientação Dinâmica (Fase 2)
+- **Shader Autoral de Vento (`res://shaders/wind_sway.gdshader`):**
+  - Shader `canvas_item` autoral compatível com `gl_compatibility` e amostragem `filter_nearest` (ancoragem na base via `vertical_anchor`, deslocamento pixel-sharp via `round()` e tremor adicional por `distortion_jitter` em Dose Maior), aplicado via `RetroLevelHelpers.apply_wind_sway(...)`. Licença / Proveniência: Autoral do projeto (MIT), zero dependências externas.
+- **Novos Adereços Procedurais de Desordem Urbana e Vegetação (`res://scripts/levels/retro_level_helpers.gd`):**
+  - Geradores pixel-art em tempo de execução (variantes normal e distorcida sem assets externos): `trash_pile` (`28×20`), `market_crates` (`36×24`), `abandoned_tricycle` (`44×28`), `abandoned_car_wreck` (`76×36`), `utility_box` (`20×32`), `overgrown_weeds` (`32×20`), `corner_shrub` (`28×28`) e `clothesline_post` (`48×36`).
+- **Camadas Ambientais e Iluminação 2D (`street_preview.gd`, `forest_trail.gd`, `forest_clearing.gd`):**
+  - `StreetPreview`: enriquecimento dos `TileMapLayer`s urbanos (vielas de terra, desgaste de meio-fio, poças e manchas), camada procedural `OverheadWiresDrawer` (`OverheadWiresLayer`) com fiação elétrica emaranhada, derivações para telhados e fios rompidos oscilando ao vento, 5 `PointLight2D` de postes com reator piscante e faíscas (`CPUParticles2D`), 7 `PointLight2D` de janelas/fachadas e sistemas `CPUParticles2D` de poeira e fumaça urbana sincronizados com Ato e Dose.
+  - `ForestTrail` e `ForestClearing`: aplicação de `wind_sway.gdshader` em árvores, arbustos (`corner_shrub`) e mato invasivo (`overgrown_weeds`), além de sistemas `CPUParticles2D` de poeira/esporos e névoa da lagoa sincronizados com o ciclo dos Atos 1–3.
+
+### 2.13 Sistema de NPCs Personalizados, Shader de Distorção do Ato 2 e Correção de Combate (Fase 3)
+- **Spritesheets 16-bit Personalizados (`scripts/tools/build_custom_npc_sheets.gd` -> `assets/characters/sprites/`):**
+  - Gerados proceduralmente de forma autoral (licença MIT / projeto) em grade `480×192` (`10×4` células de `48×48` px, 4 direções com ciclos Idle, Caminhada e Ação/Golpe nas colunas `6..9`, proporções coesas com `huwag_bfp_sheet.png`), substituindo os sheets genéricos LimeZu e placeholders:
+    - `npc_aling_nena_sheet.png` (Aling Nena — avental da sari-sari e golpe/varredura com vassoura)
+    - `npc_kuya_ben_sheet.png` (Kuya Ben — boné de mecânico, toalha no ombro e golpe com chave inglesa)
+    - `npc_toby_sheet.png` e `distorted_toby_sheet.png` (Toby normal e distorcido em silhueta infantil com bote sombrio)
+    - `npc_feirante_sheet.png` e `distorted_feirante_sheet.png` (Feirante com chapéu tradicional *salakot*, avental de feira e faca nas variantes normal/distorcida)
+    - `npc_luningning_sheet.png` (Senhora Luningning — variante normal de vigília com xale escuro e lanterna)
+- **Retrato CRT da Senhora Luningning (`assets/characters/portraits/fnaf_luningning.png`):**
+  - Busto autoral `96×96` px com scanlines CRT e borda `#C77DFF`, vinculado em `scripts/dialogue/character_profiles.gd` (`is_placeholder = false`).
+- **Shader de Distorção do Ato 2 (`res://shaders/npc_distortion.gdshader`):**
+  - Shader `canvas_item` autoral compatível com `gl_compatibility` e sheets `10×4`, aplicando esticamento vertical por vértice, espasmos horizontais, fatiamento glitch contido na célula ativa, aberração cromática e descoloração carmesim-escura modulada por `distortion_intensity` e `hostile_boost`. Licença: Autoral do projeto (MIT).
+- **Sistema de Intoxicação e Combate Seguro (`game_state.gd`, `npc_entity.gd`, `player.gd`):**
+  - Variável `Intoxicacao` em `GameState` sincronizada com Dose Normal (`1`), Dose Maior (`2`), Overdose (`3`) e transição de Atos (`0` no Ato 1/3).
+  - Correção do crash em combate no Ato 2: `NpcEntity.query_melee_hit` passou a aceitar `hit_ids: Variant` (`Dictionary` ou `Array`) e retornar `Array[Dictionary]` (junto com `query_water_hit`), `set_deferred` aplicado nas alterações de `InteractArea` e `CollisionShape2D`, guarda contra referências nulas/fora da árvore em `_process_hostile`, suporte completo a `apply_hit` / `take_damage` / `receive_damage` no `PlayerController` e logs `[NpcEntity]` / `[PlayerController]` no debugger.
+  - Validação completa adicionada em `tests/test_phase3_npc_distortion_combat.gd`.
+
+### 2.14 Refatoração da Fase 3 — Elenco 8 Direções (`672×384`) e Fichas Narrativas (Etapas 1–2)
+- **Documentação de Elenco e Fichas (`docs/fichas-de-personagens.md`):**
+  - Especificação autoral (MIT / projeto) das 14 fichas de personagens/entidades no estilo *Light Novel / Visual Novel*, padrão de pastas por personagem e grade `14×8` (`672×384` px, células `48×48` px) para 8 direções (`down`, `left`, `right`, `up`, `down_left`, `down_right`, `up_left`, `up_right`) e animação por papel (combate vs. interação/corrida).
+- **Gerador Procedural 8-Dir e Retratos CRT (`scripts/tools/build_phase3_8dir_sheets.gd`):**
+  - Script autoral em GDScript (licença MIT / zero dependências externas) que gera spritesheets `672×384` (`14×8`), cópias de transição `480×192` (`10×4`) em `assets/characters/sprites/` e retratos CRT `96×96` em `assets/characters/portraits/` e nas pastas individuais, respeitando o traço de contorno escuro `#0E0D12` e proporções `~30 px` de referência de `npc_enfermeira_maria_sheet.png` (com `npc_enfermeira_maria_sheet.png`, `npc_bombeiro_santos_sheet.png`, `fnaf_enfermeira_maria.png` e `fnaf_cap_reyes.png` preservados como referências):
+    - Pastas com variantes pacífica + distorcida (`normal_sheet.png`, `distorted_sheet.png`, `portrait.png`, `distorted_portrait.png`): `cap_reyes/`, `enfermeira_maria/`, `bombeiro_ato/`, `bombeiro_santos/`, `aling_nena/`, `kuya_ben/`, `mang_tomas/`, `mang_carding/` (novo pescador do píer), `toby/`, `senhora_luningning/` (forma distorcida própria e gatinho na coluna 13) e `lola_rosa/` (nova anciã erborista reintroduzida).
+    - Pastas de ameaças/entidades: `vulto_bosque/` (`hostile_sheet.png`, `portrait.png`), `santelmo/` (`combat_sheet.png`) e `aquatic_creature/` (`guardian_sheet.png`, `portrait.png`).
+
+### 2.15 Reconstrução 96×96 do Protagonista Huwag — Passo 2 de 4
+- **Gerador Pixel Rig e Encoder Nativo (`scripts/tools/pixel_rig/pixel_art_canvas.gd`, `scripts/tools/pixel_rig/gif89a_encoder.gd`, `scripts/tools/build_huwag_96_assets.gd`):**
+  - Pipeline 100% autoral em GDScript 4 (licença MIT, zero dependências externas/Python/ImageMagick), renderizando células `96×96` px em pixel art nítida sem antialiasing, com âncora fixa no chão `(48, 84)`, sombreamento discreto em 4 tons, exportador GIF89a LZW transparente nativo e metadados JSON (`huwag_atlas.json`).
+  - **Ativos gerados em `res://assets/characters/huwag/`** nas 4 variantes (`casual_day/`, `casual_dark/`, `bfp_day/`, `bfp_dark/`): 192 tiras RGBA horizontais em 8 direções (`idle` 6f, `walk` 8f, `run` 8f, `attack` 6f, `hurt` 4f, `defeat` 6f), 32 tiras separadas de rastro do machado em `vfx/` (`impact_frame = 2` e dissipação no frame `3`), 192 pré-visualizações `.gif` transparentes (`scale = 2`, `192×192` px) em `gifs/` e 4 arquivos `huwag_atlas.json`. Licença / Proveniência: Autoral do projeto (MIT).
+
+### 2.16 Substituição 96×96 do Protagonista Huwag (`huwag_v2`) — Trajes Bombeiro & Casual
+- **Ativos e Pipelines (`res://assets/sprites/huwag_v2/` + `scripts/tools/process_huwag_v2_sheets.{py,gd}`):**
+  - Folhas brutas geradas por IA para o projeto (`raw/huwag_bombeiro_raw_v5.jpg`, `raw/huwag_casual_raw_v1.jpg`, fundo chromakey `#00FF00`, sem texto e sem itens/extintor nas mãos), processadas de modo idêntico pelo script Python+Pillow e pelo executor nativo GDScript 4 (`Gif89aEncoder`). Licença / Proveniência: Autoral / ativos exclusivos do projeto Huwag, zero dependências externas.
+  - Backups preservados dos sheets anteriores `48×48` em `assets/sprites/huwag_v2/backup/` (`huwag_bfp_sheet.png.bak`, `huwag_casual_sheet.png.bak`).
+  - Saídas normalizadas em `bombeiro/` e `casual/`: células `96×96` (`height=80 px`, `foot_anchor=(48, 90)`), `huwag_{bombeiro,casual}_sheet_96x96.png` (`384×384`), tiras `huwag_idle_{down,up,left,right}.png` (`96×96`) e `huwag_walk_{down,up,left,right}.png` (`384×96`), `huwag_atlas.json`, recursos nativos `huwag_{bombeiro,casual}_spriteframes.tres` (`8` animações, sem `action_*`) e `8` previews GIF animados (`192×192`, `8 FPS`) em `gifs/`.
+  - Integração no `Player` (`scenes/characters/Player.tscn`, `scripts/characters/player.gd`), normalização de trajes em `GameState` (`casual` / `bfp` / `bombeiro`), calibração de câmera (`zoom=1.18`), colisão (`16×12`) e seletor no Armário (`RoomHuwag`) e Menu (`Main.tscn` `OutfitButton`).
+
+### 2.17 Reformulação Pixel Art 16-bit do Protagonista (`huwag_v3`), Spritesheets por Finalidade e Sistema de Combate/Combo/Esquiva
+- **Gerador e Reconstrutor Pixel Art (`scripts/tools/build_huwag_rebuilt_sprites.gd` -> `res://assets/sprites/huwag_v3/{casual,bombeiro}/`):**
+  - Reconstrução autoral em pixel art 16-bit (`18×28` px lógicos dentro de célula `48×48` px, renderizada em escala inteira `1:1` `scale = Vector2(1.0, 1.0)` com `TEXTURE_FILTER_NEAREST` e pés ancorados em `y = 39`, igualando a proporção exata dos tiles `16×16` e NPCs do mundo).
+  - Baseada fielmente na identidade visual da folha oficial do protagonista (Imagem 1: cabelo loiro espetado com contorno marrom-escuro quente `#462814` e brilho `#FAF0B8`, olheiras `#925E42`, jaqueta preta aberta com zíper cinza sobre camisa escura, calça verde-oliva e tênis cinza; mais variante Bombeiro BFP com faixas refletivas amarelo-ouro e laranja) e refinada segundo a qualidade de clusters e fluidez de animação da referência artística (Imagem 2). Licença / Proveniência: Autoral do projeto (MIT), zero dependências externas.
+  - **8 Spritesheets separados por finalidade para cada traje (`casual/` e `bombeiro/`):**
+    - `spritesheet_idle.png` (`192×192`, `4 direções × 4 frames`, respiração sutil e piscada natural, `5.0 FPS`)
+    - `spritesheet_walk.png` (`288×192`, `4 direções × 6 frames`, ciclo fluido com poses de passagem e *bounce* de `1 px`, `9.5 FPS`)
+    - `spritesheet_run.png` (`288×192`, `4 direções × 6 frames`, corrida com inclinação frontal, impulso ampliado e balanço do cabelo, `12.5 FPS`)
+    - `spritesheet_attack.png` (`240×192`, `4 direções × 5 frames`, golpe primário com antecipação, extensão de braço/lâmina, arco de corte e recuperação, `15.0 FPS`)
+    - `spritesheet_combo.png` (`384×192`, `4 direções × 8 frames`: `combo2_*` corte reverso cruzado `4f` + `combo3_*` finalizador pesado dourado `4f`, `16.0 FPS`)
+    - `spritesheet_dodge.png` (`192×192`, `4 direções × 4 frames`, esquiva ágil com linhas de velocidade, `14.0 FPS`)
+    - `spritesheet_hurt.png` (`144×192`, `4 direções × 3 frames`, recuo e expressão de impacto, `10.0 FPS`)
+    - `spritesheet_death.png` (`288×192`, `4 direções × 6 frames`, cambaleio, queda de joelhos e colapso horizontal no chão, `8.0 FPS`)
+  - **Recursos `SpriteFrames` e Pré-visualizações:** `huwag_casual_spriteframes.tres`, `huwag_bombeiro_spriteframes.tres` e GIFs animados em `res://assets/sprites/huwag_v3/{casual,bombeiro}/gifs/`.
+- **Sistema de Animações e Combate Integrado (`scripts/characters/player.gd`, `scenes/characters/Player.tscn`):**
+  - Máquina de estados de animação com transições suaves (`death` -> `hurt` -> `dodge` -> `attack`/`combo2`/`combo3` -> `jump` -> `run`/`walk` -> `idle`) e parâmetros `@export` configuráveis no Inspetor.
+  - Sistema de **Combo encadeado de 3 estágios** (`perform_melee_attack()`): Estágio 1 (`attack_*`, `25` dmg, raio `44 px`, arco `120°`) -> Estágio 2 (`combo2_*`, `32` dmg, raio `48.4 px`, arco `138°`, varredura reversa) -> Estágio 3 (`combo3_*`, `45` dmg, raio `53.7 px`, arco `160°`, impacto dourado).
+  - Mecânica de **Esquiva (`perform_dodge()`, teclas `[Z]` / `[L]`)**: impulso rápido na direção ativa com animação `dodge_*`, rastro fantasma e janela de invulnerabilidade (*i-frames*) com feedback `"ESQUIVA!"`.
+  - Reações de **Dano (`hurt_*`)** e **Morte (`death_*`)** integradas a `apply_hit()`, `take_damage()`, `receive_damage()` e `revive()`.
+  - Validação automatizada e capturas reais em jogo registradas via `tests/test_protagonist_combat_and_animations.gd` e `tests/test_huwag_v2_integration.gd`.
+
+### 2.18 Reformulação Orgânica 16-bit de NPCs — Lote 1: Núcleo BFP (`res://assets/sprites/npcs/`)
+- **Pipeline Pixel-Art Modular Orgânico (`scripts/tools/npc_pixel_rig/npc_humanoid_templates.gd`, `scripts/tools/npc_pixel_rig/npc_sprite_builder.gd`, `scripts/tools/build_npc_lote1_bfp.gd`):**
+  - Pipeline 100% autoral em GDScript 4 (licença MIT, zero dependências externas) construído diretamente sobre a matriz anatômica `32×32` orgânica e paleta restrita 16-bit de `huwag_v3` (`Canvas48`, células `48×48` px, pés ancorados em `y = 39`, `offset = Vector2(0, -7)`, escala `1:1` Nearest Neighbor).
+  - Gera recursos `SpriteFrames` modulares (`idle`, `walk`, `talk`, `attack`, `hurt`, `death` em 4 direções `down`, `up`, `left`, `right`) para variantes **normal** e **distorted** (incluindo postura sutilmente torta de `1 px` e olhos/expressões perturbadas):
+    - **`cap_reyes/`** (`Capitão Reyes` — quepe oficial BFP com viseira cinza, bigode grisalho/farto, traje de comando azul-marinho e golpe de varredura com lanterna/bastão âmbar)
+    - **`bombeiro_ato/`** (`Bombeiro Ato` — capacete amarelo de visor escuro, jaqueta BFP de golas erguidas e golpe vertical com croque/machado deslocado à frente/mão dominante)
+    - **`bombeiro_santos/`** (`Bombeiro Santos` e `NPC_Bombeiro_Ronda` em `StreetPreview` — cabelo cacheado escuro com *rim light* frio de 1 px para recorte, uniforme técnico escuro com faixas refletivas e arco diagonal com mangote/bocal)
+    - **`enfermeira_maria/`** (`Enfermeira Maria` — cabelo castanho repartido com coque baixo e elástico vermelho, avental/jaleco clínico branco-azulado com bolso e estocada rápida com tesoura médica/seringa)
+- **Integração em Runtime (`scenes/characters/NpcEntity.tscn`, `scripts/characters/npc_entity.gd`, `scripts/levels/fire_station.gd`, `scripts/levels/street_preview.gd`):**
+  - Suporte nativo em `NpcEntity` a `AnimatedSprite2D` com `SpriteFrames` (`normal_frames_path` / `distorted_frames_path`) preservando compatibilidade com sheets legados (`10×4`) durante a transição dos Lotes 2–3, com seleção de estados `idle`, `walk`, `talk`, `attack`, `hurt` e `death` persistente no chão ao derrotar o NPC.
+
+### 2.19 Reformulação Orgânica 16-bit de NPCs — Lote 2: Civis, Toby e Vulto (`res://assets/sprites/npcs/`)
+- **Módulos Complementares Lote 2 (`scripts/tools/npc_pixel_rig/npc_lote2_templates.gd`, `scripts/tools/npc_pixel_rig/npc_lote2_ext.gd`, `scripts/tools/build_npc_lote2_civis.gd`):**
+  - Extensão 100% autoral do pipeline `huwag_v3` `48×48` (`Canvas48`, pés em `y = 39`, `offset = Vector2(0, -7)`, escala `1:1` Nearest Neighbor) preservando silhueta orgânica para todo o elenco civil adulto (pacote completo 24 animações: `idle`, `walk`, `talk`, `attack`, `hurt`, `death` em 4 direções), variante infantil proporcionada para Toby (`idle`, `walk`, `talk`, `hurt`, sem ataque/morte) e forma espectral calcinada para o Vulto do Bosque:
+    - **`aling_nena/`** (`Aling Nena` — blusa/avental marrom-roxo de quitanda, lenço/tiara de cozinha e golpe amplo com cabo/cerdas de vassoura `*tambo*`)
+    - **`kuya_ben/`** (`Kuya Ben` — boné aba curva virado/reto de motorista de jeepney, jaqueta jeans azul-índigo aberta e golpe pesado com chave inglesa metálica)
+    - **`mang_tomas/`** (`Mang Tomas` / `NPC_Feirante` — avental branco de feira com manchas sutis, boné escuro e cutelo de açougue/feira projetado à frente do corpo)
+    - **`mang_carding/`** (`Mang Carding` — bandana turquesa com pontas traseiras, rede diagonal e lamparina na interação; remo longo de madeira em punho no ataque e na queda)
+    - **`toby/`** (`Toby` — grade infantil reduzida ancorada em `y = 39`, boné laranja esportivo, camiseta verde com mochila 2×2; apenas `idle`, `walk`, `talk` e `hurt`)
+    - **`senhora_luningning/`** (`Senhora Luningning` — coque prateado alto, xale roxo-vinho drapeado em V nas costas e ataque espectral de lamparina dupla)
+    - **`lola_rosa/`** (`Lola Rosa` — lenço floral branco com trança grisalha, blusa creme *baro*, cesta de ervas *lagundi* e rajada giratória de folhas verdes / cinzas em brasa)
+    - **`vulto_bosque/`** (`Vulto Calcinado do Bosque` / `NPC_Vulto_Bosque` — silhueta BFP carbonizada com capacete rachado em brasa, olhos incandescentes, corte largo de cinzas/brasas e desintegração em monte de cinzas com capacete partido no chão)
+- **Integração em Runtime (`scripts/levels/fire_station.gd`, `scripts/levels/street_preview.gd`, `scripts/levels/forest_trail.gd`):**
+  - `Velhinha_Espera` (`FireStation`) migrada para `senhora_luningning_{normal,distorted}_spriteframes.tres`.
+  - `StreetPreview` migrado integralmente para Lote 2 `.tres` (`NPC_Aling_Nena`, `NPC_Kuya_Ben`, `NPC_Toby`, `NPC_Feirante`, `NPC_Vigilia_Leste`) com adição em cena de `NPC_Mang_Carding` no píer oeste (`Cais_Praia`) e `NPC_Lola_Rosa` na calçada oeste ao lado da Casa de Huwag.
+  - `NPC_Vulto_Bosque` (`forest_trail.gd`) migrado para `vulto_bosque_{normal,distorted}_spriteframes.tres`.
+
+### 2.20 Etapa 1 (Portraits Anime Pixel Art 96×96), Reformulação da UI/HUD e Staging da Etapa 2 (Sprites Corrompidos Grotescos)
+- **Autoria & Licença:** Produção original autoral integrada ao projeto `Huwag-in-Godot` (uso exclusivo no jogo, sem reutilização de assets ou RTP do RPG Maker MZ), gerada proceduralmente em GDScript nativo no Godot 4 (`Nearest Neighbor`, sem dependências ou plugins externos).
+- **Etapa 1 — Portraits `96×96` Integrados (`scripts/tools/deploy_etapa1_portraits.gd`, `scripts/dialogue/character_profiles.gd`):**
+  - Implantação dos retratos aprovados `96×96` em `assets/characters/portraits/` e `assets/sprites/portraits/` (incluindo novas variantes `huwag_casual_distorted.png`, `huwag_bfp_distorted.png`, `Santelmo` e `Rádio BFP / Fita VHS`).
+  - Atualização de `CharacterProfiles` e das falas em `room_huwag.gd`, `street_preview.gd`, `forest_trail.gd` e `forest_clearing.gd` para usar exclusivamente os retratos aprovados (`is_placeholder = false`, sem overlays rígidos antigos).
+- **Reformulação Visual da UI/HUD & Sistema de Estamina (`scripts/ui/huwag_ui_theme.gd`, `scripts/ui/dialogue_box.gd`, `scenes/ui/DialogueBox.tscn`, `scenes/main/Main.tscn`, `scripts/main/main.gd`, `scenes/menu/TitleScreen.tscn`, `scripts/menu/title_screen.gd`, `scripts/autoload/game_state.gd`, `scripts/characters/player.gd`):**
+  - `DialogueBox` redesenhada em retângulo horizontal inferior (`448×88`), borda crisp `1px`, cantos retos `0px`, friso superior VHS sutil, moldura quadrada de retrato `72×72` com `TEXTURE_FILTER_NEAREST`, indicador animado em pixel art `9×6`, painel de escolhas alinhado acima da caixa e tema automático carmesim escuro para falas/estado `distorted` (e cinza clínico no Ato III).
+  - `Main` HUD superior esquerda substituída por **3 Corações em pixel art (`13×12` — cheio, meio, vazio)** com pulso em vida crítica (`<= 1` coração) + **mini barra de estamina** compacta ligada a correr (`Shift`), esquivar (`Z/L`) e atacar (`J/Espaço`) com regeneração em repouso/caminhada.
+  - `HudTopRight`, notificações toast (`StatusLabel`), modal `[F1]` (`ControlsModal`) e modal de opções da tela inicial (`OptionsModal`) unificados no mesmo padrão minimalista `1px` / `0px`.
+- **Etapa 2 (Staging — Aguardando Aprovação Visual):**
+  - Scripts `scripts/tools/corrupted_v4/corrupted_v4_builder.gd`, `corrupted_v4_designs.gd` e `build_corrupted_v4_preview.gd` geram todas as 12 entidades corrompidas reconstruídas (silhuetas anatômicas grotescas em `48×48`, âncora `y = 39`, contorno `1px`, `toby` restrito a 16 animações sem `attack`/`death`) isoladas em `assets/sprites/corrupted_v4_preview/` para aprovação antes de substituir `assets/sprites/npcs/*/distorted/`.
+
 
 
 

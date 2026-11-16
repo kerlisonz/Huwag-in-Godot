@@ -34,6 +34,7 @@ var _distorted_props: Array[Node2D] = []
 var _distorted_decals: Array[Node2D] = []
 var _lights: Array[PointLight2D] = []
 var _pond_light: PointLight2D = null
+var _clearing_mist: CPUParticles2D = null
 var _time_acc: float = 0.0
 
 
@@ -176,6 +177,37 @@ func _build_clearing_props_and_lights() -> void:
 	for pos in [Vector2(210, 118), Vector2(790, 116), Vector2(780, 420)]:
 		_add_dual_prop("dead_gnarled_tree", pos, ysort_obstacles, Vector2(0, -20))
 
+	for shrub_pos in [
+		Vector2(170, 148), Vector2(340, 110), Vector2(640, 112), Vector2(795, 200),
+		Vector2(805, 340), Vector2(660, 462), Vector2(350, 464), Vector2(165, 340)
+	]:
+		_add_dual_prop("corner_shrub", shrub_pos, ysort_obstacles, Vector2(0, -10))
+
+	for weed_pos in [
+		Vector2(280, 200), Vector2(340, 285), Vector2(560, 142), Vector2(665, 195),
+		Vector2(655, 310), Vector2(520, 390), Vector2(365, 385), Vector2(180, 290)
+	]:
+		_add_dual_prop("overgrown_weeds", weed_pos, ysort_obstacles, Vector2(0, -6))
+
+	_clearing_mist = CPUParticles2D.new()
+	_clearing_mist.name = "ClearingMistParticles"
+	_clearing_mist.position = Vector2(480, 288)
+	_clearing_mist.z_index = 4
+	_clearing_mist.amount = 45
+	_clearing_mist.lifetime = 5.5
+	_clearing_mist.preprocess = 2.0
+	_clearing_mist.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	_clearing_mist.emission_rect_extents = Vector2(400, 220)
+	_clearing_mist.direction = Vector2(0.8, -0.25)
+	_clearing_mist.spread = 35.0
+	_clearing_mist.gravity = Vector2(1.0, -2.5)
+	_clearing_mist.initial_velocity_min = 4.0
+	_clearing_mist.initial_velocity_max = 12.0
+	_clearing_mist.scale_amount_min = 2.0
+	_clearing_mist.scale_amount_max = 4.0
+	_clearing_mist.color = Color(0.68, 0.88, 0.94, 0.25)
+	add_child(_clearing_mist)
+
 	_add_dual_prop("wooden_signpost", Vector2(215, 200), ysort_obstacles, Vector2(0, -10))
 
 	for pos in [Vector2(380, 240), Vector2(495, 336), Vector2(610, 256), Vector2(495, 168)]:
@@ -222,6 +254,13 @@ func _add_dual_prop(kind: String, pos: Vector2, parent_node: Node2D, offset_px: 
 	d.visible = false
 	parent_node.add_child(d)
 	_distorted_props.append(d)
+
+	if kind in ["pine_canopy_cluster", "dead_gnarled_tree", "overgrown_weeds", "corner_shrub"]:
+		var phase := pos.x * 0.05 + pos.y * 0.02
+		var strength := 1.0 if kind == "dead_gnarled_tree" else 1.7
+		var speed := 1.4 if kind == "dead_gnarled_tree" else 1.85
+		RetroLevelHelpers.apply_wind_sway(n, phase, strength, speed, 0.0)
+		RetroLevelHelpers.apply_wind_sway(d, phase, strength * 1.15, speed * 1.25, 0.7)
 
 
 func _sync_clearing_atmosphere() -> void:
@@ -283,6 +322,14 @@ func _sync_clearing_atmosphere() -> void:
 			Color(0.85, 0.20, 0.25, 0.55) if higher else
 			(Color(0.80, 0.83, 0.86, 0.35) if act3 else Color(0.62, 0.88, 0.96, 0.50))
 		)
+
+	if _clearing_mist:
+		if act3:
+			_clearing_mist.color = Color(0.76, 0.78, 0.82, 0.20)
+		elif higher:
+			_clearing_mist.color = Color(0.86, 0.20, 0.26, 0.34)
+		else:
+			_clearing_mist.color = Color(0.68, 0.88, 0.94, 0.25)
 
 
 func _on_exit_area_body_entered(body: Node2D) -> void:
@@ -355,7 +402,7 @@ func _on_creature_interaction() -> void:
 		request_dialogue.emit([
 			{
 				"speaker": "Guardiã da Lagoa",
-				"portrait": "res://assets/characters/portraits/placeholder_creature.png",
+				"expression": "distorted",
 				"text": "Na água avermelhada, três reflexos sem rosto boiam lado a lado.\n\"Os ovos nunca foram mágicos, Huwag. Você os contou porque não suportava contar capacetes vazios.\""
 			}
 		], Callable())
@@ -365,7 +412,6 @@ func _on_creature_interaction() -> void:
 		request_dialogue.emit([
 			{
 				"speaker": "Guardiã da Lagoa",
-				"portrait": "res://assets/characters/portraits/placeholder_creature.png",
 				"text": "(A presença aquática descansa sob as ondulações turquesa da lagoa, em harmonia com a floresta.)"
 			}
 		], Callable())
@@ -392,7 +438,6 @@ func _on_creature_interaction() -> void:
 			request_dialogue.emit([
 				{
 					"speaker": "Guardiã da Lagoa",
-					"portrait": "res://assets/characters/portraits/placeholder_creature.png",
 					"text": "\"Aquele que apaga o fogo destrutivo compreende o valor da água que preserva a vida. Leve a bênção da lagoa, jovem bombeiro.\""
 				},
 				{
