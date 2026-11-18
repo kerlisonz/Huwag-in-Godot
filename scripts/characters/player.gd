@@ -349,11 +349,13 @@ func set_camera_limits(bounds: Rect2i) -> void:
 	if camera == null:
 		camera = get_node_or_null("Camera2D") as Camera2D
 	if camera:
+		camera.limit_smoothed = false
 		camera.limit_left = bounds.position.x
 		camera.limit_top = bounds.position.y
 		camera.limit_right = bounds.position.x + bounds.size.x
 		camera.limit_bottom = bounds.position.y + bounds.size.y
 		camera.reset_smoothing()
+		camera.force_update_scroll()
 
 
 func apply_hit(damage_or_from: Variant, from_or_damage: Variant = null) -> void:

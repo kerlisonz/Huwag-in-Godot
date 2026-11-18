@@ -75,6 +75,10 @@ func _is_dialogue_locked() -> bool:
 func start_boss_fight() -> void:
 	if is_defeated or is_hostile:
 		return
+	if GameState.has_method("are_all_forest_santelmos_defeated") and not GameState.is_unfiltered_act3() and not GameState.are_all_forest_santelmos_defeated():
+		var rem: int = GameState.get_remaining_forest_santelmo_count()
+		GameState.notification_requested.emit("Derrote todos os %d Santelmos restantes na floresta antes de enfrentar a Guardiã." % rem)
+		return
 	is_hostile = true
 	boss_state = BossState.IDLE_COMBAT
 	current_hp = max_hp

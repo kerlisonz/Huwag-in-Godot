@@ -11,8 +11,10 @@ const TOWN_NORMAL_TS := preload("res://assets/tilesets/v2/agdangan_town_v2_norma
 const TOWN_DISTORTED_TS := preload("res://assets/tilesets/v2/agdangan_town_v2_distorted_tileset.tres")
 const TOWN_ACT3_TS := preload("res://assets/tilesets/v2/agdangan_town_v2_act3_tileset.tres")
 
-# Rua estendida de Agdangan: 180 x 35 tiles de 16px (2880 x 560)
-const MAP_BOUNDS := Rect2i(0, 0, 2880, 560)
+# Rua compactada de Agdangan: 112 x 35 tiles de 16px (1792 x 560, faixa ativa y=128..560)
+const MAP_W_TILES := 112
+const MAP_H_TILES := 35
+const MAP_BOUNDS := Rect2i(0, 128, MAP_W_TILES * 16, 432)
 
 @onready var canvas_mod: CanvasModulate = $CanvasModulate
 @onready var ground_normal: TileMapLayer = $TownGroundNormal
@@ -114,16 +116,16 @@ class OverheadWiresDrawer extends Node2D:
 func _ready() -> void:
 	match GameState.spawn_tag:
 		"from_room":
-			player.position = Vector2(569, 395)
+			player.position = Vector2(408, 378)
 			player.facing_dir = Vector2.DOWN
 		"from_station":
-			player.position = Vector2(1185, 345)
+			player.position = Vector2(792, 364)
 			player.facing_dir = Vector2.DOWN
 		"from_forest":
-			player.position = Vector2(2808, 448)
+			player.position = Vector2(1704, 448)
 			player.facing_dir = Vector2.LEFT
 		_:
-			player.position = Vector2(569, 395)
+			player.position = Vector2(408, 378)
 			player.facing_dir = Vector2.DOWN
 
 	player.set_camera_limits(MAP_BOUNDS)
@@ -197,182 +199,203 @@ func _build_town_tilemaps() -> void:
 	var t_cat := V2TileCatalog.TOWN_TILES
 	for layer in [ground_normal, walls_normal]:
 		layer.tile_set = TOWN_ACT3_TS if GameState.is_unfiltered_act3() else TOWN_NORMAL_TS
+		layer.z_index = -2 if layer == ground_normal else -1
 	for layer in [ground_distorted, walls_distorted]:
 		layer.tile_set = TOWN_DISTORTED_TS
+		layer.z_index = -2 if layer == ground_distorted else -1
+		layer.collision_enabled = false
 
 	for gl in [ground_normal, ground_distorted]:
 		gl.clear()
-		# Base contínua de gramado provincial filipino 16x16 em TODO o mapa 180x35 (zero buracos!)
-		for gy in range(0, 35):
-			for gx in range(0, 180):
+		# Base contínua de gramado provincial filipino 16x16 no mapa compactado 112x35
+		for gy in range(0, MAP_H_TILES):
+			for gx in range(0, MAP_W_TILES):
 				var gtile: Vector2i = t_cat["grass_b"] if ((gx * 7 + gy * 13) % 5 == 0) else t_cat["grass_a"]
 				gl.set_cell(Vector2i(gx, gy), 0, gtile)
 
-		# Vielas pavimentadas entre lotes e pátio da feira leste
-		for alley_x in [28, 41, 50, 57, 77, 89, 104, 121, 132, 142, 155, 167]:
-			V2TileCatalog.fill_rect(gl, Rect2i(alley_x, 18, 2, 5), t_cat["plaza_slab"])
-		V2TileCatalog.fill_rect(gl, Rect2i(123, 15, 19, 3), t_cat["plaza_slab"])
+		# Costa oeste de Agdangan: oceano animado, água rasa, espuma costeira e transição suave areia <-> terra
+		V2TileCatalog.fill_rect(gl, Rect2i(0, 0, 4, MAP_H_TILES), t_cat["sea_water_anim"])
+		V2TileCatalog.fill_rect(gl, Rect2i(4, 0, 2, MAP_H_TILES), t_cat["shallow_water_anim"])
+		for sy in range(0, MAP_H_TILES):
+			gl.set_cell(Vector2i(6, sy), 0, t_cat["sand_edge_w"])
+			for sx in range(7, 16):
+				if sx <= 10:
+					var stile: Vector2i = t_cat["sand_b"] if (sx == 7 or (sx + sy) % 4 == 0) else t_cat["sand_a"]
+					gl.set_cell(Vector2i(sx, sy), 0, stile)
+				elif sx == 11:
+					gl.set_cell(Vector2i(sx, sy), 0, t_cat["sand_dirt_mix"])
+				elif sx == 12:
+					gl.set_cell(Vector2i(sx, sy), 0, t_cat["sand_dirt_blend"])
+				else:
+					var dtile: Vector2i = t_cat["dirt_b"] if ((sx + sy) % 3 == 0) else t_cat["dirt_a"]
+					gl.set_cell(Vector2i(sx, sy), 0, dtile)
 
-		# Costa oeste de Agdangan: oceano animado, água rasa, praia de areia contínua e píer (x: 0..13)
-		V2TileCatalog.fill_rect(gl, Rect2i(0, 0, 4, 35), t_cat["sea_water_anim"])
-		V2TileCatalog.fill_rect(gl, Rect2i(4, 0, 2, 35), t_cat["shallow_water_anim"])
-		for sy in range(0, 35):
-			for sx in range(6, 14):
-				var stile: Vector2i = t_cat["sand_b"] if ((sx + sy) % 4 == 0) else t_cat["sand_a"]
-				gl.set_cell(Vector2i(sx, sy), 0, stile)
-		# Píer de madeira contínuo (x: 4..13, y: 26..28)
+		# Calçadão de pedra alinhado ao píer e Píer de madeira contínuo (x: 4..13, y: 26..28)
+		V2TileCatalog.fill_rect(gl, Rect2i(14, 24, 2, 7), t_cat["plaza_slab"])
 		for py in range(26, 29):
 			gl.set_cell(Vector2i(4, py), 0, t_cat["pier_plank_l"])
 			for px in range(5, 13):
 				gl.set_cell(Vector2i(px, py), 0, t_cat["pier_plank"])
 			gl.set_cell(Vector2i(13, py), 0, t_cat["pier_plank_r"])
-		for px in range(4, 14, 3):
+		for px in [4, 5]:
 			gl.set_cell(Vector2i(px, 29), 0, t_cat["pier_post"])
 
-		# Calçada Norte contínua (y=23..24, x=16..172) + Pátio do Quartel BFP + Adro da Igreja
-		V2TileCatalog.fill_rect(gl, Rect2i(16, 23, 156, 1), t_cat["curb_top"])
-		V2TileCatalog.fill_rect(gl, Rect2i(16, 24, 156, 1), t_cat["curb_bottom"])
-		V2TileCatalog.fill_rect(gl, Rect2i(59, 20, 19, 3), t_cat["plaza_slab"])
-		V2TileCatalog.fill_rect(gl, Rect2i(108, 13, 11, 10), t_cat["plaza_slab"])
+		# Calçada Norte contínua (y=23..24, x=16..103) + Pátios compactos BFP, Igreja e Feira
+		V2TileCatalog.fill_rect(gl, Rect2i(16, 23, 88, 1), t_cat["curb_top"])
+		V2TileCatalog.fill_rect(gl, Rect2i(16, 24, 88, 1), t_cat["curb_bottom"])
+		V2TileCatalog.fill_rect(gl, Rect2i(37, 21, 15, 2), t_cat["plaza_slab"]) # Pátio BFP
+		V2TileCatalog.fill_rect(gl, Rect2i(68, 20, 13, 3), t_cat["plaza_slab"]) # Adro compacto da Igreja
+		V2TileCatalog.fill_rect(gl, Rect2i(82, 22, 11, 1), t_cat["plaza_slab"]) # Pátio da Feira
+		for alley_x in [21, 29, 35, 52, 59, 67, 81, 87, 93]:
+			V2TileCatalog.fill_rect(gl, Rect2i(alley_x, 21, 1, 2), t_cat["plaza_slab"])
 
-		# Avenida principal asfaltada contínua (x: 16..172, y: 25..31) + Calçada Sul (y=32)
-		V2TileCatalog.fill_rect(gl, Rect2i(16, 25, 156, 7), t_cat["asphalt"])
-		V2TileCatalog.fill_rect(gl, Rect2i(16, 32, 156, 1), t_cat["curb_top"])
+		# Avenida principal asfaltada contínua (x: 16..103, y: 25..31) + Calçada Sul (y=32) + acostamento em terra
+		V2TileCatalog.fill_rect(gl, Rect2i(16, 25, 88, 7), t_cat["asphalt"])
+		V2TileCatalog.fill_rect(gl, Rect2i(16, 32, 88, 1), t_cat["curb_top"])
+		V2TileCatalog.fill_rect(gl, Rect2i(16, 33, 88, 2), t_cat["dirt_a"])
+		for sx in range(16, 104, 3):
+			gl.set_cell(Vector2i(sx, 34), 0, t_cat["dirt_b"])
 
-		# Faixa central tracejada, rachaduras no asfalto e faixas de pedestres
-		for rx in range(20, 170, 3):
+		# Faixa central tracejada e faixas de pedestres
+		for rx in range(20, 102, 3):
 			gl.set_cell(Vector2i(rx, 28), 0, t_cat["asphalt_dash_h"])
-		for cw_x in [35, 73, 112, 146]:
+		for cw_x in [25, 45, 74, 89]:
 			V2TileCatalog.fill_rect(gl, Rect2i(cw_x, 25, 2, 7), t_cat["crosswalk"])
 
-		# Quadra Comunitária de Basquete do Barangay (x: 31..46, y: 8..15)
-		V2TileCatalog.fill_rect(gl, Rect2i(31, 8, 16, 8), t_cat["plaza_slab"])
-		V2TileCatalog.fill_rect(gl, Rect2i(31, 12, 16, 1), t_cat["plaza_line_h"])
-		V2TileCatalog.fill_rect(gl, Rect2i(38, 8, 1, 8), t_cat["plaza_line_v"])
-		V2TileCatalog.fill_rect(gl, Rect2i(34, 16, 4, 2), t_cat["plaza_slab"])
-
-		# Estrada de terra leste entrando na floresta de Agdangan (x: 172..179, y: 25..31)
-		V2TileCatalog.fill_rect(gl, Rect2i(172, 25, 8, 7), t_cat["dirt_a"])
+		# Estrada de terra leste entrando na floresta (x: 104..111, y: 25..31) sem recorte quadriculado
+		V2TileCatalog.fill_rect(gl, Rect2i(104, 25, 8, 7), t_cat["dirt_a"])
+		for dy in [26, 27, 28, 30]:
+			gl.set_cell(Vector2i(103, dy), 0, t_cat["dirt_a"])
+		gl.set_cell(Vector2i(102, 27), 0, t_cat["dirt_b"])
+		gl.set_cell(Vector2i(102, 29), 0, t_cat["dirt_b"])
 		for dy in range(26, 31):
-			gl.set_cell(Vector2i(175, dy), 0, t_cat["dirt_b"])
+			gl.set_cell(Vector2i(107, dy), 0, t_cat["dirt_b"])
 
-		# Poças de chuva tropical e rachaduras discretas ao longo da avenida
+		# Poças de chuva tropical e rachaduras discretas ao longo da avenida compacta
 		for p_pos in [
-			Vector2i(21, 29), Vector2i(29, 26), Vector2i(44, 26), Vector2i(53, 30),
-			Vector2i(64, 29), Vector2i(80, 26), Vector2i(94, 26), Vector2i(104, 29),
-			Vector2i(124, 30), Vector2i(130, 26), Vector2i(141, 27), Vector2i(150, 30),
-			Vector2i(158, 29), Vector2i(165, 26)
+			Vector2i(19, 29), Vector2i(28, 26), Vector2i(39, 30), Vector2i(50, 29),
+			Vector2i(62, 26), Vector2i(71, 29), Vector2i(80, 26), Vector2i(95, 29), Vector2i(101, 26)
 		]:
 			gl.set_cell(p_pos, 0, t_cat["asphalt_puddle"])
 
 		for crk_pos in [
-			Vector2i(24, 27), Vector2i(49, 29), Vector2i(68, 26), Vector2i(87, 30),
-			Vector2i(101, 26), Vector2i(118, 26), Vector2i(136, 27), Vector2i(142, 29),
-			Vector2i(152, 27), Vector2i(163, 30)
+			Vector2i(22, 27), Vector2i(34, 29), Vector2i(48, 26), Vector2i(65, 30),
+			Vector2i(78, 26), Vector2i(86, 29), Vector2i(98, 27)
 		]:
 			gl.set_cell(crk_pos, 0, t_cat["asphalt_crack"])
 
-	# Prédios de grande porte em tiles 1x1 (Quartel BFP e Igreja de Agdangan) sem sobreposição
+	# Prédios de grande porte (Quartel BFP e Igreja trazida para perto da avenida)
 	for wl in [walls_normal, walls_distorted]:
 		wl.clear()
 		var win_t: Vector2i = t_cat["wall_window_lit"] if (wl == walls_distorted or _is_night()) else t_cat["wall_window_dark"]
 
-		# CENTRAL DE BOMBEIROS BFP AGDANGAN (x: 59..77, y: 8..19, porta em x=74)
-		_paint_building(wl, 59, 8, 19, 12, t_cat["roof_yero_rust"], t_cat["wall_bfp_red"], true, 74)
-		V2TileCatalog.fill_rect(wl, Rect2i(59, 13, 19, 1), t_cat["roof_yero_rust_eave"])
-		V2TileCatalog.fill_rect(wl, Rect2i(67, 16, 4, 4), t_cat["wall_bfp_shutter"])
-		for wx in [61, 63, 72, 76]:
-			wl.set_cell(Vector2i(wx, 15), 0, win_t)
-			wl.set_cell(Vector2i(wx, 17), 0, win_t)
+		# CENTRAL DE BOMBEIROS BFP AGDANGAN (x: 37..51, y: 10..20, porta em x=49)
+		_paint_building(wl, 37, 10, 15, 11, t_cat["roof_yero_rust"], t_cat["wall_bfp_red"], true, 49)
+		V2TileCatalog.fill_rect(wl, Rect2i(37, 14, 15, 1), t_cat["roof_yero_rust_eave"])
+		V2TileCatalog.fill_rect(wl, Rect2i(42, 17, 4, 4), t_cat["wall_bfp_shutter"])
+		for wx in [39, 41, 47, 50]:
+			wl.set_cell(Vector2i(wx, 16), 0, win_t)
+			wl.set_cell(Vector2i(wx, 18), 0, win_t)
 
-		# Igreja de Agdangan ao norte (x: 108..118, y: 5..12, porta em x=113)
-		_paint_building(wl, 108, 5, 11, 8, t_cat["roof_yero_grey"], t_cat["wall_concrete"], true, 113)
-		V2TileCatalog.fill_rect(wl, Rect2i(108, 8, 11, 1), t_cat["roof_yero_grey_eave"])
-		wl.set_cell(Vector2i(110, 10), 0, win_t)
-		wl.set_cell(Vector2i(116, 10), 0, win_t)
+		# Igreja de Agdangan próxima à rua (x: 69..79, y: 12..19, porta em x=74)
+		_paint_building(wl, 69, 12, 11, 8, t_cat["roof_yero_grey"], t_cat["wall_concrete"], true, 74)
+		V2TileCatalog.fill_rect(wl, Rect2i(69, 15, 11, 1), t_cat["roof_yero_grey_eave"])
+		wl.set_cell(Vector2i(71, 17), 0, win_t)
+		wl.set_cell(Vector2i(77, 17), 0, win_t)
 
-		# Cercas de bambu alinhadas entre lotes
-		V2TileCatalog.fill_rect(wl, Rect2i(22, 10, 1, 12), t_cat["fence_bamboo_v"])
-		V2TileCatalog.fill_rect(wl, Rect2i(51, 21, 6, 1), t_cat["fence_bamboo_h"])
-		V2TileCatalog.fill_rect(wl, Rect2i(86, 22, 5, 1), t_cat["fence_bamboo_h"])
-		V2TileCatalog.fill_rect(wl, Rect2i(99, 22, 7, 1), t_cat["fence_bamboo_h"])
+		# Cercas de bambu alinhadas delimitando quintais sem árvores cortadas na frente
+		V2TileCatalog.fill_rect(wl, Rect2i(14, 12, 1, 10), t_cat["fence_bamboo_v"])
+		V2TileCatalog.fill_rect(wl, Rect2i(15, 12, 22, 1), t_cat["fence_bamboo_h"])
+		V2TileCatalog.fill_rect(wl, Rect2i(52, 14, 17, 1), t_cat["fence_bamboo_h"])
+		V2TileCatalog.fill_rect(wl, Rect2i(68, 12, 1, 10), t_cat["fence_bamboo_v"])
+		V2TileCatalog.fill_rect(wl, Rect2i(80, 12, 1, 10), t_cat["fence_bamboo_v"])
+		V2TileCatalog.fill_rect(wl, Rect2i(81, 14, 21, 1), t_cat["fence_bamboo_h"])
+		V2TileCatalog.fill_rect(wl, Rect2i(102, 14, 1, 8), t_cat["fence_bamboo_v"])
 
-	# Camada dedicada para casas, Sari-Sari Store, veículos, postes e vegetação v2 (100% alinhados no grid, zero sobreposição)
+	# Camada Y-sorted com colisão real completa (casas, lojas, coqueiros, veículos e árvores inteiras)
 	if _town_props_layer == null:
 		_town_props_layer = TileMapLayer.new()
 		_town_props_layer.name = "V2TownPropsLayer"
 		_town_props_layer.z_index = 0
+		_town_props_layer.y_sort_enabled = true
 		_town_props_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		_town_props_layer.collision_enabled = false
-		add_child(_town_props_layer)
+		_town_props_layer.collision_enabled = true
+		if ysort_root != null:
+			ysort_root.add_child(_town_props_layer)
+		else:
+			add_child(_town_props_layer)
+	if decals_layer != null:
+		decals_layer.z_index = 0
 	if ysort_root != null:
 		ysort_root.z_index = 2
 	_town_props_layer.tile_set = TOWN_ACT3_TS if GameState.is_unfiltered_act3() else (TOWN_DISTORTED_TS if _is_higher_dose_active() else TOWN_NORMAL_TS)
 	_town_props_layer.clear()
 
-	# Barco Banca no píer oeste + Casas costeiras
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(5, 23), t_cat["banca_boat"], Vector2i(4, 2))
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(7, 6), t_cat["house_concrete_rust"], Vector2i(6, 5))
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(15, 11), t_cat["house_concrete_grey"], Vector2i(6, 5))
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(15, 17), t_cat["house_concrete_rust"], Vector2i(6, 5))
+	# Barco Banca atracado perto do píer
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(2, 22), t_cat["banca_boat"], Vector2i(4, 2))
 
-	# Casa de Huwag (x: 33..38, y: 18..22 -> porta alinhada em x=35, y=22 / px=569)
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(33, 18), t_cat["house_concrete_rust"], Vector2i(6, 5))
+	# Casas & Mercearias compactadas lado a lado ao longo do quarteirão norte
+	# 1. Casa Oeste (Lola Rosa): x=15..20, y=17..21
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(15, 17), t_cat["house_concrete_grey"], Vector2i(6, 5))
+	# 2. Casa de Huwag: x=23..28, y=17..21 (porta centrada em x=408 px)
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(23, 17), t_cat["house_concrete_rust"], Vector2i(6, 5))
+	# 3. Sari-Sari Store de Aling Nena: x=30..34, y=18..21
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(30, 18), t_cat["sari_sari_store"], Vector2i(5, 4))
 
-	# Sari-Sari Store de Aling Nena (x: 44..48, y: 19..22 -> centrada em px=750)
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(44, 19), t_cat["sari_sari_store"], Vector2i(5, 4))
+	# 4. Viatura BFP no pátio do Quartel (x=40..44, y=20..22) + hidrante
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(40, 20), t_cat["bfp_truck"], Vector2i(5, 3))
+	_town_props_layer.set_cell(Vector2i(38, 22), 0, t_cat["fire_hydrant"])
 
-	# Viatura BFP estacionada no pátio do Quartel (x: 67..71, y: 20..22 -> px=1110)
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(67, 20), t_cat["bfp_truck"], Vector2i(5, 3))
-	_town_props_layer.set_cell(Vector2i(64, 22), 0, t_cat["fire_hydrant"])
+	# 5. Karinderya (x=54..58, y=18..21) + Triciclo de Kuya Ben (x=55..57, y=25..26)
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(54, 18), t_cat["sari_sari_store"], Vector2i(5, 4))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(55, 25), t_cat["tricycle"], Vector2i(3, 2))
 
-	# Karinderya (x: 80..84, y: 19..22) + Triciclo de Kuya Ben (x: 82..84, y: 25..26 -> px=1330)
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(80, 19), t_cat["sari_sari_store"], Vector2i(5, 4))
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(82, 25), t_cat["tricycle"], Vector2i(3, 2))
+	# 6. Casa Residencial Central (x=61..66, y=17..21)
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(61, 17), t_cat["house_concrete_grey"], Vector2i(6, 5))
 
-	# Casa Residencial Central (x: 92..97, y: 18..22)
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(92, 18), t_cat["house_concrete_grey"], Vector2i(6, 5))
+	# 7. Bancos próximos no adro compacto da Igreja
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(70, 21), t_cat["plaza_bench"], Vector2i(2, 1))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(77, 21), t_cat["plaza_bench"], Vector2i(2, 1))
 
-	# Feira do Barangay & Casas do Beco Leste (x: 125..163, y: 18..22)
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(125, 19), t_cat["sari_sari_store"], Vector2i(5, 4))
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(134, 19), t_cat["sari_sari_store"], Vector2i(5, 4))
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(146, 18), t_cat["house_concrete_grey"], Vector2i(6, 5))
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(158, 18), t_cat["house_concrete_rust"], Vector2i(6, 5))
+	# 8. Feira & Casa Leste compactadas (x=82..99, y=17..21)
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(82, 18), t_cat["sari_sari_store"], Vector2i(5, 4))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(88, 18), t_cat["sari_sari_store"], Vector2i(5, 4))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(94, 17), t_cat["house_concrete_rust"], Vector2i(6, 5))
 
-	# Bancos na quadra e no adro da Igreja
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(32, 16), t_cat["plaza_bench"], Vector2i(2, 1))
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(109, 16), t_cat["plaza_bench"], Vector2i(2, 1))
-	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(116, 16), t_cat["plaza_bench"], Vector2i(2, 1))
-
-	# Coqueiros (3x6), Bananeiras (2x3) e Árvores Costeiras (2x3) em posições livres de gramado
-	for palm_pos in [
-		Vector2i(8, 14), Vector2i(24, 15), Vector2i(52, 13), Vector2i(86, 14),
-		Vector2i(102, 14), Vector2i(120, 14), Vector2i(141, 14), Vector2i(165, 14)
-	]:
+	# Abundância de coqueiros costeiros & tropicais (praia, quintais e orla sul — 100% colidíveis)
+	var palm_spots := [
+		Vector2i(7, 10), Vector2i(10, 13), Vector2i(7, 18), Vector2i(11, 20),
+		Vector2i(7, 27), Vector2i(10, 28), Vector2i(18, 12), Vector2i(26, 12),
+		Vector2i(55, 12), Vector2i(63, 12), Vector2i(85, 12), Vector2i(95, 12)
+	]
+	for palm_pos in palm_spots:
 		var p_key := "coconut_left" if palm_pos.x % 2 == 0 else "coconut_right"
 		V2TileCatalog.stamp_rect(_town_props_layer, palm_pos, t_cat[p_key], Vector2i(3, 6))
 
-	for ban_pos in [
-		Vector2i(24, 8), Vector2i(48, 9), Vector2i(86, 8), Vector2i(101, 8),
-		Vector2i(121, 8), Vector2i(141, 8), Vector2i(154, 16), Vector2i(166, 20)
-	]:
+	# Bananeiras esparsas apenas nos quintais e cantos de cerca
+	var ban_spots := [
+		Vector2i(12, 11), Vector2i(21, 14), Vector2i(35, 14),
+		Vector2i(52, 16), Vector2i(67, 15), Vector2i(81, 15), Vector2i(100, 17)
+	]
+	for ban_pos in ban_spots:
 		V2TileCatalog.stamp_rect(_town_props_layer, ban_pos, t_cat["banana_plant"], Vector2i(2, 3))
 
-	# Fileira norte e borda leste de árvores costeiras
-	for tx in range(14, 174, 6):
-		if (tx >= 30 and tx <= 47) or (tx >= 58 and tx <= 78) or (tx >= 107 and tx <= 119):
-			continue
-		var t_key := "coastal_tree_a" if tx % 12 == 0 else ("coastal_tree_b" if tx % 12 == 6 else "coastal_tree_c")
-		V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(tx, 1), t_cat[t_key], Vector2i(2, 3))
+	# Árvores inteiras com distribuição orgânica na borda leste da floresta (ty >= 10)
+	var east_trees := [
+		Vector2i(104, 11), Vector2i(107, 12), Vector2i(109, 10),
+		Vector2i(103, 15), Vector2i(106, 16), Vector2i(109, 15),
+		Vector2i(105, 19), Vector2i(108, 20), Vector2i(104, 21),
+		Vector2i(104, 31), Vector2i(107, 32), Vector2i(109, 31)
+	]
+	for et_idx in range(east_trees.size()):
+		var et_pos: Vector2i = east_trees[et_idx]
+		var et_key := "coastal_tree_c" if et_idx % 3 == 0 else ("coastal_tree_b" if et_idx % 3 == 1 else "coastal_tree_a")
+		V2TileCatalog.stamp_rect(_town_props_layer, et_pos, t_cat[et_key], Vector2i(2, 3))
 
-	for fy in [5, 9, 13, 17, 21]:
-		for fx in [171, 174, 177]:
-			V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(fx, fy), t_cat["coastal_tree_c"], Vector2i(2, 3))
-
-	# Postes de iluminação nos intervalos entre os prédios ao longo da calçada norte (zero sobreposição com fachadas)
-	for lx_tile in [21, 30, 41, 56, 78, 90, 105, 121, 142, 156, 170]:
+	# Postes de iluminação ao longo da calçada compacta
+	for lx_tile in [21, 35, 53, 60, 68, 81, 87, 101]:
 		V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(lx_tile, 19), t_cat["lamppost_lit"], Vector2i(1, 5))
-	for dx_tile in [50, 99, 132, 165]:
+	for dx_tile in [29, 79, 93]:
 		V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(dx_tile, 19), t_cat["lamppost_dark"], Vector2i(1, 5))
 
 
@@ -388,20 +411,20 @@ func _paint_building(wl: TileMapLayer, x0: int, y0: int, w: int, h: int, roof_ti
 
 
 func _build_town_props_and_lights() -> void:
-	# Decais distorcidos Yume Nikki / manchas pela rua (arquitetura, árvores e veículos agora vêm 100% de V2TownPropsLayer)
-	for dx in [310.0, 569.0, 750.0, 960.0, 1110.0, 1340.0, 1590.0, 1810.0, 2140.0, 2380.0, 2480.0, 2720.0]:
+	# Decais distorcidos Yume Nikki / manchas pela rua compactada
+	for dx in [270.0, 408.0, 520.0, 680.0, 792.0, 904.0, 1024.0, 1192.0, 1340.0, 1440.0, 1580.0]:
 		_add_distorted_decal("floor_stain", Vector2(dx, 444), Vector2(1.4, 1.1))
-		_add_distorted_decal("yume_eye_rune", Vector2(dx - 30.0, 384), Vector2(1.1, 1.1))
+		_add_distorted_decal("yume_eye_rune", Vector2(dx - 24.0, 384), Vector2(1.1, 1.1))
 
 	# Luzes PointLight2D nos postes acesos ao longo da via
-	var lit_lamps_x := [340.0, 560.0, 750.0, 1140.0, 1360.0, 1810.0, 2140.0, 2540.0, 2810.0]
+	var lit_lamps_x := [344.0, 568.0, 856.0, 968.0, 1096.0, 1304.0, 1400.0, 1624.0]
 	for lx in lit_lamps_x:
 		var pl := RetroLevelHelpers.create_point_light(Vector2(lx, 396), Color(0.98, 0.80, 0.46), 0.92, 2.6)
 		lights_layer.add_child(pl)
 		_lamp_lights.append(pl)
 
 	# Postes danificados com reator piscante intermitente e faíscas esparsas
-	var dead_lamps_x := [930.0, 1580.0, 1960.0, 2340.0, 2680.0]
+	var dead_lamps_x := [472.0, 1272.0, 1496.0]
 	for i in range(dead_lamps_x.size()):
 		var dead_x: float = dead_lamps_x[i]
 		var fl := RetroLevelHelpers.create_point_light(Vector2(dead_x, 386), Color(0.85, 0.72, 0.48), 0.35, 2.0)
@@ -409,7 +432,7 @@ func _build_town_props_and_lights() -> void:
 		lights_layer.add_child(fl)
 		_flicker_lamps.append(fl)
 
-		if dead_x == 930.0 or dead_x == 2340.0:
+		if dead_x == 472.0 or dead_x == 1496.0:
 			var sparks := CPUParticles2D.new()
 			sparks.position = Vector2(dead_x, 344)
 			sparks.z_index = 6
@@ -428,15 +451,15 @@ func _build_town_props_and_lights() -> void:
 			lights_layer.add_child(sparks)
 			_spark_particles.append(sparks)
 
-	# Luzes de janelas e fachadas (atividade humana / abandono)
+	# Luzes de janelas e fachadas (Casas, Sari-Sari, Quartel BFP, Igreja)
 	var window_defs := [
-		{"pos": Vector2(546, 338), "col": Color(0.95, 0.78, 0.44), "e": 0.46, "s": 1.15},
-		{"pos": Vector2(604, 338), "col": Color(0.95, 0.78, 0.44), "e": 0.46, "s": 1.15},
-		{"pos": Vector2(748, 356), "col": Color(0.82, 0.94, 0.68), "e": 0.56, "s": 1.45},
-		{"pos": Vector2(1110, 272), "col": Color(0.85, 0.88, 0.96), "e": 0.55, "s": 1.65},
-		{"pos": Vector2(1185, 308), "col": Color(0.96, 0.82, 0.52), "e": 0.60, "s": 1.40},
-		{"pos": Vector2(1324, 338), "col": Color(0.96, 0.74, 0.42), "e": 0.52, "s": 1.40},
-		{"pos": Vector2(1810, 182), "col": Color(0.92, 0.84, 0.62), "e": 0.58, "s": 1.90}
+		{"pos": Vector2(288, 326), "col": Color(0.95, 0.78, 0.44), "e": 0.46, "s": 1.15},
+		{"pos": Vector2(408, 326), "col": Color(0.95, 0.78, 0.44), "e": 0.46, "s": 1.15},
+		{"pos": Vector2(520, 336), "col": Color(0.82, 0.94, 0.68), "e": 0.56, "s": 1.45},
+		{"pos": Vector2(704, 272), "col": Color(0.85, 0.88, 0.96), "e": 0.55, "s": 1.65},
+		{"pos": Vector2(792, 308), "col": Color(0.96, 0.82, 0.52), "e": 0.60, "s": 1.40},
+		{"pos": Vector2(904, 336), "col": Color(0.96, 0.74, 0.42), "e": 0.52, "s": 1.40},
+		{"pos": Vector2(1192, 260), "col": Color(0.92, 0.84, 0.62), "e": 0.58, "s": 1.85}
 	]
 	for wd in window_defs:
 		var wl_pt := RetroLevelHelpers.create_point_light(wd["pos"], wd["col"], wd["e"], wd["s"])
@@ -446,7 +469,7 @@ func _build_town_props_and_lights() -> void:
 		_window_lights.append(wl_pt)
 
 	# Giroflex vermelho sobre o quartel / caminhão BFP
-	_beacon_light = RetroLevelHelpers.create_point_light(Vector2(1140, 316), Color(0.94, 0.18, 0.22), 0.72, 1.8)
+	_beacon_light = RetroLevelHelpers.create_point_light(Vector2(696, 328), Color(0.94, 0.18, 0.22), 0.72, 1.8)
 	lights_layer.add_child(_beacon_light)
 
 
@@ -454,17 +477,15 @@ func _build_overhead_wires() -> void:
 	_wires_drawer = OverheadWiresDrawer.new()
 	_wires_drawer.name = "OverheadWiresLayer"
 	_wires_drawer.z_index = 5
-	_wires_drawer.pole_xs = [344.0, 488.0, 664.0, 808.0, 904.0, 1256.0, 1448.0, 1592.0, 1688.0, 1944.0, 2120.0, 2280.0, 2504.0, 2648.0, 2728.0]
-	_wires_drawer.dead_xs = [808.0, 1592.0, 2120.0, 2648.0]
+	_wires_drawer.pole_xs = [344.0, 472.0, 568.0, 856.0, 968.0, 1096.0, 1304.0, 1400.0, 1496.0, 1624.0]
+	_wires_drawer.dead_xs = [472.0, 1272.0, 1496.0]
 	_wires_drawer.drop_targets = [
-		{"from": Vector2(488, 314), "to": Vector2(544, 304), "sag": 6.0},
-		{"from": Vector2(664, 314), "to": Vector2(720, 318), "sag": 5.0},
-		{"from": Vector2(904, 314), "to": Vector2(1020, 244), "sag": 12.0},
-		{"from": Vector2(1256, 314), "to": Vector2(1300, 304), "sag": 8.0},
-		{"from": Vector2(1448, 314), "to": Vector2(1504, 304), "sag": 9.0},
-		{"from": Vector2(1944, 314), "to": Vector2(2020, 308), "sag": 10.0},
-		{"from": Vector2(2280, 314), "to": Vector2(2360, 304), "sag": 10.0},
-		{"from": Vector2(2504, 314), "to": Vector2(2560, 304), "sag": 10.0}
+		{"from": Vector2(344, 314), "to": Vector2(408, 304), "sag": 6.0},
+		{"from": Vector2(568, 314), "to": Vector2(640, 260), "sag": 10.0},
+		{"from": Vector2(856, 314), "to": Vector2(904, 304), "sag": 6.0},
+		{"from": Vector2(1096, 314), "to": Vector2(1148, 250), "sag": 9.0},
+		{"from": Vector2(1304, 314), "to": Vector2(1344, 304), "sag": 7.0},
+		{"from": Vector2(1496, 314), "to": Vector2(1544, 304), "sag": 8.0}
 	]
 	add_child(_wires_drawer)
 
@@ -477,12 +498,12 @@ func _build_ambient_particles() -> void:
 
 	_street_dust_particles = CPUParticles2D.new()
 	_street_dust_particles.name = "StreetDustParticles"
-	_street_dust_particles.position = Vector2(1440, 280)
-	_street_dust_particles.amount = 110
+	_street_dust_particles.position = Vector2(900, 340)
+	_street_dust_particles.amount = 85
 	_street_dust_particles.lifetime = 5.2
 	_street_dust_particles.preprocess = 2.0
 	_street_dust_particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	_street_dust_particles.emission_rect_extents = Vector2(1400, 260)
+	_street_dust_particles.emission_rect_extents = Vector2(880, 200)
 	_street_dust_particles.direction = Vector2(1.0, 0.12)
 	_street_dust_particles.spread = 28.0
 	_street_dust_particles.gravity = Vector2(3.5, -2.5)
@@ -495,12 +516,12 @@ func _build_ambient_particles() -> void:
 
 	_street_smoke_particles = CPUParticles2D.new()
 	_street_smoke_particles.name = "StreetSmokeParticles"
-	_street_smoke_particles.position = Vector2(1600, 370)
-	_street_smoke_particles.amount = 55
+	_street_smoke_particles.position = Vector2(1020, 390)
+	_street_smoke_particles.amount = 42
 	_street_smoke_particles.lifetime = 6.0
 	_street_smoke_particles.preprocess = 2.5
 	_street_smoke_particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	_street_smoke_particles.emission_rect_extents = Vector2(1300, 140)
+	_street_smoke_particles.emission_rect_extents = Vector2(800, 120)
 	_street_smoke_particles.direction = Vector2(-0.6, -1.0)
 	_street_smoke_particles.spread = 35.0
 	_street_smoke_particles.gravity = Vector2(-2.0, -5.0)
@@ -543,14 +564,25 @@ func _add_distorted_decal(kind: String, pos: Vector2, scl: Vector2) -> void:
 
 
 func _setup_collisions() -> void:
-	# Limites externos extras + veículos/postes alinhados ao mapa de 2880x560
-	_add_box(collisions_body, Rect2(1070, 316, 86, 44))   # Caminhão BFP
-	_add_box(collisions_body, Rect2(1296, 396, 78, 34))   # Jeepney / Triciclo
-	_add_box(collisions_body, Rect2(1976, 490, 68, 28))   # Carcaça de carro abandonado oeste-leste
-	_add_box(collisions_body, Rect2(2606, 490, 68, 28))   # Carcaça de carro abandonado leste
-	_add_box(collisions_body, Rect2(1730, 80, 176, 128))  # Corpo da Igreja
-	_add_box(collisions_body, Rect2(496, 272, 160, 96))   # Fachada Casa de Huwag
-	_add_box(collisions_body, Rect2(2872, 0, 20, 560))    # Trava extremo leste
+	# Contenção externa, barreiras marítimas e volumes sólidos completos dos edifícios/casas
+	_add_box(collisions_body, Rect2(0, 0, 96, 416))                     # Mar norte do píer
+	_add_box(collisions_body, Rect2(0, 464, 96, 96))                    # Mar sul do píer
+	_add_box(collisions_body, Rect2(0, 416, 64, 48))                    # Cabeceira do píer
+	_add_box(collisions_body, Rect2(592, 160, 240, 176))                # Complexo completo do Quartel BFP
+	_add_box(collisions_body, Rect2(1104, 192, 176, 128))               # Corpo completo da Igreja de Agdangan
+	# Garantia física adicional em todas as casas/lojas (além do V2TownPropsLayer)
+	_add_box(collisions_body, Rect2(243, 280, 90, 68))                  # Casa Lola Rosa
+	_add_box(collisions_body, Rect2(371, 280, 90, 68))                  # Casa Huwag
+	_add_box(collisions_body, Rect2(482, 294, 76, 56))                  # Sari-Sari Store
+	_add_box(collisions_body, Rect2(866, 294, 76, 56))                  # Karinderya
+	_add_box(collisions_body, Rect2(979, 280, 90, 68))                  # Casa Central
+	_add_box(collisions_body, Rect2(1314, 294, 76, 56))                 # Feira 1
+	_add_box(collisions_body, Rect2(1410, 294, 76, 56))                 # Feira 2
+	_add_box(collisions_body, Rect2(1507, 280, 90, 68))                 # Casa Leste
+	_add_box(collisions_body, Rect2(240, 0, MAP_W_TILES * 16 - 240, 296)) # Fundos dos quintais urbanos (evita passar atrás de casas)
+	_add_box(collisions_body, Rect2(0, 0, MAP_W_TILES * 16, 192))       # Limite superior norte atrás das cercas
+	_add_box(collisions_body, Rect2(0, 528, MAP_W_TILES * 16, 36))      # Borda sul ao longo da avenida
+	_add_box(collisions_body, Rect2(MAP_W_TILES * 16 - 8, 0, 24, 560))  # Trava extremo leste
 
 
 func _add_box(parent: Node2D, r: Rect2) -> void:
@@ -568,7 +600,7 @@ func _spawn_town_npcs() -> void:
 		"NPC_Aling_Nena", "Aling Nena",
 		"res://assets/sprites/npcs/aling_nena/aling_nena_normal_spriteframes.tres",
 		"res://assets/sprites/npcs/aling_nena/aling_nena_distorted_spriteframes.tres",
-		Vector2(786, 396), "down", []
+		Vector2(548, 384), "down", []
 	)
 
 	# 2. Bombeiro de Ronda diante do Quartel BFP
@@ -576,41 +608,41 @@ func _spawn_town_npcs() -> void:
 		"NPC_Bombeiro_Ronda", "Bombeiro de Ronda",
 		"res://assets/sprites/npcs/bombeiro_santos/bombeiro_santos_normal_spriteframes.tres",
 		"res://assets/sprites/npcs/bombeiro_santos/bombeiro_santos_distorted_spriteframes.tres",
-		Vector2(1010, 378), "right",
-		[Vector2(1010, 378), Vector2(1062, 378)]
+		Vector2(606, 384), "right",
+		[Vector2(606, 384), Vector2(654, 384)]
 	)
 
-	# 3. Kuya Ben ao lado do Jeepney/Triciclo
+	# 3. Kuya Ben ao lado do Triciclo / Karinderya
 	_spawn_npc(
 		"NPC_Kuya_Ben", "Kuya Ben",
 		"res://assets/sprites/npcs/kuya_ben/kuya_ben_normal_spriteframes.tres",
 		"res://assets/sprites/npcs/kuya_ben/kuya_ben_distorted_spriteframes.tres",
-		Vector2(1386, 424), "left", []
+		Vector2(954, 422), "left", []
 	)
 
-	# 4. Toby na região leste da praça/feira abandonada
+	# 4. Toby perto da Igreja / Feira Leste
 	_spawn_npc(
 		"NPC_Toby", "Toby",
 		"res://assets/sprites/npcs/toby/toby_normal_spriteframes.tres",
 		"res://assets/sprites/npcs/toby/toby_distorted_spriteframes.tres",
-		Vector2(2060, 394), "down",
-		[Vector2(2040, 394), Vector2(2110, 394)]
+		Vector2(1312, 386), "down",
+		[Vector2(1292, 386), Vector2(1348, 386)]
 	)
 
-	# 5. Mang Tomas (Feirante do Barangay) na banca leste - ajuda e narrativa Ato 2->3
+	# 5. Mang Tomas (Feirante do Barangay) na banca leste
 	_spawn_npc(
 		"NPC_Feirante", "Feirante do Barangay",
 		"res://assets/sprites/npcs/mang_tomas/mang_tomas_normal_spriteframes.tres",
 		"res://assets/sprites/npcs/mang_tomas/mang_tomas_distorted_spriteframes.tres",
-		Vector2(2260, 392), "down", []
+		Vector2(1446, 384), "down", []
 	)
 
-	# 6. Aparição / Vigília da Senhora Luningning no beco leste perto da saída da floresta
+	# 6. Aparição / Vigília da Senhora Luningning perto da saída para a floresta
 	_spawn_npc(
 		"NPC_Vigilia_Leste", "Senhora Luningning",
 		"res://assets/sprites/npcs/senhora_luningning/senhora_luningning_normal_spriteframes.tres",
 		"res://assets/sprites/npcs/senhora_luningning/senhora_luningning_distorted_spriteframes.tres",
-		Vector2(2560, 392), "left", []
+		Vector2(1596, 386), "left", []
 	)
 
 	# 7. Mang Carding no píer oeste dos pescadores (costa)
@@ -621,12 +653,12 @@ func _spawn_town_npcs() -> void:
 		Vector2(188, 436), "left", []
 	)
 
-	# 8. Lola Rosa (vizinha erborista no quarteirão oeste próximo à Casa de Huwag)
+	# 8. Lola Rosa próxima à casa costeira oeste
 	_spawn_npc(
 		"NPC_Lola_Rosa", "Lola Rosa",
 		"res://assets/sprites/npcs/lola_rosa/lola_rosa_normal_spriteframes.tres",
 		"res://assets/sprites/npcs/lola_rosa/lola_rosa_distorted_spriteframes.tres",
-		Vector2(448, 392), "right", []
+		Vector2(350, 386), "right", []
 	)
 
 
@@ -653,16 +685,15 @@ func _spawn_npc(id: String, prompt: String, norm_path: String, dist_path: String
 
 
 func _setup_interactables() -> void:
-	_add_interactable("Casa_Huwag", "Casa de Huwag", "Entrar", Vector2(569, 375), Vector2(30, 22))
-	_add_interactable("Quadra_Basquete", "Quadra do Barangay", "Observar", Vector2(620, 260), Vector2(40, 24))
-	_add_interactable("Sari_Sari", "Sari-Sari Store", "Examinar", Vector2(750, 395), Vector2(38, 24))
-	_add_interactable("Mural_Barangay", "Mural do Barangay", "Olhar", Vector2(870, 395), Vector2(34, 24))
-	_add_interactable("Caminhao_Bombeiros", "Caminhão de Bombeiros", "Examinar", Vector2(1110, 375), Vector2(46, 28))
-	_add_interactable("Entrada_Quartel", "Quartel dos Bombeiros", "Entrar", Vector2(1185, 335), Vector2(30, 24))
-	_add_interactable("Karinderya_Triciclo", "Triciclo", "Examinar", Vector2(1330, 440), Vector2(36, 24))
-	_add_interactable("Igreja_Agdangan", "Igreja de Agdangan", "Observar", Vector2(1810, 210), Vector2(42, 28))
-	_add_interactable("Cais_Praia", "Píer dos Pescadores", "Olhar", Vector2(160, 435), Vector2(38, 28))
-	_add_interactable("Estrada_Floresta", "Estrada para a Floresta", "Seguir", Vector2(2848, 448), Vector2(40, 88))
+	_add_interactable("Casa_Huwag", "Casa de Huwag", "Entrar", Vector2(408, 360), Vector2(32, 24))
+	_add_interactable("Sari_Sari", "Sari-Sari Store", "Examinar", Vector2(520, 364), Vector2(40, 24))
+	_add_interactable("Mural_Barangay", "Mural do Barangay", "Olhar", Vector2(574, 364), Vector2(30, 24))
+	_add_interactable("Caminhao_Bombeiros", "Caminhão de Bombeiros", "Examinar", Vector2(680, 376), Vector2(48, 28))
+	_add_interactable("Entrada_Quartel", "Quartel dos Bombeiros", "Entrar", Vector2(792, 344), Vector2(32, 24))
+	_add_interactable("Karinderya_Triciclo", "Triciclo", "Examinar", Vector2(904, 436), Vector2(38, 24))
+	_add_interactable("Igreja_Agdangan", "Igreja de Agdangan", "Observar", Vector2(1192, 330), Vector2(42, 28))
+	_add_interactable("Cais_Praia", "Píer dos Pescadores", "Olhar", Vector2(160, 440), Vector2(38, 28))
+	_add_interactable("Estrada_Floresta", "Estrada para a Floresta", "Seguir", Vector2(1748, 448), Vector2(40, 88))
 
 
 func _add_interactable(id: String, title_text: String, verb_text: String, pos: Vector2, box_size: Vector2) -> void:
@@ -827,17 +858,6 @@ func _on_interactable_triggered(id: String) -> void:
 				if choice == 0:
 					request_level_change.emit("res://scenes/levels/RoomHuwag.tscn", "from_street")
 			)
-
-		"Quadra_Basquete":
-			request_dialogue.emit([{
-				"speaker": "Huwag Matitiis",
-				"expression": "scared" if higher else ("unfiltered" if act3 else "neutral"),
-				"text": "O aro enferrujado balança sem vento... O concreto parece marcado por pegadas de borracha carbonizada." if higher else (
-					"A quadra está vazia sob o céu cinzento. Aqui os colegas do pelotão jogavam nos fins de tarde."
-					if act3 else
-					"A quadra comunitária do barangay. As linhas brancas já descascaram sob o calor úmido."
-				)
-			}], Callable())
 
 		"Sari_Sari", "NPC_Aling_Nena":
 			if higher:

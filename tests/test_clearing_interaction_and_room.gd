@@ -65,8 +65,24 @@ func _run_suite() -> void:
 	var nest = clearing.get_node_or_null("ObstaclesYsort/EggNest")
 	assert(nest != null, "Ninho com ovos azuis presente!")
 
-	# Huwag caminha em direção à margem oeste da lagoa
-	print("Huwag caminhando em direção à margem da lagoa...")
+	# Com Santelmos ainda vivos, a barreira dos Santelmos barra a entrada do santuário antes de x=430
+	print("Testando bloqueio da Barreira dos Santelmos antes de derrotar os 16 inimigos...")
+	cl_player.position = Vector2(350, 235)
+	cl_player.facing_dir = Vector2.RIGHT
+	for i in range(30):
+		cl_player.move_and_collide(Vector2(4, 0))
+		await physics_frame
+	assert(cl_player.position.x < 430.0, "Barreira dos Santelmos deve travar antes da Guardiã! (x=%f)" % cl_player.position.x)
+	var barrier_ia: Interactable = cl_player.get_best_interactable()
+	assert(barrier_ia != null and barrier_ia.title == "Barreira dos Santelmos", "Deve detectar Barreira dos Santelmos enquanto restarem Santelmos vivos!")
+	print("[PASS] Barreira dos Santelmos bloqueou fisicamente acesso prematuro em x=%f." % cl_player.position.x)
+
+	# Derrotando os 16 Santelmos, a passagem até a Guardiã abre livremente
+	var gs_clear = root.get_node_or_null("GameState")
+	gs_clear.mark_all_forest_santelmos_defeated()
+	for _f in range(3):
+		await physics_frame
+	print("Huwag caminhando em direção à margem da lagoa liberada...")
 	cl_player.position = Vector2(350, 235)
 	cl_player.facing_dir = Vector2.RIGHT
 
@@ -75,13 +91,13 @@ func _run_suite() -> void:
 		await process_frame
 
 	print("Posição de Huwag na margem: %s" % cl_player.position)
-	assert(cl_player.position.x >= 420.0, "Huwag deve conseguir caminhar até a margem d'água!")
+	assert(cl_player.position.x >= 420.0, "Huwag deve conseguir caminhar até a margem d'água após derrotar os 16 Santelmos!")
 
 	# Verifica se a interação com a Guardiã foi detectada
 	var best_inter: Interactable = cl_player.get_best_interactable()
 	assert(best_inter != null, "Huwag deve detectar um objeto interativo na margem da lagoa!")
 	print("[PASS] Interagível detectado: '%s' | Prompt: '%s'" % [best_inter.title, best_inter.get_prompt_text()])
-	assert(best_inter.title == "Guardiã da Lagoa", "O interagível deve ser a Guardiã da Lagoa!")
+	assert("Guardi" in best_inter.title and "Lagoa" in best_inter.title, "O interagível deve ser a Guardiã/Guardião da Lagoa! (%s)" % best_inter.title)
 
 	# Testa acionamento do diálogo
 	var dialogue_tracker := {"triggered": false}

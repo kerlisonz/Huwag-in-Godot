@@ -30,6 +30,125 @@ static func _noisy_fill(img: Image, tile: Vector2i, c_a: Color, c_b: Color, c_sp
 			_set_g(img, x0 + x, y0 + y, col, variant)
 
 
+static func draw_ocean_and_pier_tiles(img: Image, variant: String) -> void:
+	# 1. Areia costeira + borda de arrebentação contínua (cols 14..15, rows 0..1)
+	var sand_a := Color("#C9B07C")
+	var sand_b := Color("#BEA36E")
+	var sand_sp := Color("#D8C28E")
+	var sand_wet := Color("#A28B5E")
+	var foam_hi := Color("#D2EDF2")
+	var foam_mid := Color("#8AC3D1")
+	var surf_col := Color("#2F7F99")
+	_noisy_fill(img, Vector2i(15, 0), sand_a, sand_b, sand_sp, 41, variant)
+	_noisy_fill(img, Vector2i(15, 1), sand_b, sand_a, Color("#AE9460"), 42, variant)
+	_noisy_fill(img, Vector2i(14, 1), sand_wet, sand_b, sand_a, 43, variant)
+	# (14, 0) sand_edge_w: transição suave água rasa -> espuma costeira -> areia úmida -> areia seca
+	_noisy_fill(img, Vector2i(14, 0), sand_wet, sand_a, sand_b, 44, variant)
+	for y in range(16):
+		var wave_x := 6 + int(round(sin(float(y) * TAU / 16.0) * 1.2))
+		for x in range(wave_x):
+			var d_col := surf_col if x < wave_x - 2 else foam_mid
+			_set_g(img, 14 * 16 + x, y, d_col, variant)
+		_set_g(img, 14 * 16 + wave_x, y, foam_hi, variant)
+		_set_g(img, 14 * 16 + wave_x + 1, y, sand_wet, variant)
+
+	# 2. Mar profundo animado (19..21, 0) e água rasa costeira animada (22..24, 0) — 100% seamless
+	var deep_base := Color("#154563")
+	var deep_mid := Color("#1A5273")
+	var deep_crest := Color("#2A6D8E")
+	var shal_base := Color("#246C87")
+	var shal_mid := Color("#2D7D99")
+	var shal_crest := Color("#4FA0B8")
+	for f in range(3):
+		var phase_x := float(f) * (16.0 / 3.0)
+		var dx0 := (19 + f) * 16
+		var sx0 := (22 + f) * 16
+		for y in range(16):
+			for x in range(16):
+				var wave1 := sin((float(x) + phase_x) * TAU / 16.0 + float(y) * TAU / 16.0)
+				var wave2 := cos((float(x) - phase_x) * TAU / 8.0 - float(y) * TAU / 16.0)
+				var v := wave1 * 0.6 + wave2 * 0.4
+				var dcol := deep_base
+				if v > 0.62:
+					dcol = deep_crest
+				elif v > 0.12:
+					dcol = deep_mid
+				_set_g(img, dx0 + x, y, dcol, variant)
+
+				var scol := shal_base
+				if v > 0.56:
+					scol = shal_crest
+				elif v > 0.08:
+					scol = shal_mid
+				_set_g(img, sx0 + x, y, scol, variant)
+
+	# 3. Píer horizontal de madeira (16..18, 0) + estacas de apoio na água (17, 1)
+	var out_c := Color("#12131A")
+	var wood_hi := Color("#9A6D49")
+	var wood_md := Color("#7C5436")
+	var wood_dk := Color("#563924")
+	for idx in range(3):
+		var px0 := (16 + idx) * 16
+		# Fundo sólido de tábuas horizontais do píer (preenche toda a largura para emendar sem falhas)
+		_rect_g(img, px0, 0, 16, 16, wood_md, variant)
+		_rect_g(img, px0, 0, 16, 1, out_c, variant)
+		_rect_g(img, px0, 1, 16, 2, wood_hi, variant)
+		_rect_g(img, px0, 13, 16, 2, wood_dk, variant)
+		_rect_g(img, px0, 15, 16, 1, out_c, variant)
+		for sx in range(0, 16, 4):
+			_rect_g(img, px0 + sx, 3, 1, 10, wood_dk, variant)
+			_rect_g(img, px0 + sx + 1, 3, 2, 10, wood_md if (sx % 8 == 0) else wood_hi, variant)
+			_set_g(img, px0 + sx + 2, 4, Color("#3B271A"), variant)
+			_set_g(img, px0 + sx + 2, 11, Color("#3B271A"), variant)
+	# Cabeceira oeste do píer (16, 0) com vigas terminais
+	_rect_g(img, 16 * 16, 0, 2, 16, out_c, variant)
+	_rect_g(img, 16 * 16 + 2, 1, 2, 14, wood_dk, variant)
+	# Estaca de suporte do píer dentro da água (17, 1)
+	_rect_g(img, 17 * 16, 16, 16, 16, shal_base, variant)
+	_rect_g(img, 17 * 16 + 5, 16, 6, 12, out_c, variant)
+	_rect_g(img, 17 * 16 + 6, 16, 4, 11, wood_dk, variant)
+	_rect_g(img, 17 * 16 + 6, 16, 2, 10, wood_md, variant)
+	_rect_g(img, 17 * 16 + 4, 27, 8, 2, foam_hi, variant)
+
+
+static func draw_soil_and_blend_tiles(img: Image, variant: String) -> void:
+	# Terra costeira (4..5, 1) e transições orgânicas areia <-> terra (6..7, 1)
+	var dirt_a := Color("#6D513A")
+	var dirt_b := Color("#604530")
+	var dirt_sp := Color("#7E6046")
+	_noisy_fill(img, Vector2i(4, 1), dirt_a, dirt_b, dirt_sp, 61, variant)
+	_noisy_fill(img, Vector2i(5, 1), dirt_b, dirt_a, Color("#513926"), 62, variant)
+
+	# Pontilhos sutis de pedrinha na terra batida
+	for k in range(4):
+		var px := 4 * 16 + 3 + k * 3
+		var py := 16 + 4 + ((k * 5) % 8)
+		_set_g(img, px, py, Color("#8C7259"), variant)
+		_set_g(img, px + 1, py + 1, Color("#4D3725"), variant)
+
+	# (6, 1): Gradiente orgânico horizontal Areia (esquerda) -> Terra (direita)
+	for y in range(16):
+		for x in range(16):
+			var sand_c := img.get_pixel(15 * 16 + x, y)
+			var dirt_c := img.get_pixel(4 * 16 + x, 16 + y)
+			var hash_j := float(((x * 73 + y * 139) ^ (x * y * 19)) & 15) / 15.0
+			var t := clampf((float(x) + (hash_j - 0.5) * 4.5 - 2.0) / 11.0, 0.0, 1.0)
+			img.set_pixel(6 * 16 + x, 16 + y, dirt_c if t > 0.5 else sand_c)
+
+	# (7, 1): Solo misto areia-terra harmonioso (meio-termo natural sem degrau brusco)
+	for y in range(16):
+		for x in range(16):
+			var sand_c := img.get_pixel(15 * 16 + x, y)
+			var dirt_c := img.get_pixel(4 * 16 + x, 16 + y)
+			var h := ((x * 59 + y * 113 + 7) ^ (x * y * 13)) & 31
+			var mix_c := sand_c.lerp(dirt_c, 0.52)
+			if h < 9:
+				mix_c = sand_c.lerp(dirt_c, 0.30)
+			elif h > 23:
+				mix_c = dirt_c.lerp(sand_c, 0.25)
+			img.set_pixel(7 * 16 + x, 16 + y, mix_c)
+
+
 static func draw_road_and_plaza_tiles(img: Image, origin: Vector2i, variant: String) -> void:
 	var asp_a := Color("#262832")
 	var asp_b := Color("#2D303C")
@@ -467,13 +586,140 @@ static func draw_sawali_and_banig(img: Image, sawali_origin: Vector2i, banig_ori
 				_set_g(img, tx + x, ty + y, col, variant)
 		_rect_g(img, tx, ty + 15, 16, 1, Color("#140F12"), variant)
 
-	# Esteira Banig 3x2 tiles (48x32) tecida com borda vermelha/verde filipina
+	# Esteira Banig 3x2 tiles (48x32) tecida com borda marrom escura suave filipina
 	var mx0 := banig_origin.x * 16
 	var my0 := banig_origin.y * 16
-	_rect_g(img, mx0 + 1, my0 + 1, 46, 30, Color("#161214"), variant)
+	_rect_g(img, mx0 + 1, my0 + 1, 46, 30, Color("#3D2820"), variant)
 	_rect_g(img, mx0 + 2, my0 + 2, 44, 28, Color("#8C4030"), variant)
 	for y in range(my0 + 4, my0 + 28):
 		for x in range(mx0 + 4, mx0 + 44):
 			var pat := ((x + y) % 4 == 0) or ((x - y + 64) % 4 == 0)
 			var col := Color("#B89862") if pat else Color("#9C7C49")
 			_set_g(img, x, y, col, variant)
+
+
+static func draw_vertical_bamboo_fence_tile(img: Image, dst_tile: Vector2i, variant: String) -> void:
+	# Cerca vertical contínua de bambu (16x16 sem emendas quebradas entre tiles verticais)
+	var x0 := dst_tile.x * 16
+	var y0 := dst_tile.y * 16
+	for py in range(16):
+		for px in range(16):
+			img.set_pixel(x0 + px, y0 + py, Color(0, 0, 0, 0))
+	var out_c := Color("#161214")
+	# Dois trilhos/varas verticais contínuos de cima a baixo (y=0..15)
+	_rect_g(img, x0 + 5, y0, 6, 16, out_c, variant)
+	_rect_g(img, x0 + 6, y0, 2, 16, Color("#8A6843"), variant)
+	_rect_g(img, x0 + 8, y0, 2, 16, Color("#5E4126"), variant)
+	# Mourão central mais largo com topo destacado + nós de bambu alinhados
+	_rect_g(img, x0 + 4, y0 + 2, 8, 6, out_c, variant)
+	_rect_g(img, x0 + 5, y0 + 2, 6, 2, Color("#A27C52"), variant)
+	_rect_g(img, x0 + 5, y0 + 4, 6, 3, Color("#735232"), variant)
+	_rect_g(img, x0 + 6, y0 + 11, 4, 1, Color("#462E19"), variant)
+
+
+static func draw_interior_window_tile(img: Image, window_tl: Vector2i, variant: String) -> void:
+	# Janela completa 2x3 (32x48): moldura fechada nas 4 bordas em 2x2 superior + sombra sutil na linha inferior
+	P.clear_tiles_rect(img, window_tl, Vector2i(2, 3))
+	var x0 := window_tl.x * 16
+	var y0 := window_tl.y * 16
+	var out_c := Color("#161114")
+	var wood_dk := Color("#4A2F1D")
+	var wood_md := Color("#744C32")
+	var wood_hi := Color("#9A6B49")
+	var sill_c := Color("#83583A")
+	var glass_a := Color("#D8EAF2")
+	var glass_b := Color("#F4F8EA")
+	var glass_hi := Color("#FFFFFF")
+	if variant == "distorted":
+		glass_a = Color("#A84B59")
+		glass_b = Color("#CF727D")
+		glass_hi = Color("#F5C4C9")
+	elif variant == "act3":
+		glass_a = Color("#B7BEC6")
+		glass_b = Color("#CFD5DC")
+		glass_hi = Color("#E7EBF0")
+
+	# Moldura externa fechada dos 4 lados (32x31 px em rows 0..1)
+	_rect_g(img, x0 + 1, y0 + 1, 30, 29, out_c, variant)
+	_rect_g(img, x0 + 2, y0 + 2, 28, 25, wood_md, variant)
+	_rect_g(img, x0 + 2, y0 + 2, 28, 1, wood_hi, variant)
+	_rect_g(img, x0 + 2, y0 + 2, 1, 25, wood_hi, variant)
+	_rect_g(img, x0 + 29, y0 + 2, 1, 25, wood_dk, variant)
+
+	# 4 vidraças simétricas com travessas centrais horizontais e verticais completas
+	for py in [y0 + 5, y0 + 16]:
+		for px in [x0 + 5, x0 + 17]:
+			_rect_g(img, px, py, 10, 9, out_c, variant)
+			_rect_g(img, px + 1, py + 1, 8, 7, glass_a, variant)
+			_rect_g(img, px + 1, py + 1, 5, 5, glass_b, variant)
+			_rect_g(img, px + 2, py + 2, 2, 2, glass_hi, variant)
+			_set_g(img, px + 4, py + 3, glass_hi, variant)
+
+	# Travessa central em cruz (100% fechada dentro da moldura)
+	_rect_g(img, x0 + 15, y0 + 4, 2, 22, wood_dk, variant)
+	_rect_g(img, x0 + 4, y0 + 14, 24, 2, wood_dk, variant)
+	_rect_g(img, x0 + 4, y0 + 14, 24, 1, wood_md, variant)
+
+	# Peitoril inferior completo projetado para frente
+	_rect_g(img, x0, y0 + 27, 32, 4, out_c, variant)
+	_rect_g(img, x0 + 1, y0 + 27, 30, 1, wood_hi, variant)
+	_rect_g(img, x0 + 1, y0 + 28, 30, 2, sill_c, variant)
+
+	# Sombra sutil sob o peitoril no piso (sem bloco sólido pendurado)
+	P.rect_px(img, x0 + 1, y0 + 31, 30, 4, Color(0.03, 0.03, 0.06, 0.24))
+
+
+static func draw_interior_chairs(img: Image, chair_origin: Vector2i, variant: String) -> void:
+	# 4 cadeiras direcionais em carvalho combinando com a mesa de madeira (0..3, 5)
+	P.clear_tiles_rect(img, chair_origin, Vector2i(4, 1))
+	var out_c := Color("#161114")
+	var wood_hi := Color("#AE825B")
+	var wood_md := Color("#8B6240")
+	var wood_dk := Color("#5D3D24")
+	var sh_c := Color(0.03, 0.03, 0.06, 0.30)
+
+	# Col +0: chair_down (norte da mesa / espera — encosto em cima, frente para baixo)
+	var c0 := chair_origin.x * 16
+	var y0 := chair_origin.y * 16
+	P.rect_px(img, c0 + 2, y0 + 13, 12, 2, sh_c)
+	_rect_g(img, c0 + 3, y0 + 1, 10, 13, out_c, variant)
+	_rect_g(img, c0 + 4, y0 + 2, 8, 4, wood_md, variant)
+	_rect_g(img, c0 + 4, y0 + 2, 8, 1, wood_hi, variant)
+	_rect_g(img, c0 + 4, y0 + 6, 8, 5, wood_hi, variant)
+	_rect_g(img, c0 + 4, y0 + 10, 8, 1, wood_dk, variant)
+	_rect_g(img, c0 + 4, y0 + 11, 2, 3, wood_dk, variant)
+	_rect_g(img, c0 + 10, y0 + 11, 2, 3, wood_dk, variant)
+	P.rect_px(img, c0 + 6, y0 + 11, 4, 3, Color(0, 0, 0, 0))
+
+	# Col +1: chair_up (sul da mesa — encosto voltado para a câmera embaixo)
+	var c1 := (chair_origin.x + 1) * 16
+	P.rect_px(img, c1 + 2, y0 + 13, 12, 2, sh_c)
+	_rect_g(img, c1 + 3, y0 + 3, 10, 11, out_c, variant)
+	_rect_g(img, c1 + 4, y0 + 4, 8, 2, wood_dk, variant)
+	_rect_g(img, c1 + 4, y0 + 6, 8, 5, wood_md, variant)
+	_rect_g(img, c1 + 4, y0 + 6, 8, 1, wood_hi, variant)
+	_rect_g(img, c1 + 4, y0 + 11, 2, 3, wood_dk, variant)
+	_rect_g(img, c1 + 10, y0 + 11, 2, 3, wood_dk, variant)
+	P.rect_px(img, c1 + 6, y0 + 11, 4, 3, Color(0, 0, 0, 0))
+
+	# Col +2: chair_right (lado esquerdo da mesa — encosto na esquerda, olhando direita)
+	var c2 := (chair_origin.x + 2) * 16
+	P.rect_px(img, c2 + 3, y0 + 13, 12, 2, sh_c)
+	_rect_g(img, c2 + 4, y0 + 2, 3, 12, out_c, variant)
+	_rect_g(img, c2 + 5, y0 + 3, 2, 8, wood_md, variant)
+	_rect_g(img, c2 + 5, y0 + 3, 2, 1, wood_hi, variant)
+	_rect_g(img, c2 + 6, y0 + 6, 9, 5, out_c, variant)
+	_rect_g(img, c2 + 6, y0 + 7, 8, 3, wood_hi, variant)
+	_rect_g(img, c2 + 5, y0 + 11, 2, 3, wood_dk, variant)
+	_rect_g(img, c2 + 12, y0 + 11, 2, 3, wood_dk, variant)
+
+	# Col +3: chair_left (lado direito da mesa — encosto na direita, olhando esquerda)
+	var c3 := (chair_origin.x + 3) * 16
+	P.rect_px(img, c3 + 1, y0 + 13, 12, 2, sh_c)
+	_rect_g(img, c3 + 9, y0 + 2, 3, 12, out_c, variant)
+	_rect_g(img, c3 + 9, y0 + 3, 2, 8, wood_md, variant)
+	_rect_g(img, c3 + 9, y0 + 3, 2, 1, wood_hi, variant)
+	_rect_g(img, c3 + 1, y0 + 6, 9, 5, out_c, variant)
+	_rect_g(img, c3 + 2, y0 + 7, 8, 3, wood_hi, variant)
+	_rect_g(img, c3 + 2, y0 + 11, 2, 3, wood_dk, variant)
+	_rect_g(img, c3 + 9, y0 + 11, 2, 3, wood_dk, variant)

@@ -89,9 +89,23 @@ func _run_test_suite() -> void:
 	assert(hud_label.text.begins_with("06:30 ·") and hud_label.text.find("Ato") == -1, "HUD deve exibir horário e não 'Ato': %s" % hud_label.text)
 	print("[PASS] HUD exibe horário discreto sem rótulo de Ato: %s" % hud_label.text)
 
-	# Quartel - Capitão Reyes apresenta ocorrência
+	# Quartel - Capitão Reyes apresenta ocorrência e jogador elimina 1 Santelmo antes das 23:00
 	gs.set_switch("002_Chefe_Ato1_apresentado", true)
-	print("[PASS] Capitão Reyes apresentou a ocorrência do Ato 1.")
+	gs.mark_forest_santelmo_defeated("Santelmo1")
+	assert(gs.is_task_active("ato1_ovos_floresta"), "Tarefa do Ato 1 deve ficar ativa")
+	assert(gs.get_defeated_forest_santelmo_count() == 1, "Santelmo derrotado contabilizado")
+
+	# Dia 1 -> 23:00 com tarefa em andamento: avança para Dia 2 preservando todas as tarefas e switches (sem forçar Ato 2)
+	gs.set_clock_minutes(1380, true)
+	var el_day := 0.0
+	while main_node.get_sleep_state() != 0 and el_day < 3.0:
+		main_node._process(0.10)
+		await process_frame
+		el_day += 0.10
+	_assert_ok(int(gs.get_var("Ato", 1)) == 1 and gs.day_number == 2, "Às 23:00 com tarefa pendente, avança para Dia 2 mantendo Ato 1")
+	_assert_ok(gs.get_switch("002_Chefe_Ato1_apresentado") == true and gs.is_task_active("ato1_ovos_floresta"), "Tarefas ativas e progresso com Capitão Reyes preservados entre dias")
+	_assert_ok(gs.get_defeated_forest_santelmo_count() == 1, "Santelmos derrotados preservados ao acordar no dia seguinte")
+	print("[PASS] Capitão Reyes apresentou ocorrência e sistema contínuo preservou tarefas ao passar de dia às 23:00.")
 
 	# Clareira - Encontro com a criatura e coleta do ovo (avança para Fim de Tarde 16:00)
 	gs.set_switch("003_Ovos_sem_derrotar", true)

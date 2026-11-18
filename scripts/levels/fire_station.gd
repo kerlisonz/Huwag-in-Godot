@@ -80,6 +80,7 @@ func _build_station_tilemaps() -> void:
 		layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else NORMAL_TS
 	for layer in [floor_distorted, walls_distorted]:
 		layer.tile_set = DISTORTED_TS
+		layer.collision_enabled = false
 
 	# Complexo 60x40 tiles (960x640) reconstruído com interiors_v2 (16x16, zero sobreposição)
 	for fl in [floor_normal, floor_distorted]:
@@ -115,6 +116,8 @@ func _build_station_tilemaps() -> void:
 				fl.set_cell(Vector2i(cx, cy), 0, ctile)
 		V2TileCatalog.fill_rect(fl, Rect2i(41, 10, 2, 3), t_cat["wood_floor_warm"])
 		V2TileCatalog.fill_rect(fl, Rect2i(41, 25, 2, 3), t_cat["wood_floor_warm"])
+		# Tapete / soleira visual da porta sul da recepção (x=28..31, y=34..35)
+		V2TileCatalog.fill_rect(fl, Rect2i(28, 34, 4, 2), t_cat["concrete_station"])
 
 	# Paredes internas e externas + sombras projetadas (sem móveis misturados na camada de parede)
 	for wl in [walls_normal, walls_distorted]:
@@ -156,14 +159,18 @@ func _build_station_tilemaps() -> void:
 		V2TileCatalog.fill_rect(wl, Rect2i(18, 35, 10, 1), t_cat["wall_trim_gold"])
 		V2TileCatalog.fill_rect(wl, Rect2i(32, 35, 10, 1), t_cat["wall_trim_gold"])
 
-	# Camada dedicada para mobiliário multi-tile v2 do Quartel BFP (zero sobreposição)
+	# Camada Y-sorted com colisão real para mobiliário multi-tile v2 do Quartel BFP (zero sobreposição)
 	if _furniture_layer == null:
 		_furniture_layer = TileMapLayer.new()
 		_furniture_layer.name = "V2StationFurnitureLayer"
 		_furniture_layer.z_index = 0
+		_furniture_layer.y_sort_enabled = true
 		_furniture_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		_furniture_layer.collision_enabled = false
-		add_child(_furniture_layer)
+		_furniture_layer.collision_enabled = true
+		if ysort_root != null:
+			ysort_root.add_child(_furniture_layer)
+		else:
+			add_child(_furniture_layer)
 	if ysort_root != null:
 		ysort_root.z_index = 2
 	_furniture_layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
@@ -258,14 +265,11 @@ func _setup_collisions() -> void:
 	body.collision_layer = 1
 	add_child(body)
 
+	# Banco de espera + batentes/trava física da porta de saída sul (impede sair para o vazio fora do mapa)
 	var boxes: Array[Rect2] = [
-		Rect2(432, 134, 96, 30),   # Mesa Comando Cap. Reyes
-		Rect2(536, 412, 48, 28),   # Balcão Recepção Leste
-		Rect2(340, 424, 56, 20),   # Banco Espera
-		Rect2(746, 154, 52, 24),   # Mesa Enfermaria
-		Rect2(800, 224, 36, 52),   # Maca 1
-		Rect2(800, 324, 36, 52),   # Maca 2
-		Rect2(154, 464, 28, 24),   # Mesa Rádio Oeste
+		Rect2(340, 424, 56, 16),
+		Rect2(448, 560, 64, 32),   # Soleira física da porta sul (x=28..31, y=35..36)
+		Rect2(272, 560, 416, 48),  # Contenção de segurança inferior sob toda a recepção
 	]
 	for r in boxes:
 		var cs := CollisionShape2D.new()

@@ -108,6 +108,22 @@ func _run_forest_suite() -> void:
 			img_trail.save_png("res://docs/screenshots/forest_trail_validated.png")
 			print("[OK] Captura da trilha salva em docs/screenshots/forest_trail_validated.png")
 
+	var trail_understory := trail.find_child("V2UnderstoryLayer", true, false) as TileMapLayer
+	var trail_canopy := trail.find_child("V2CanopyLayer", true, false) as TileMapLayer
+	assert(trail_understory != null and trail_understory.collision_enabled == true, "V2UnderstoryLayer da trilha deve ter colisão ativa!")
+	assert(trail_canopy != null and trail_canopy.collision_enabled == true, "V2CanopyLayer da trilha deve ter colisão ativa!")
+	if player != null:
+		player.position = Vector2(160, 360)
+		for _i in range(14):
+			player.move_and_collide(Vector2(0, -4))
+		assert(player.position.y >= 332.0, "Cerca norte da entrada da floresta deve bloquear travessia (y=%f)" % player.position.y)
+
+		player.position = Vector2(160, 440)
+		for _i in range(25):
+			player.move_and_collide(Vector2(0, 4))
+		assert(player.position.y <= 550.0, "Árvores ao sul da trilha devem bloquear travessia (y=%f)" % player.position.y)
+		print("[PASS] Colisão física da cerca e árvores na ForestTrail validada!")
+
 	trail.queue_free()
 	await process_frame
 
@@ -130,14 +146,28 @@ func _run_forest_suite() -> void:
 
 	print("[PASS] Criatura aquática e ninho com ovos azuis confirmados na clareira!")
 
-	# Teste de interação pacífica com a criatura
+	# Teste da barreira dos 16 Santelmos antes de liberar a Guardiã
+	var barrier_msg := {"text": ""}
 	var tracker := {"dialogue_requested": false}
 	clearing.request_dialogue.connect(func(pages, _cb):
 		print("[PASS] request_dialogue emitido com %d páginas!" % pages.size())
+		if pages.size() > 0:
+			barrier_msg["text"] = str(pages[0].get("text", ""))
 		tracker["dialogue_requested"] = true
 	)
 	clearing._on_creature_interaction()
-	assert(tracker["dialogue_requested"], "Interação pacífica com a criatura deve disparar diálogo narrativo!")
+	assert(tracker["dialogue_requested"] and barrier_msg["text"].find("Santelmo") != -1, "Com Santelmos vivos, interação deve avisar do selo!")
+	creature.start_boss_fight()
+	assert(creature.is_hostile == false, "Guardiã não deve iniciar luta enquanto restarem Santelmos vivos!")
+	print("[PASS] Selo dos 16 Santelmos bloqueia acesso antecipado à Guardiã.")
+
+	# Libera todos os 16 Santelmos e valida interação pacífica + Boss Fight
+	var gs_c = root.get_node_or_null("GameState")
+	gs_c.mark_all_forest_santelmos_defeated()
+	await process_frame
+	tracker["dialogue_requested"] = false
+	clearing._on_creature_interaction()
+	assert(tracker["dialogue_requested"], "Interação pacífica com a criatura deve disparar diálogo narrativo após derrotar os 16 Santelmos!")
 	print("[PASS] Diálogo narrativo da Guardiã da Lagoa acionado com sucesso!")
 
 	# Teste da Boss Fight da Lagoa Azul (Fases, Telégrafos e Derrota)
@@ -166,6 +196,18 @@ func _run_forest_suite() -> void:
 		if img_clearing:
 			img_clearing.save_png("res://docs/screenshots/forest_clearing_validated.png")
 			print("[OK] Captura da clareira salva em docs/screenshots/forest_clearing_validated.png")
+
+	var clear_understory := clearing.find_child("V2UnderstoryLayer", true, false) as TileMapLayer
+	var clear_canopy := clearing.find_child("V2CanopyLayer", true, false) as TileMapLayer
+	assert(clear_understory != null and clear_understory.collision_enabled == true, "V2UnderstoryLayer da clareira deve ter colisão ativa!")
+	assert(clear_canopy != null and clear_canopy.collision_enabled == true, "V2CanopyLayer da clareira deve ter colisão ativa!")
+	var clear_player := clearing.get_node_or_null("ObstaclesYsort/PlayerHuwag") as CharacterBody2D
+	if clear_player != null:
+		clear_player.position = Vector2(752, 312)
+		for _i in range(18):
+			clear_player.move_and_collide(Vector2(4, 0))
+		assert(clear_player.position.x <= 792.0, "Tronco da Árvore Anciã deve bloquear o player (x=%f)" % clear_player.position.x)
+		print("[PASS] Colisão física das árvores e Árvore Anciã na ForestClearing validada!")
 
 	clearing.queue_free()
 	await process_frame

@@ -75,7 +75,7 @@ func _compose_forest_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 	P.blit_tiles(img, lt, Vector2i(0, 15), Vector2i(3, 0), Vector2i(3, 1), variant, 0.72, 0.78, Color("#D6CFC6"))
 	P.blit_tiles(img, df, Vector2i(14, 0), Vector2i(3, 1), Vector2i(2, 1), variant, 0.78, 0.86, Color("#D8D0C4"), true)
 	P.blit_tiles(img, lt, Vector2i(0, 16), Vector2i(5, 1), Vector2i(1, 1), variant, 0.75, 0.78)
-	P.blit_tiles(img, lt, Vector2i(6, 6), Vector2i(6, 0), Vector2i(3, 2), variant, 0.72, 0.76, Color("#CEDFD2"))
+	P.blit_tiles(img, lt, Vector2i(6, 6), Vector2i(6, 0), Vector2i(3, 2), variant, 0.65, 0.48, Color("#96BA96"))
 	P.blit_tiles(img, lt, Vector2i(0, 24), Vector2i(9, 0), Vector2i(3, 2), variant, 0.76, 0.76, Color("#C6DBD0"))
 
 	# Água animada horizontal (3 frames: cols 12..14 e cols 15..17) + cachoeira 1x3 (col 18)
@@ -102,10 +102,25 @@ func _compose_forest_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 	P.blit_tiles(img, df, Vector2i(8, 8), Vector2i(12, 7), Vector2i(2, 4), variant, 0.76, 0.82, Color.WHITE, true)
 	P.blit_tiles(img, tr, Vector2i(1, 6), Vector2i(24, 5), Vector2i(3, 2), variant, 0.75, 0.80)
 
-	# Rows 13..18: Árvores multi-tile com Y-sort na base
+	# Rows 13..18: Árvores multi-tile com Y-sort na base e paleta verde-musgo unificada no modo normal
 	P.blit_tiles(img, df, Vector2i(8, 1), Vector2i(0, 13), Vector2i(5, 6), variant, 0.78, 0.84, Color("#D4E2D8"), true)
-	P.blit_tiles(img, lo, Vector2i(11, 10), Vector2i(5, 13), Vector2i(3, 6), variant, 0.74, 0.80, Color("#CFE0D4"))
-	P.blit_tiles(img, lo, Vector2i(14, 10), Vector2i(8, 13), Vector2i(3, 6), variant, 0.76, 0.78, Color("#D6C6C2"))
+	P.blit_tiles(img, lo, Vector2i(11, 10), Vector2i(5, 13), Vector2i(3, 5), variant, 0.74, 0.80, Color("#CFE0D4"))
+	if variant == "normal":
+		P.blit_tiles(img, lo, Vector2i(11, 10), Vector2i(8, 13), Vector2i(3, 5), variant, 0.70, 0.72, Color("#9CC2A8"))
+	else:
+		P.blit_tiles(img, lo, Vector2i(14, 10), Vector2i(8, 13), Vector2i(3, 5), variant, 0.76, 0.78, Color("#D6C6C2"))
+	# Sombra suave de contato na base dos dois pinheiros (row 17..18)
+	for tree_col: int in [5, 8]:
+		var tcx: int = tree_col * 16 + 24
+		var tcy: int = 18 * 16 - 3
+		for sy in range(-3, 5):
+			for sx in range(-12, 13):
+				var nx := float(sx) / 12.0
+				var ny := float(sy) / 4.2
+				if nx * nx + ny * ny <= 1.0:
+					var px_c := img.get_pixel(tcx + sx, tcy + sy)
+					if px_c.a < 0.05:
+						img.set_pixel(tcx + sx, tcy + sy, Color(0.03, 0.05, 0.04, 0.42))
 	P.blit_tiles(img, tr, Vector2i(8, 2), Vector2i(11, 13), Vector2i(1, 6), variant, 0.76, 0.82, Color("#D2E0D4"))
 	P.blit_tiles(img, lo, Vector2i(11, 5), Vector2i(13, 13), Vector2i(4, 5), variant, 0.74, 0.80, Color("#CEE0D2"))
 	P.blit_tiles(img, df, Vector2i(6, 8), Vector2i(17, 13), Vector2i(2, 2), variant, 0.80, 0.84, Color.WHITE, true)
@@ -147,8 +162,7 @@ func _compose_forest_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 		for x in range(3, 9):
 			if x <= 5:
 				water.append(Vector2i(x, y))
-				if x == 4 and y == 3:
-					solid.append(Vector2i(x, y))
+				solid.append(Vector2i(x, y))
 			else:
 				solid.append(Vector2i(x, y))
 	for x in range(3, 6):
@@ -158,9 +172,10 @@ func _compose_forest_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 		for y in range(2, 6):
 			surface_map[Vector2i(x, y)] = "wood"
 
-	var trunk_box := PackedVector2Array([Vector2(-7, -4), Vector2(7, -4), Vector2(7, 8), Vector2(-7, 8)])
-	var big_box := PackedVector2Array([Vector2(-12, -6), Vector2(12, -6), Vector2(12, 8), Vector2(-12, 8)])
-	var ancient_box := PackedVector2Array([Vector2(-24, -6), Vector2(24, -6), Vector2(24, 8), Vector2(-24, 8)])
+	var trunk_box := PackedVector2Array([Vector2(-10, -8), Vector2(10, -8), Vector2(10, 8), Vector2(-10, 8)])
+	var canopy_box := PackedVector2Array([Vector2(-12, -8), Vector2(12, -8), Vector2(12, 8), Vector2(-12, 8)])
+	var big_box := PackedVector2Array([Vector2(-15, -10), Vector2(15, -10), Vector2(15, 8), Vector2(-15, 8)])
+	var ancient_box := PackedVector2Array([Vector2(-28, -10), Vector2(28, -10), Vector2(28, 8), Vector2(-28, 8)])
 	var full_2x2 := PackedVector2Array([Vector2(-14, -10), Vector2(14, -10), Vector2(14, 8), Vector2(-14, 8)])
 
 	var spec := {
@@ -177,7 +192,7 @@ func _compose_forest_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 			{"coord": Vector2i(5, 13), "size": Vector2i(3, 6), "origin_x": 0, "y_sort_origin": 6, "collision_poly": trunk_box, "blocks_light": true, "surface": "wood"},
 			{"coord": Vector2i(8, 13), "size": Vector2i(3, 6), "origin_x": 0, "y_sort_origin": 6, "collision_poly": trunk_box, "blocks_light": true, "surface": "wood"},
 			{"coord": Vector2i(11, 13), "size": Vector2i(1, 6), "origin_x": 0, "y_sort_origin": 6, "collision_poly": trunk_box, "blocks_light": true, "surface": "wood"},
-			{"coord": Vector2i(13, 13), "size": Vector2i(4, 5), "origin_x": 8, "y_sort_origin": 6, "collision_poly": trunk_box, "blocks_light": true, "surface": "wood"},
+			{"coord": Vector2i(13, 13), "size": Vector2i(4, 5), "origin_x": 8, "y_sort_origin": 6, "collision_poly": canopy_box, "blocks_light": true, "surface": "wood"},
 			{"coord": Vector2i(17, 13), "size": Vector2i(2, 2), "origin_x": 8, "y_sort_origin": 6, "collision_poly": full_2x2, "surface": "wood"},
 			{"coord": Vector2i(19, 13), "size": Vector2i(1, 3), "origin_x": 0, "y_sort_origin": 4, "collision_poly": PackedVector2Array([Vector2(-6, -24), Vector2(6, -24), Vector2(6, 8), Vector2(-6, 8)]), "surface": "wood"},
 			{"coord": Vector2i(20, 13), "size": Vector2i(3, 1), "origin_x": 0, "y_sort_origin": 4, "collision_poly": PackedVector2Array([Vector2(-22, -6), Vector2(22, -6), Vector2(22, 6), Vector2(-22, 6)]), "surface": "wood"},
@@ -199,20 +214,19 @@ func _compose_town_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 	var tr: Image = imgs["town_rpg"]
 	var lw: Image = imgs["lpc_water"]
 
-	# Rows 0..1: Estradas asfalto, quadra, faixa, poças + grama/areia/pier Serene + mar animado + sombras
+	# Rows 0..1: Estradas asfalto, quadra, faixa, poças + grama/areia/terra/pier/mar seamless
 	Props.draw_road_and_plaza_tiles(img, Vector2i(0, 0), variant)
 	P.blit_tiles(img, sv, Vector2i(4, 0), Vector2i(8, 0), Vector2i(6, 2), variant, 0.78, 0.88, Color("#DCE6E2"))
-	P.blit_tiles(img, sv, Vector2i(16, 4), Vector2i(14, 0), Vector2i(2, 2), variant, 0.78, 0.86, Color("#DDD6CC"))
-	P.blit_tiles(img, sv, Vector2i(10, 4), Vector2i(16, 0), Vector2i(3, 2), variant, 0.80, 0.88)
-	P.blit_tiles(img, lw, Vector2i(18, 0), Vector2i(19, 0), Vector2i(3, 1), variant, 0.72, 0.78, Color("#9CC8D6"))
-	P.blit_tiles(img, lw, Vector2i(21, 0), Vector2i(22, 0), Vector2i(3, 1), variant, 0.72, 0.82, Color("#AED6DF"))
+	Props.draw_ocean_and_pier_tiles(img, variant)
+	Props.draw_soil_and_blend_tiles(img, variant)
 	P.add_shadow_strips(img, Vector2i(25, 0), Vector2i(26, 0), Vector2i(27, 0), Vector2i(28, 0), variant)
 
 	# Row 2: Paredes provinciais filipinas & telhados yero (zinco)
 	Props.draw_modular_filipino_buildings(img, Vector2i(0, 2), Vector2i(7, 2), variant)
 
-	# Row 3..4: Cercas Serene + floreiras/placas Serene + barris/caixotes + mureta/escada costeira
+	# Row 3..4: Cercas Serene + cerca vertical contínua + floreiras/placas Serene + barris/caixotes
 	P.blit_tiles(img, sv, Vector2i(5, 15), Vector2i(0, 3), Vector2i(3, 2), variant, 0.80, 0.86)
+	Props.draw_vertical_bamboo_fence_tile(img, Vector2i(1, 3), variant)
 	P.blit_tiles(img, sv, Vector2i(4, 18), Vector2i(6, 3), Vector2i(4, 2), variant, 0.80, 0.86)
 	P.blit_tiles(img, tr, Vector2i(8, 8), Vector2i(10, 3), Vector2i(2, 1), variant, 0.82, 0.88)
 	P.blit_tiles(img, sv, Vector2i(6, 13), Vector2i(12, 3), Vector2i(2, 2), variant, 0.82, 0.88)
@@ -242,9 +256,9 @@ func _compose_town_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 	Props.draw_bfp_fire_truck(img, Vector2i(0, 12), variant)
 	Props.draw_tricycle_and_banca(img, Vector2i(5, 12), Vector2i(8, 12), variant)
 	# Árvores costeiras Serene recortadas em pixel para evitar corte nas bordas (3 unidades 2x3 em 12..17)
-	P.blit_px_centered(img, sv, Rect2i(160, 194, 23, 44), Vector2i(12, 12), Vector2i(2, 3), variant, 0.78, 0.84, Color("#D2E2D8"))
-	P.blit_px_centered(img, sv, Rect2i(184, 194, 25, 44), Vector2i(14, 12), Vector2i(2, 3), variant, 0.78, 0.84, Color("#D2E2D8"))
-	P.blit_px_centered(img, sv, Rect2i(212, 194, 26, 44), Vector2i(16, 12), Vector2i(2, 3), variant, 0.78, 0.84, Color("#D2E2D8"))
+	P.blit_px_centered(img, sv, Rect2i(148, 194, 27, 44), Vector2i(12, 12), Vector2i(2, 3), variant, 0.78, 0.84, Color("#D2E2D8"))
+	P.blit_px_centered(img, sv, Rect2i(179, 194, 27, 44), Vector2i(14, 12), Vector2i(2, 3), variant, 0.78, 0.84, Color("#D2E2D8"))
+	P.blit_px_centered(img, sv, Rect2i(211, 194, 27, 44), Vector2i(16, 12), Vector2i(2, 3), variant, 0.78, 0.84, Color("#D2E2D8"))
 
 	var solid: Array[Vector2i] = []
 	var blocks_light: Array[Vector2i] = []
@@ -258,10 +272,12 @@ func _compose_town_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 	for x in range(16, 19):
 		surface_map[Vector2i(x, 0)] = "wood"
 		surface_map[Vector2i(x, 1)] = "wood"
-	for x in range(0, 7):
+	for x in range(0, 11):
 		solid.append(Vector2i(x, 2))
 		blocks_light.append(Vector2i(x, 2))
 		surface_map[Vector2i(x, 2)] = "stone"
+	for x in range(4, 8):
+		surface_map[Vector2i(x, 1)] = "dirt"
 	for x in range(0, 3):
 		solid.append(Vector2i(x, 3))
 		surface_map[Vector2i(x, 3)] = "wood"
@@ -269,7 +285,9 @@ func _compose_town_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 		solid.append(Vector2i(x, 4))
 		surface_map[Vector2i(x, 4)] = "stone"
 
-	var trunk_box := PackedVector2Array([Vector2(-6, -4), Vector2(6, -4), Vector2(6, 8), Vector2(-6, 8)])
+	var palm_box := PackedVector2Array([Vector2(-9, -6), Vector2(9, -6), Vector2(9, 8), Vector2(-9, 8)])
+	var tree_box := PackedVector2Array([Vector2(-12, -20), Vector2(12, -20), Vector2(12, 8), Vector2(-12, 8)])
+	var banana_box := PackedVector2Array([Vector2(-8, -6), Vector2(8, -6), Vector2(8, 8), Vector2(-8, 8)])
 	var spec := {
 		"solid_cells": solid,
 		"water_cells": [],
@@ -280,22 +298,22 @@ func _compose_town_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 			{"coord": Vector2i(22, 0), "frames": 3, "frame_duration": 0.30, "solid": true, "poly": PackedVector2Array([Vector2(-8, -8), Vector2(8, -8), Vector2(8, 8), Vector2(-8, 8)]), "surface": "water", "is_water": true},
 		],
 		"multi_tiles": [
-			{"coord": Vector2i(0, 5), "size": Vector2i(3, 6), "origin_x": 0, "y_sort_origin": 6, "collision_poly": trunk_box, "surface": "wood"},
-			{"coord": Vector2i(3, 5), "size": Vector2i(3, 6), "origin_x": 0, "y_sort_origin": 6, "collision_poly": trunk_box, "surface": "wood"},
-			{"coord": Vector2i(6, 5), "size": Vector2i(2, 3), "origin_x": 8, "y_sort_origin": 6, "collision_poly": trunk_box, "surface": "prop"},
+			{"coord": Vector2i(0, 5), "size": Vector2i(3, 6), "origin_x": 0, "y_sort_origin": 6, "collision_poly": palm_box, "surface": "wood"},
+			{"coord": Vector2i(3, 5), "size": Vector2i(3, 6), "origin_x": 0, "y_sort_origin": 6, "collision_poly": palm_box, "surface": "wood"},
+			{"coord": Vector2i(6, 5), "size": Vector2i(2, 3), "origin_x": 8, "y_sort_origin": 6, "collision_poly": banana_box, "surface": "prop"},
 			{"coord": Vector2i(8, 5), "size": Vector2i(1, 5), "origin_x": 0, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-5, -2), Vector2(5, -2), Vector2(5, 8), Vector2(-5, 8)]), "surface": "stone"},
 			{"coord": Vector2i(9, 5), "size": Vector2i(1, 5), "origin_x": 0, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-5, -2), Vector2(5, -2), Vector2(5, 8), Vector2(-5, 8)]), "surface": "stone"},
-			{"coord": Vector2i(10, 5), "size": Vector2i(5, 4), "origin_x": 0, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-38, -22), Vector2(38, -22), Vector2(38, 8), Vector2(-38, 8)]), "blocks_light": true, "surface": "wood"},
-			{"coord": Vector2i(15, 5), "size": Vector2i(6, 5), "origin_x": 8, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-44, -26), Vector2(44, -26), Vector2(44, 8), Vector2(-44, 8)]), "blocks_light": true, "surface": "stone"},
-			{"coord": Vector2i(21, 5), "size": Vector2i(6, 5), "origin_x": 8, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-44, -26), Vector2(44, -26), Vector2(44, 8), Vector2(-44, 8)]), "blocks_light": true, "surface": "stone"},
+			{"coord": Vector2i(10, 5), "size": Vector2i(5, 4), "origin_x": 0, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-38, -46), Vector2(38, -46), Vector2(38, 7), Vector2(-38, 7)]), "blocks_light": true, "surface": "wood"},
+			{"coord": Vector2i(15, 5), "size": Vector2i(6, 5), "origin_x": 8, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-45, -60), Vector2(45, -60), Vector2(45, 7), Vector2(-45, 7)]), "blocks_light": true, "surface": "stone"},
+			{"coord": Vector2i(21, 5), "size": Vector2i(6, 5), "origin_x": 8, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-45, -60), Vector2(45, -60), Vector2(45, 7), Vector2(-45, 7)]), "blocks_light": true, "surface": "stone"},
 			{"coord": Vector2i(27, 5), "size": Vector2i(1, 2), "origin_x": 0, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-5, -4), Vector2(5, -4), Vector2(5, 8), Vector2(-5, 8)]), "surface": "stone"},
 			{"coord": Vector2i(28, 5), "size": Vector2i(2, 1), "origin_x": 8, "y_sort_origin": 4, "collision_poly": PackedVector2Array([Vector2(-6, -4), Vector2(22, -4), Vector2(22, 6), Vector2(-6, 6)]), "surface": "wood"},
-			{"coord": Vector2i(0, 12), "size": Vector2i(5, 3), "origin_x": 0, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-36, -14), Vector2(36, -14), Vector2(36, 8), Vector2(-36, 8)]), "blocks_light": true, "surface": "stone"},
-			{"coord": Vector2i(5, 12), "size": Vector2i(3, 2), "origin_x": 0, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-20, -8), Vector2(20, -8), Vector2(20, 8), Vector2(-20, 8)]), "surface": "stone"},
-			{"coord": Vector2i(8, 12), "size": Vector2i(4, 2), "origin_x": 8, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-28, -8), Vector2(28, -8), Vector2(28, 8), Vector2(-28, 8)]), "surface": "wood"},
-			{"coord": Vector2i(12, 12), "size": Vector2i(2, 3), "origin_x": 8, "y_sort_origin": 6, "collision_poly": trunk_box, "blocks_light": true, "surface": "wood"},
-			{"coord": Vector2i(14, 12), "size": Vector2i(2, 3), "origin_x": 8, "y_sort_origin": 6, "collision_poly": trunk_box, "blocks_light": true, "surface": "wood"},
-			{"coord": Vector2i(16, 12), "size": Vector2i(2, 3), "origin_x": 8, "y_sort_origin": 6, "collision_poly": trunk_box, "blocks_light": true, "surface": "wood"},
+			{"coord": Vector2i(0, 12), "size": Vector2i(5, 3), "origin_x": 0, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-36, -18), Vector2(36, -18), Vector2(36, 8), Vector2(-36, 8)]), "blocks_light": true, "surface": "stone"},
+			{"coord": Vector2i(5, 12), "size": Vector2i(3, 2), "origin_x": 0, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-20, -10), Vector2(20, -10), Vector2(20, 8), Vector2(-20, 8)]), "surface": "stone"},
+			{"coord": Vector2i(8, 12), "size": Vector2i(4, 2), "origin_x": 8, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-28, -10), Vector2(28, -10), Vector2(28, 8), Vector2(-28, 8)]), "surface": "wood"},
+			{"coord": Vector2i(12, 12), "size": Vector2i(2, 3), "origin_x": 8, "y_sort_origin": 6, "collision_poly": tree_box, "blocks_light": true, "surface": "wood"},
+			{"coord": Vector2i(14, 12), "size": Vector2i(2, 3), "origin_x": 8, "y_sort_origin": 6, "collision_poly": tree_box, "blocks_light": true, "surface": "wood"},
+			{"coord": Vector2i(16, 12), "size": Vector2i(2, 3), "origin_x": 8, "y_sort_origin": 6, "collision_poly": tree_box, "blocks_light": true, "surface": "wood"},
 		],
 	}
 	return {"image": img, "spec": spec}
@@ -324,11 +342,10 @@ func _compose_interior_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 	P.blit_tiles(img, rb, Vector2i(0, 17), Vector2i(6, 2), Vector2i(2, 2), variant, 0.80, 0.84)
 	P.blit_tiles(img, rb, Vector2i(0, 19), Vector2i(8, 2), Vector2i(2, 2), variant, 0.80, 0.86)
 	P.blit_tiles(img, io, Vector2i(11, 0), Vector2i(10, 2), Vector2i(4, 3), variant, 0.82, 0.86)
-	P.blit_tiles(img, io, Vector2i(9, 0), Vector2i(14, 2), Vector2i(2, 3), variant, 0.84, 0.88)
+	Props.draw_interior_window_tile(img, Vector2i(14, 2), variant)
 
-	# Row 5: Props 1x1 (cadeiras, castiçal, jarras)
-	P.blit_tiles(img, io, Vector2i(14, 4), Vector2i(0, 5), Vector2i(2, 1), variant, 0.82, 0.86)
-	P.blit_tiles(img, io, Vector2i(14, 6), Vector2i(2, 5), Vector2i(2, 1), variant, 0.82, 0.86)
+	# Row 5: Props 1x1 (4 cadeiras direcionais em carvalho, castiçal, jarras)
+	Props.draw_interior_chairs(img, Vector2i(0, 5), variant)
 	P.blit_tiles(img, io, Vector2i(15, 10), Vector2i(4, 5), Vector2i(1, 1), variant, 0.88, 0.94)
 	P.blit_tiles(img, io, Vector2i(13, 14), Vector2i(5, 5), Vector2i(3, 1), variant, 0.82, 0.86)
 
@@ -343,8 +360,8 @@ func _compose_interior_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 	P.blit_px_centered(img, im, Rect2i(12 * 16, 39 * 16 + 14, 16, 34), Vector2i(18, 7), Vector2i(1, 3), variant, 0.82, 0.86)
 	P.blit_tiles(img, im, Vector2i(1, 36), Vector2i(19, 7), Vector2i(6, 2), variant, 0.82, 0.86)
 
-	P.blit_tiles(img, im, Vector2i(2, 18), Vector2i(0, 12), Vector2i(2, 3), variant, 0.84, 0.88)
-	P.blit_tiles(img, im, Vector2i(7, 51), Vector2i(3, 12), Vector2i(2, 3), variant, 0.82, 0.86)
+	P.blit_px_centered(img, im, Rect2i(2 * 16, 18 * 16 + 8, 32, 31), Vector2i(0, 12), Vector2i(2, 3), variant, 0.84, 0.88)
+	P.blit_px_centered(img, im, Rect2i(7 * 16, 51 * 16 + 4, 32, 39), Vector2i(3, 12), Vector2i(2, 3), variant, 0.82, 0.86)
 	P.blit_tiles(img, im, Vector2i(13, 44), Vector2i(5, 12), Vector2i(2, 3), variant, 0.82, 0.88)
 	P.blit_tiles(img, io, Vector2i(11, 10), Vector2i(7, 12), Vector2i(2, 2), variant, 0.82, 0.86)
 	P.blit_tiles(img, im, Vector2i(2, 62), Vector2i(9, 12), Vector2i(2, 2), variant, 0.80, 0.82)
@@ -369,7 +386,8 @@ func _compose_interior_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 		surface_map[Vector2i(x, 0)] = "stone"
 
 	var box_2x := PackedVector2Array([Vector2(-14, -10), Vector2(14, -10), Vector2(14, 8), Vector2(-14, 8)])
-	var box_3x := PackedVector2Array([Vector2(-22, -12), Vector2(22, -12), Vector2(22, 8), Vector2(-22, 8)])
+	var box_bed := PackedVector2Array([Vector2(-22, -48), Vector2(22, -48), Vector2(22, 8), Vector2(-22, 8)])
+	var box_table := PackedVector2Array([Vector2(-22, -22), Vector2(22, -22), Vector2(22, 8), Vector2(-22, 8)])
 	var spec := {
 		"solid_cells": solid,
 		"water_cells": [],
@@ -377,8 +395,8 @@ func _compose_interior_atlas(imgs: Dictionary, variant: String) -> Dictionary:
 		"surface_map": surface_map,
 		"animated_tiles": [],
 		"multi_tiles": [
-			{"coord": Vector2i(0, 7), "size": Vector2i(3, 4), "origin_x": 0, "y_sort_origin": 6, "collision_poly": box_3x, "surface": "wood"},
-			{"coord": Vector2i(3, 7), "size": Vector2i(3, 3), "origin_x": 0, "y_sort_origin": 6, "collision_poly": box_3x, "surface": "wood"},
+			{"coord": Vector2i(0, 7), "size": Vector2i(3, 4), "origin_x": 0, "y_sort_origin": 6, "collision_poly": box_bed, "surface": "wood"},
+			{"coord": Vector2i(3, 7), "size": Vector2i(3, 3), "origin_x": 0, "y_sort_origin": 6, "collision_poly": box_table, "surface": "wood"},
 			{"coord": Vector2i(6, 7), "size": Vector2i(2, 2), "origin_x": 8, "y_sort_origin": 6, "collision_poly": box_2x, "surface": "wood"},
 			{"coord": Vector2i(8, 7), "size": Vector2i(2, 2), "origin_x": 8, "y_sort_origin": 6, "collision_poly": box_2x, "surface": "wood"},
 			{"coord": Vector2i(10, 7), "size": Vector2i(4, 3), "origin_x": 8, "y_sort_origin": 6, "collision_poly": PackedVector2Array([Vector2(-28, -10), Vector2(28, -10), Vector2(28, 8), Vector2(-28, 8)]), "surface": "wood"},

@@ -102,12 +102,12 @@ func _run_all() -> void:
 	var street := street_sc.instantiate()
 	root.add_child(street)
 	await process_frame
-	_assert_ok(street.MAP_BOUNDS.size.x >= 2880, "Rua estendida possui largura >= 2880px")
+	_assert_ok(street.MAP_BOUNDS.size.x >= 1792, "Rua compactada possui largura >= 1792px")
 	_assert_ok(street.get_node("TownGroundDistorted").visible == true, "Rua reflete Dose Maior")
 	for s_npc in ["NPC_Aling_Nena", "NPC_Bombeiro_Ronda", "NPC_Kuya_Ben", "NPC_Toby", "NPC_Feirante", "NPC_Vigilia_Leste"]:
 		_assert_ok(street._npcs.has(s_npc) and street._npcs[s_npc] != null, "NPC urbano %s presente" % s_npc)
 	var east_npc: NpcEntity = street._npcs["NPC_Vigilia_Leste"]
-	_assert_ok(east_npc.global_position.x > 2400.0, "Bloco leste estendido povoado com NPC em x > 2400")
+	_assert_ok(east_npc.global_position.x > 1400.0, "Bloco leste povoado com NPC em x > 1400")
 	street._on_dialogue_conflict_triggered("NPC_Aling_Nena", {})
 	await process_frame
 	_assert_ok(street._npcs["NPC_Aling_Nena"].is_hostile == true, "NPC_Aling_Nena reage à escolha errada ficando hostil")
@@ -122,7 +122,7 @@ func _run_all() -> void:
 	var trail := trail_sc.instantiate()
 	root.add_child(trail)
 	await process_frame
-	_assert_ok(trail._santelmos.size() == 13, "Floresta possui 13 Santelmos (encontrado %d)" % trail._santelmos.size())
+	_assert_ok(trail._santelmos.size() == 16, "Floresta possui 16 Santelmos (encontrado %d)" % trail._santelmos.size())
 	var s1: SantelmoEnemy = trail.get_node("ObstaclesYsort/Santelmo1")
 	var s13: SantelmoEnemy = trail.get_node("ObstaclesYsort/Santelmo13")
 	_assert_ok(s1.max_health == 60 and s13.max_health >= 130, "Dificuldade crescente validada (S1=%d HP, S13=%d HP)" % [s1.max_health, s13.max_health])

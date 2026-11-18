@@ -99,7 +99,7 @@ func _run_full_suite() -> void:
 	# TESTE 5: Barreira do Vão da Porta para o Vazio Exterior
 	# ----------------------------------------------------
 	print("\n--- TESTE 5: Barreira do Vão da Porta (caminhável até a soleira, bloqueia o vazio) ---")
-	player.position = Vector2(535, 275)
+	player.position = Vector2(535, 225)
 	for i in range(40):
 		player.move_and_collide(Vector2(10, 0))
 		await process_frame

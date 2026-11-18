@@ -38,10 +38,16 @@ var _distorted_decals: Array[Node2D] = []
 var _lights: Array[PointLight2D] = []
 var _pond_light: PointLight2D = null
 var _clearing_mist: CPUParticles2D = null
+var _clutter_layer: TileMapLayer = null
 var _understory_layer: TileMapLayer = null
 var _canopy_layer: TileMapLayer = null
 var _canopy_material: ShaderMaterial = null
 var _fog_overlay: ColorRect = null
+var _santelmo_barrier_root: Node2D = null
+var _santelmo_barrier_col: CollisionShape2D = null
+var _santelmo_barrier_interact: Interactable = null
+var _santelmo_barrier_particles: CPUParticles2D = null
+var _santelmo_barrier_light: PointLight2D = null
 var _time_acc: float = 0.0
 
 
@@ -57,6 +63,7 @@ func _ready() -> void:
 
 	_build_clearing_tilemaps()
 	_build_clearing_props_and_lights()
+	_setup_santelmo_barrier()
 
 	if exit_area:
 		exit_area.body_entered.connect(_on_exit_area_body_entered)
@@ -77,13 +84,19 @@ func _ready() -> void:
 		_setup_act3_pond_mirror()
 
 	GameState.perception_changed.connect(func(_m: int) -> void: _sync_clearing_atmosphere())
-	GameState.switch_changed.connect(func(_k: String, _v: bool) -> void: _sync_clearing_atmosphere())
+	GameState.switch_changed.connect(func(_k: String, _v: bool) -> void:
+		_sync_clearing_atmosphere()
+		_update_santelmo_barrier()
+	)
+	if GameState.has_signal("task_state_changed"):
+		GameState.task_state_changed.connect(func(_t: String, _a: bool, _c: bool) -> void: _update_santelmo_barrier())
 	if GameState.has_signal("day_period_changed"):
 		GameState.day_period_changed.connect(func(_p: String) -> void: _sync_clearing_atmosphere())
 	if GameState.has_signal("higher_dose_changed"):
 		GameState.higher_dose_changed.connect(func(active: bool) -> void: apply_higher_dose_world(active))
 
 	_sync_clearing_atmosphere()
+	_update_santelmo_barrier()
 
 	if has_node("/root/AudioManager"):
 		var am = get_node("/root/AudioManager")
@@ -116,6 +129,46 @@ func _is_higher_dose_active() -> bool:
 	return GameState.has_method("is_higher_dose") and GameState.is_higher_dose()
 
 
+func _is_lagoon_water(x: int, y: int) -> bool:
+	if y == 12:
+		return x == 30 or x == 31
+	if y == 13:
+		return x >= 29 and x <= 33
+	if y == 14 or y == 15:
+		return x >= 28 and x <= 34
+	if y == 16:
+		return x >= 29 and x <= 33
+	if y == 17:
+		return x >= 30 and x <= 32
+	return false
+
+
+func _pick_lagoon_tile(x: int, y: int, f_cat: Dictionary) -> Vector2i:
+	if y == 12:
+		return f_cat["water_ripple_anim"]
+	var has_n := _is_lagoon_water(x, y - 1)
+	var has_s := _is_lagoon_water(x, y + 1)
+	var has_w := _is_lagoon_water(x - 1, y)
+	var has_e := _is_lagoon_water(x + 1, y)
+	if not has_n and not has_w:
+		return f_cat["pond_tl"]
+	if not has_n and not has_e:
+		return f_cat["pond_tr"]
+	if not has_s and not has_w:
+		return f_cat["pond_bl"]
+	if not has_s and not has_e:
+		return f_cat["pond_br"]
+	if not has_n:
+		return f_cat["pond_t"]
+	if not has_s:
+		return f_cat["pond_b"]
+	if not has_w:
+		return f_cat["pond_l"]
+	if not has_e:
+		return f_cat["pond_r"]
+	return f_cat["water_deep_anim"] if ((x + y) % 3 != 0) else f_cat["pond_c"]
+
+
 func _build_clearing_tilemaps() -> void:
 	var f_cat := V2TileCatalog.FOREST_TILES
 	for layer in [ground_normal, walls_normal]:
@@ -135,19 +188,30 @@ func _build_clearing_tilemaps() -> void:
 			for y in range(maxi(0, y0), mini(MAP_H, y0 + h)):
 				walkable[x][y] = true
 
-	# Corredor oeste vindo da trilha + ampla clareira central + santuário sul
+	# Corredor oeste sinuoso vindo da trilha + bacia oval orgânica da clareira
 	carve.call(0, 12, 12, 6)
-	carve.call(8, 5, 44, 24)
-	carve.call(20, 27, 22, 5)
+	for x in range(8, 48):
+		for y in range(6, 31):
+			var ex := (float(x) - 29.0) / 18.5
+			var ey := (float(y) - 18.0) / 11.0
+			var edge_wave := sin(float(x) * 0.45) * 0.08 + cos(float(y) * 0.65) * 0.07
+			if (ex * ex + ey * ey + edge_wave) <= 1.0:
+				walkable[x][y] = true
+	carve.call(23, 13, 18, 8)
+	carve.call(43, 12, 5, 7)
+	# Paredão rochoso natural atrás da cachoeira norte (x=28..33, y=6..11)
+	for wx in range(28, 34):
+		for wy in range(6, 12):
+			walkable[wx][wy] = false
 
-	# Bacia sagrada da Lagoa Azul centrada em (495, 240) -> tiles x=29..32, y=13..16 + cachoeira norte
+	# Terreno musgoso, Lagoa Azul orgânica de bordas arredondadas e paredão rochoso natural
 	for x in range(MAP_W):
 		for y in range(MAP_H):
 			var base_grass: Vector2i = f_cat["grass_a"] if ((x + y) % 2 == 0) else f_cat["grass_b"]
 			for gl in [ground_normal, ground_distorted]:
 				gl.set_cell(Vector2i(x, y), 0, base_grass)
 
-			var in_pond_core := (x >= 29 and x <= 32 and y >= 13 and y <= 16)
+			var in_pond_core := _is_lagoon_water(x, y)
 			if not walkable[x][y]:
 				var near_walkable := false
 				for dy in range(-1, 2):
@@ -164,40 +228,50 @@ func _build_clearing_tilemaps() -> void:
 					for wl in [walls_normal, walls_distorted]:
 						wl.set_cell(Vector2i(x, y), 0, wcoord)
 			elif in_pond_core:
-				var is_edge := (x == 29 or x == 32 or y == 13 or y == 16)
-				var water_tile: Vector2i = f_cat["water_ripple_anim"] if is_edge else f_cat["water_deep_anim"]
-				if y == 13 and (x == 30 or x == 31):
-					water_tile = f_cat["waterfall_foam"]
+				var water_tile: Vector2i = _pick_lagoon_tile(x, y, f_cat)
 				for wl in [walls_normal, walls_distorted]:
 					wl.set_cell(Vector2i(x, y), 0, water_tile)
 				for gl in [ground_normal, ground_distorted]:
-					gl.set_cell(Vector2i(x, y), 0, f_cat["water_shore_center"])
+					gl.set_cell(Vector2i(x, y), 0, f_cat["grass_a"])
 			else:
-				var dx := (float(x) - 30.5) / 7.5
-				var dy := (float(y) - 14.8) / 5.2
+				var near_lagoon := false
+				for dy in range(-1, 2):
+					for dx in range(-1, 2):
+						if _is_lagoon_water(x + dx, y + dy):
+							near_lagoon = true
+							break
+					if near_lagoon:
+						break
+				var dx := (float(x) - 31.0) / 8.5
+				var dy := (float(y) - 15.0) / 5.5
 				var r2 := dx * dx + dy * dy
 				var gtile: Vector2i = f_cat["grass_a"]
-				if (x * 5 + y) % 6 == 0:
+				if near_lagoon and (x + y * 2) % 3 == 0:
+					gtile = f_cat["needle_grass_b"]
+				elif (x * 5 + y) % 4 == 0:
 					gtile = f_cat["grass_b"]
-				if r2 <= 0.65:
-					gtile = f_cat["needle_grass_a"] if (x + y) % 2 == 0 else f_cat["needle_grass_b"]
-				elif r2 <= 1.0:
-					gtile = f_cat["needle_grass_b"] if (x * 3 + y) % 3 != 0 else f_cat["grass_b"]
+				elif r2 <= 0.72 and (x + y * 2) % 3 != 0:
+					gtile = f_cat["needle_grass_b"]
 				for gl in [ground_normal, ground_distorted]:
 					gl.set_cell(Vector2i(x, y), 0, gtile)
 
-	# Cachoeira sagrada norte desaguando na Lagoa Azul
+	# Cachoeira sagrada norte descendo direto do paredão rochoso para a Lagoa Azul
 	for wl in [walls_normal, walls_distorted]:
 		for wx in [30, 31]:
 			wl.set_cell(Vector2i(wx, 10), 0, f_cat["waterfall_top"])
 			wl.set_cell(Vector2i(wx, 11), 0, f_cat["waterfall_mid"])
-			wl.set_cell(Vector2i(wx, 12), 0, f_cat["waterfall_foam"])
+			wl.set_cell(Vector2i(wx, 12), 0, f_cat["water_ripple_anim"])
 
-	# Trilha oeste + píer de madeira até a margem da Guardiã + margem leste dos ovos
+	# Trilha contínua oeste sem esporões + píer rústico de madeira até a margem da Guardiã
 	for gl in [ground_normal, ground_distorted]:
-		V2TileCatalog.fill_rect(gl, Rect2i(0, 14, 24, 2), f_cat["soil_a"])
+		for sx in range(0, 24):
+			var cy := 14 if (sx < 8 or sx >= 17) else 15
+			gl.set_cell(Vector2i(sx, cy), 0, f_cat["soil_a"])
+			gl.set_cell(Vector2i(sx, cy + 1), 0, f_cat["soil_b"] if sx % 2 == 0 else f_cat["soil_a"])
 		V2TileCatalog.fill_rect(gl, Rect2i(24, 14, 4, 2), f_cat["bridge_h_mid_t"])
-		V2TileCatalog.fill_rect(gl, Rect2i(35, 14, 5, 2), f_cat["needle_grass_a"])
+		for ex in range(35, 41):
+			for ey in range(14, 16):
+				gl.set_cell(Vector2i(ex, ey), 0, f_cat["needle_grass_b"] if (ex + ey) % 2 == 0 else f_cat["grass_b"])
 
 	_setup_v2_clearing_canopy_and_fog(walkable)
 	walls_distorted.collision_enabled = false
@@ -207,13 +281,27 @@ func _setup_v2_clearing_canopy_and_fog(walkable: Array) -> void:
 	var f_cat := V2TileCatalog.FOREST_TILES
 	var active_ts: TileSet = ACT3_TS if GameState.is_unfiltered_act3() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
 
+	if _clutter_layer == null:
+		_clutter_layer = TileMapLayer.new()
+		_clutter_layer.name = "V2GroundClutterLayer"
+		_clutter_layer.z_index = -1
+		_clutter_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_clutter_layer.collision_enabled = false
+		add_child(_clutter_layer)
+	_clutter_layer.tile_set = active_ts
+	_clutter_layer.clear()
+
 	if _understory_layer == null:
 		_understory_layer = TileMapLayer.new()
 		_understory_layer.name = "V2UnderstoryLayer"
-		_understory_layer.z_index = 1
+		_understory_layer.z_index = 0
+		_understory_layer.y_sort_enabled = true
 		_understory_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		_understory_layer.collision_enabled = false
-		add_child(_understory_layer)
+		_understory_layer.collision_enabled = true
+		if ysort_obstacles != null:
+			ysort_obstacles.add_child(_understory_layer)
+		else:
+			add_child(_understory_layer)
 	_understory_layer.tile_set = active_ts
 	_understory_layer.clear()
 
@@ -221,63 +309,86 @@ func _setup_v2_clearing_canopy_and_fog(walkable: Array) -> void:
 		_canopy_layer = TileMapLayer.new()
 		_canopy_layer.name = "V2CanopyLayer"
 		_canopy_layer.z_index = 4
+		_canopy_layer.y_sort_enabled = true
 		_canopy_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		_canopy_layer.collision_enabled = false
+		_canopy_layer.collision_enabled = true
 		_canopy_material = AtmosphereRig.create_canopy_material(38.0, 0.36)
 		_canopy_layer.material = _canopy_material
 		add_child(_canopy_layer)
 	_canopy_layer.tile_set = active_ts
 	_canopy_layer.clear()
 
-	# Samambaias, cogumelos e pedras musgosas no sub-bosque (sobre piso opaco, evitando água/cachoeira)
+	# Samambaias, cogumelos, seixos e rochas musgosas naturais ao redor da margem orgânica da lagoa
 	for gx in range(2, MAP_W - 2, 2):
 		for gy in range(2, MAP_H - 2, 2):
 			if walls_normal.get_cell_source_id(Vector2i(gx, gy)) != -1:
 				continue
 			if walkable[gx][gy]:
-				if (gx >= 26 and gx <= 36 and gy >= 10 and gy <= 19) and not (gx >= 28 and gx <= 33 and gy >= 12 and gy <= 17):
-					if (gx + gy) % 3 == 0:
-						_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_a" if gx % 2 == 0 else "mushrooms_a"])
+				if (gx >= 24 and gx <= 39 and gy >= 10 and gy <= 20) and not _is_lagoon_water(gx, gy):
+					var m_idx := (gx + gy * 3) % 5
+					if m_idx == 0:
+						_clutter_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_a"])
+					elif m_idx == 1:
+						_clutter_layer.set_cell(Vector2i(gx, gy), 0, f_cat["pebbles"])
+					elif m_idx == 2:
+						_clutter_layer.set_cell(Vector2i(gx, gy), 0, f_cat["mushrooms_a"])
 				continue
 			var h := (gx * 11 + gy * 17) % 6
 			if h == 0:
-				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_a"])
+				_clutter_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_a"])
 			elif h == 1:
-				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_b"])
+				_clutter_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_b"])
 			elif h == 2:
-				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["mushrooms_a"])
+				_clutter_layer.set_cell(Vector2i(gx, gy), 0, f_cat["mushrooms_a"])
 
-	# Anel florestal denso e orgânico abraçando toda a clareira da Lagoa Azul e Árvore Anciã
-	for gy in range(0, MAP_H - 5, 3):
-		var row_shift := (gy % 2) * 2
-		for gx in range(0, MAP_W - 4, 3):
-			var tx := gx + row_shift
-			if tx >= MAP_W - 3:
+	# Pedras musgosas e tocos enraizados dando contornos orgânicos às margens (sem fechar passagem do píer/ninho)
+	for bpos in [Vector2i(27, 11), Vector2i(34, 11), Vector2i(35, 17), Vector2i(28, 18)]:
+		V2TileCatalog.stamp_rect(_understory_layer, bpos, f_cat["moss_boulder"], Vector2i(2, 2))
+	V2TileCatalog.stamp_rect(_understory_layer, Vector2i(25, 18), f_cat["stump_rooted"], Vector2i(2, 2))
+
+	# Anel florestal denso e irregular (com variação vertical y_jit) fechando todo o perímetro
+	for gy in range(-3, MAP_H - 2, 2):
+		var row_shift := ((gy + 10) % 4)
+		for gx in range(-1 + (row_shift % 2), MAP_W, 2):
+			var tx := gx + ((gx * 3 + gy * 5) % 2)
+			var y_jit := ((gx * 7 + gy * 11 + 3) & 1)
+			var sty := gy + y_jit
+			var pick := (tx * 5 + sty * 7 + 100) % 5
+			var stamp_w := 5 if pick == 3 else (1 if pick == 4 else 3)
+			var trunk_x := tx + (2 if pick == 3 else (1 if stamp_w == 3 else 0))
+			var base_y := sty + 5
+			if trunk_x < 0 or trunk_x >= MAP_W or base_y < 0 or base_y >= MAP_H:
 				continue
-			var base_y := gy + 5
-			var in_west_path := (tx <= 23 and base_y >= 13 and base_y <= 17)
-			var near_signpost := (tx >= 11 and tx <= 14 and base_y >= 11 and base_y <= 14)
-			var in_waterfall := (tx >= 28 and tx <= 33 and base_y >= 9 and base_y <= 13)
-			var ldx := (float(tx + 1) - 30.5) / 7.8
-			var ldy := (float(base_y) - 15.5) / 5.4
-			var in_lagoon_sanctuary := (ldx * ldx + ldy * ldy <= 1.0) or in_waterfall
-			var in_east_glade := (tx >= 37 and tx <= 46 and base_y >= 12 and base_y <= 20)
-			var in_ancient_tree_trunk := (tx >= 44 and tx <= 56 and base_y >= 10 and base_y <= 20)
-			var near_rocks := (tx >= 17 and tx <= 21 and base_y >= 20 and base_y <= 23) or (tx >= 40 and tx <= 44 and base_y >= 9 and base_y <= 12)
-			if in_west_path or near_signpost or in_lagoon_sanctuary or in_east_glade or in_ancient_tree_trunk or near_rocks:
+			var in_west_path := (trunk_x <= 23 and base_y >= 11 and base_y <= 19)
+			var near_signpost := (trunk_x >= 11 and trunk_x <= 15 and base_y >= 11 and base_y <= 14)
+			var in_waterfall := (trunk_x >= 28 and trunk_x <= 33 and base_y >= 9 and base_y <= 14)
+			var in_ancient_trunk := (trunk_x >= 47 and trunk_x <= 55 and base_y >= 13 and base_y <= 21)
+			var blocked := in_west_path or near_signpost or in_waterfall or in_ancient_trunk
+			if not blocked:
+				for cx in range(maxi(0, trunk_x - 1), mini(MAP_W, trunk_x + 2)):
+					if walkable[cx][base_y]:
+						blocked = true
+						break
+					if base_y + 1 < MAP_H and walkable[cx][base_y + 1]:
+						blocked = true
+						break
+					var wcell := walls_normal.get_cell_atlas_coords(Vector2i(cx, base_y))
+					if wcell in [f_cat["water_deep_anim"], f_cat["water_ripple_anim"], f_cat["waterfall_top"], f_cat["waterfall_mid"], f_cat["waterfall_foam"]]:
+						blocked = true
+						break
+			if blocked:
 				continue
-			var pick := (tx * 5 + gy * 7) % 5
-			var target_layer: TileMapLayer = _canopy_layer if ((tx + gy) % 2 == 0) else _understory_layer
+			var target_layer: TileMapLayer = _canopy_layer if ((tx + sty) % 2 == 0) else _understory_layer
 			if pick == 0 or pick == 1:
-				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, gy), f_cat["pine_dark"], Vector2i(3, 6))
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, sty), f_cat["pine_dark"], Vector2i(3, 6))
 			elif pick == 2:
-				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, gy), f_cat["pine_withered"], Vector2i(3, 6))
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, sty), f_cat["pine_withered"], Vector2i(3, 6))
 			elif pick == 3 and tx + 4 < MAP_W:
-				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, gy), f_cat["tree_gnarled_mid"], Vector2i(5, 6))
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, sty), f_cat["tree_gnarled_mid"], Vector2i(5, 6))
 			else:
-				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx + 1, gy), f_cat["pine_slender"], Vector2i(1, 6))
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(trunk_x, sty), f_cat["pine_slender"], Vector2i(1, 6))
 
-	# Árvore Anciã Sagrada (14x18) no extremo leste da clareira
+	# Árvore Anciã Sagrada (14x18) no extremo leste da clareira (tronco sólido no _canopy_layer)
 	V2TileCatalog.stamp_rect(_canopy_layer, Vector2i(44, 2), f_cat["ancient_tree"], Vector2i(14, 18))
 
 	if _fog_overlay == null:
@@ -363,6 +474,9 @@ func _sync_clearing_atmosphere() -> void:
 	var active_base_ts: TileSet = ACT3_TS if act3 else NORMAL_TS
 	ground_normal.tile_set = active_base_ts
 	walls_normal.tile_set = active_base_ts
+	ground_distorted.collision_enabled = false
+	if _clutter_layer != null:
+		_clutter_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
 	if _understory_layer != null:
 		_understory_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
 	if _canopy_layer != null:
@@ -439,8 +553,112 @@ func _on_exit_area_body_entered(body: Node2D) -> void:
 		request_level_change.emit("res://scenes/levels/forest_trail.tscn", "from_clearing")
 
 
+func _is_lagoon_sealed_by_santelmos() -> bool:
+	if GameState.is_unfiltered_act3():
+		return false
+	if GameState.get_switch("003_Ovos_sem_derrotar") or GameState.get_switch("004_Ovos_e_derrotou") or GameState.water_boss_defeated:
+		return false
+	return GameState.has_method("are_all_forest_santelmos_defeated") and not GameState.are_all_forest_santelmos_defeated()
+
+
+func _setup_santelmo_barrier() -> void:
+	_santelmo_barrier_root = Node2D.new()
+	_santelmo_barrier_root.name = "SantelmoBarrier"
+	_santelmo_barrier_root.z_index = 3
+	add_child(_santelmo_barrier_root)
+
+	var body := StaticBody2D.new()
+	body.name = "SantelmoBarrierBody"
+	body.position = Vector2(432, 280)
+	body.collision_layer = 1
+	_santelmo_barrier_root.add_child(body)
+
+	var col := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(18, 480)
+	col.shape = rect
+	body.add_child(col)
+	_santelmo_barrier_col = col
+
+	# Visual da barreira espiritual dos Santelmos cruzando a entrada da Lagoa
+	var line := Line2D.new()
+	line.width = 4.0
+	line.default_color = Color(1.0, 0.42, 0.16, 0.78)
+	for py in range(136, 424, 16):
+		line.add_point(Vector2(432 + sin(float(py) * 0.12) * 3.0, float(py)))
+	_santelmo_barrier_root.add_child(line)
+
+	var core_line := Line2D.new()
+	core_line.width = 1.6
+	core_line.default_color = Color(1.0, 0.85, 0.42, 0.92)
+	for py in range(136, 424, 16):
+		core_line.add_point(Vector2(432 + sin(float(py) * 0.12) * 2.0, float(py)))
+	_santelmo_barrier_root.add_child(core_line)
+
+	_santelmo_barrier_particles = CPUParticles2D.new()
+	_santelmo_barrier_particles.position = Vector2(432, 260)
+	_santelmo_barrier_particles.amount = 36
+	_santelmo_barrier_particles.lifetime = 1.4
+	_santelmo_barrier_particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	_santelmo_barrier_particles.emission_rect_extents = Vector2(6, 128)
+	_santelmo_barrier_particles.direction = Vector2(0.0, -1.0)
+	_santelmo_barrier_particles.gravity = Vector2(0.0, -18.0)
+	_santelmo_barrier_particles.initial_velocity_min = 8.0
+	_santelmo_barrier_particles.initial_velocity_max = 20.0
+	_santelmo_barrier_particles.scale_amount_min = 1.5
+	_santelmo_barrier_particles.scale_amount_max = 3.2
+	_santelmo_barrier_particles.color = Color(1.0, 0.52, 0.18, 0.85)
+	_santelmo_barrier_root.add_child(_santelmo_barrier_particles)
+
+	_santelmo_barrier_light = RetroLevelHelpers.create_point_light(Vector2(432, 240), Color(1.0, 0.48, 0.18), 0.85, 2.2)
+	_santelmo_barrier_root.add_child(_santelmo_barrier_light)
+
+	var inter := Interactable.new()
+	inter.name = "BarreiraSantelmoInteract"
+	inter.interaction_id = "BarreiraSantelmo"
+	inter.title = "Barreira dos Santelmos"
+	inter.verb = "Examinar"
+	inter.position = Vector2(422, 240)
+	var icol := CollisionShape2D.new()
+	var irect := RectangleShape2D.new()
+	irect.size = Vector2(24, 180)
+	icol.shape = irect
+	inter.add_child(icol)
+	inter.interacted.connect(func(_ia: Interactable) -> void:
+		var rem := GameState.get_remaining_forest_santelmo_count()
+		request_dialogue.emit([{
+			"speaker": "Selo dos Santelmos",
+			"text": "Uma muralha de chamas espirituais sela a entrada da Guardiã da Lagoa.\nRestam %d de %d Santelmo(s) na Trilha da Floresta — derrote todos para abrir passagem." % [rem, GameState.FOREST_SANTELMO_TOTAL]
+		}], Callable())
+	)
+	_santelmo_barrier_root.add_child(inter)
+	_santelmo_barrier_interact = inter
+
+
+func _update_santelmo_barrier() -> void:
+	var sealed := _is_lagoon_sealed_by_santelmos()
+	if _santelmo_barrier_root != null:
+		_santelmo_barrier_root.visible = sealed
+	if _santelmo_barrier_col != null:
+		_santelmo_barrier_col.set_deferred("disabled", not sealed)
+	if _santelmo_barrier_particles != null:
+		_santelmo_barrier_particles.emitting = sealed
+	if _santelmo_barrier_light != null:
+		_santelmo_barrier_light.enabled = sealed
+	if _santelmo_barrier_interact != null:
+		_santelmo_barrier_interact.set_deferred("monitoring", sealed)
+		_santelmo_barrier_interact.set_deferred("monitorable", sealed)
+
+
 func _on_nest_interaction(_interactable: Interactable) -> void:
 	if GameState.is_unfiltered_act3():
+		return
+	if _is_lagoon_sealed_by_santelmos():
+		var rem := GameState.get_remaining_forest_santelmo_count()
+		request_dialogue.emit([{
+			"speaker": "Selo dos Santelmos",
+			"text": "O calor dos %d Santelmo(s) restantes na Trilha da Floresta bloqueia o acesso ao ninho e à Guardiã da Lagoa." % rem
+		}], Callable())
 		return
 	if GameState.get_switch("003_Ovos_sem_derrotar") or GameState.get_switch("004_Ovos_e_derrotou"):
 		request_dialogue.emit([
@@ -498,6 +716,13 @@ func _on_nest_interaction(_interactable: Interactable) -> void:
 
 func _on_creature_interaction() -> void:
 	if GameState.is_unfiltered_act3():
+		return
+	if _is_lagoon_sealed_by_santelmos():
+		var rem := GameState.get_remaining_forest_santelmo_count()
+		request_dialogue.emit([{
+			"speaker": "Selo dos Santelmos",
+			"text": "A Guardiã da Lagoa permanece inacessível atrás do calor dos Santelmos!\nAinda restam %d de %d Santelmo(s) ativos na Trilha da Floresta." % [rem, GameState.FOREST_SANTELMO_TOTAL]
+		}], Callable())
 		return
 	var higher := _is_higher_dose_active()
 	if higher:
@@ -615,7 +840,7 @@ func _setup_act2_cat_rescue() -> void:
 	cat_inter.interaction_id = "Resgatar_Gato"
 	cat_inter.title = "Gatinho da Senhora Luningning"
 	cat_inter.verb = "Resgatar"
-	cat_inter.position = Vector2(400, 324)
+	cat_inter.position = Vector2(360, 324)
 	cat_inter.collision_layer = 4
 	cat_inter.collision_mask = 2
 

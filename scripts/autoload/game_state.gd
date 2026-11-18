@@ -14,6 +14,7 @@ signal higher_dose_changed(active: bool)
 signal clock_minute_changed(total_minutes: int, formatted_hhmm: String)
 signal day_period_changed(period_id: String)
 signal sleep_curfew_triggered(current_act: int)
+signal task_state_changed(task_id: String, active: bool, completed: bool)
 
 @export var in_game_minutes_per_real_second: float = 2.0
 @export var day_start_minutes: int = 390 # 06:30
@@ -83,6 +84,12 @@ var player_stamina: float = 100.0
 var player_max_stamina: float = 100.0
 var water_boss_defeated: bool = false
 var equipped_outfit: String = "casual" # "casual" (Imagem 3) ou "bfp" (Uniforme de Bombeiro)
+
+const FOREST_SANTELMO_TOTAL := 16
+var day_number: int = 1
+var active_tasks: Dictionary = {}
+var completed_tasks: Dictionary = {}
+var defeated_forest_santelmos: Dictionary = {}
 
 # Configurações de acessibilidade e preferência
 var setting_flash_reduction: bool = false
@@ -247,6 +254,10 @@ func reset_to_new_game() -> void:
 	player_max_stamina = 100.0
 	water_boss_defeated = false
 	equipped_outfit = "casual"
+	day_number = 1
+	active_tasks.clear()
+	completed_tasks.clear()
+	defeated_forest_santelmos.clear()
 	hp_changed.emit(player_hp, player_max_hp)
 	stamina_changed.emit(player_stamina, player_max_stamina)
 	perception_changed.emit(perception_mode)
@@ -277,6 +288,7 @@ func get_switch(key: String) -> bool:
 func set_switch(key: String, value: bool) -> void:
 	var prev: bool = bool(switches.get(key, false))
 	switches[key] = value
+	_sync_task_for_switch(key, value)
 	if prev != value:
 		switch_changed.emit(key, value)
 
@@ -401,6 +413,7 @@ func set_higher_dose(active: bool) -> void:
 
 
 func advance_to_act_2() -> void:
+	day_number = maxi(2, day_number + 1)
 	variables["Ato"] = 2
 	variables["Intoxicacao"] = 1
 	set_switch("006_Dormir_avancou_para_Ato2", true)
@@ -423,6 +436,132 @@ func advance_to_act_2() -> void:
 	day_period_changed.emit("morning")
 	autosave(current_scene_path, "initial")
 	notification_requested.emit("06:30 — Um novo turno começa em Agdangan")
+
+
+func start_task(task_id: String, title_text: String = "", target_count: int = 1) -> void:
+	if bool(completed_tasks.get(task_id, false)):
+		return
+	if not active_tasks.has(task_id):
+		active_tasks[task_id] = {
+			"title": title_text if not title_text.is_empty() else task_id,
+			"started_day": day_number,
+			"progress": 0,
+			"target": maxi(1, target_count),
+		}
+		task_state_changed.emit(task_id, true, false)
+
+
+func update_task_progress(task_id: String, progress_val: int, title_text: String = "", target_count: int = 1) -> void:
+	if bool(completed_tasks.get(task_id, false)):
+		return
+	if not active_tasks.has(task_id):
+		start_task(task_id, title_text, target_count)
+	var entry: Dictionary = active_tasks[task_id]
+	var target_v: int = maxi(1, int(entry.get("target", target_count)))
+	entry["progress"] = clampi(progress_val, 0, target_v)
+	active_tasks[task_id] = entry
+	task_state_changed.emit(task_id, true, false)
+
+
+func complete_task(task_id: String) -> void:
+	completed_tasks[task_id] = true
+	if active_tasks.has(task_id):
+		active_tasks.erase(task_id)
+	task_state_changed.emit(task_id, false, true)
+
+
+func is_task_active(task_id: String) -> bool:
+	return active_tasks.has(task_id) and not bool(completed_tasks.get(task_id, false))
+
+
+func is_task_completed(task_id: String) -> bool:
+	return bool(completed_tasks.get(task_id, false))
+
+
+func get_active_tasks() -> Dictionary:
+	return active_tasks.duplicate(true)
+
+
+func advance_day_preserving_tasks() -> int:
+	# Ao atingir 23:00 ou dormir entre dias sem concluir o Ato, avanca apenas o calendario
+	# preservando switches de dialogo, tarefas ativas/concluidas e progresso na floresta.
+	day_number += 1
+	is_afternoon = false
+	set_clock_minutes(day_start_minutes, false)
+	if int(variables.get("Ato", 1)) < 3:
+		set_perception_mode(PerceptionMode.FILTERED_MORNING)
+	if player_hp < player_max_hp:
+		heal_player(25)
+	reset_stamina()
+	notification_requested.emit("Dia %d — 06:30 · Tarefas em andamento preservadas" % day_number)
+	return day_number
+
+
+func _sync_task_for_switch(key: String, value: bool) -> void:
+	if not value:
+		return
+	match key:
+		"002_Chefe_Ato1_apresentado":
+			complete_task("ato1_apresentacao_reyes")
+			start_task("ato1_ovos_floresta", "Investigar fumaça e ovos na Floresta Leste")
+		"003_Ovos_sem_derrotar", "004_Ovos_e_derrotou":
+			complete_task("ato1_ovos_floresta")
+		"007_Chefe_Ato2_apresentado":
+			start_task("ato2_ocorrencias_cidade", "Atender ocorrências em Agdangan", 3)
+		"008_Missao_chave1_aberta":
+			start_task("ato2_missao_1", "Ajuda na costa (Mang Carding)")
+		"009_Missao_chave1_concluida":
+			complete_task("ato2_missao_1")
+		"010_Missao_chave2_aberta":
+			start_task("ato2_missao_2", "Bomba e hidrante da Rua")
+		"011_Missao_chave2_concluida":
+			complete_task("ato2_missao_2")
+		"012_Missao_chave3_aberta":
+			start_task("ato2_missao_3", "Vistoria na feira leste")
+		"013_Missao_chave3_concluida":
+			complete_task("ato2_missao_3")
+		"014_Floresta_liberada":
+			complete_task("ato2_ocorrencias_cidade")
+			start_task("ato2_resgate_floresta", "Purificar os 16 Santelmos e resgatar o gatinho", FOREST_SANTELMO_TOTAL)
+		"018_Gatinho_devolvido":
+			complete_task("ato2_resgate_floresta")
+
+
+func mark_forest_santelmo_defeated(santelmo_id: String) -> void:
+	if santelmo_id.is_empty():
+		return
+	defeated_forest_santelmos[santelmo_id] = true
+	var count := get_defeated_forest_santelmo_count()
+	if count >= FOREST_SANTELMO_TOTAL:
+		complete_task("forest_santelmos")
+	else:
+		update_task_progress("forest_santelmos", count, "Extinguir os 16 Santelmos da Trilha da Floresta", FOREST_SANTELMO_TOTAL)
+
+
+func is_forest_santelmo_defeated(santelmo_id: String) -> bool:
+	return bool(defeated_forest_santelmos.get(santelmo_id, false))
+
+
+func get_defeated_forest_santelmo_count() -> int:
+	var c := 0
+	for k in defeated_forest_santelmos.keys():
+		if bool(defeated_forest_santelmos[k]):
+			c += 1
+	return clampi(c, 0, FOREST_SANTELMO_TOTAL)
+
+
+func get_remaining_forest_santelmo_count() -> int:
+	return maxi(0, FOREST_SANTELMO_TOTAL - get_defeated_forest_santelmo_count())
+
+
+func are_all_forest_santelmos_defeated() -> bool:
+	return get_remaining_forest_santelmo_count() <= 0
+
+
+func mark_all_forest_santelmos_defeated() -> void:
+	for i in range(1, FOREST_SANTELMO_TOTAL + 1):
+		defeated_forest_santelmos["Santelmo%d" % i] = true
+	complete_task("forest_santelmos")
 
 ## Avança para o Ato 3 (Revelação sem filtro) após concluir o Ato 2 e descansar
 func advance_to_act_3() -> void:
@@ -585,6 +724,10 @@ func save_game() -> bool:
 		"player_hp": player_hp,
 		"water_boss_defeated": water_boss_defeated,
 		"equipped_outfit": equipped_outfit,
+		"day_number": day_number,
+		"active_tasks": active_tasks,
+		"completed_tasks": completed_tasks,
+		"defeated_forest_santelmos": defeated_forest_santelmos,
 		"settings": {
 			"flash_reduction": setting_flash_reduction,
 			"vhs_effects": setting_vhs_effects,
@@ -629,6 +772,10 @@ func load_game() -> bool:
 	_last_emitted_period = get_day_period(clock_minutes)
 	player_hp = int(data.get("player_hp", 100))
 	water_boss_defeated = bool(data.get("water_boss_defeated", false))
+	day_number = maxi(1, int(data.get("day_number", 1)))
+	active_tasks = data.get("active_tasks", {}).duplicate(true) if typeof(data.get("active_tasks", null)) == TYPE_DICTIONARY else {}
+	completed_tasks = data.get("completed_tasks", {}).duplicate() if typeof(data.get("completed_tasks", null)) == TYPE_DICTIONARY else {}
+	defeated_forest_santelmos = data.get("defeated_forest_santelmos", {}).duplicate() if typeof(data.get("defeated_forest_santelmos", null)) == TYPE_DICTIONARY else {}
 	current_scene_path = str(data.get("current_scene", "res://scenes/levels/RoomHuwag.tscn"))
 	spawn_tag = str(data.get("spawn_tag", "initial"))
 	var px: float = float(data.get("player_pos_x", 0.0))

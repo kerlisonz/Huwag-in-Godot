@@ -198,14 +198,16 @@ func _build_vhs_v2_tiles() -> void:
 	var layer := TileMapLayer.new()
 	layer.name = "V2VhsFloorLayer"
 	layer.z_index = -2
+	layer.collision_enabled = false
 	layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	layer.tile_set = VHS_TILESET
 	add_child(layer)
-	V2TileCatalog.fill_rect(layer, Rect2i(0, 0, 40, 23), t_cat["void"])
+	V2TileCatalog.fill_rect(layer, Rect2i(-8, -4, 56, 32), t_cat["void"])
 	V2TileCatalog.fill_rect(layer, Rect2i(2, 3, 36, 17), t_cat["wood_floor_dark"])
 	V2TileCatalog.fill_rect(layer, Rect2i(2, 2, 36, 1), t_cat["wall_station_mid"])
-	for dx in [5, 11, 16, 22, 27, 33]:
-		V2TileCatalog.stamp_rect(layer, Vector2i(dx, 4), t_cat["debris_broken"], Vector2i(2, 2))
+	# Tapetes esparsos no piso sem bloquear nem sujar o labirinto com sprites corrompidos
+	for rx in [6, 16, 26, 34]:
+		V2TileCatalog.stamp_rect(layer, Vector2i(rx, 10), t_cat["rug_crimson_tl"], Vector2i(2, 2))
 
 
 func _setup_boundaries() -> void:

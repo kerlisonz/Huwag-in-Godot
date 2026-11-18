@@ -181,8 +181,11 @@ func load_level(scene_path: String, spawn_tag: String = "default") -> void:
 	_current_scene_path = scene_path
 	GameState.current_scene_path = scene_path
 	if _current_level != null and is_instance_valid(_current_level):
-		_current_level.queue_free()
+		var prev_level := _current_level
 		_current_level = null
+		if prev_level.get_parent() == level_container:
+			level_container.remove_child(prev_level)
+		prev_level.queue_free()
 
 	var packed: PackedScene = load(scene_path)
 	if packed == null:
@@ -339,28 +342,33 @@ func _process_sleep_fsm(delta: float) -> void:
 func _perform_curfew_wake_transition() -> void:
 	var ato: int = int(GameState.get_var("Ato", 1))
 	if ato == 1:
-		GameState.set_switch("005_Chefe_liberou_cidade", true)
-		GameState.advance_to_act_2()
-		load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
+		var act1_done := GameState.get_switch("003_Ovos_sem_derrotar") or GameState.get_switch("004_Ovos_e_derrotou") or GameState.get_switch("005_Chefe_liberou_cidade")
+		if act1_done:
+			GameState.set_switch("005_Chefe_liberou_cidade", true)
+			GameState.advance_to_act_2()
+			load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
+		else:
+			GameState.player_hp = GameState.player_max_hp
+			GameState.hp_changed.emit(GameState.player_hp, GameState.player_max_hp)
+			GameState.advance_day_preserving_tasks()
+			load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
 	elif ato == 2:
 		if GameState.get_switch("019_Ato2_concluido"):
 			load_level("res://scenes/levels/vhs_memory_minigame.tscn", "from_curfew")
 		else:
 			GameState.set_switch("006c_Dose_escolhida_Ato2", false)
+			GameState.set_switch("006b_Dose_maior_pilulas", false)
+			GameState.set_intoxication_level(1)
 			GameState.player_hp = GameState.player_max_hp
-			GameState.player_stamina = GameState.player_max_stamina
 			GameState.hp_changed.emit(GameState.player_hp, GameState.player_max_hp)
-			GameState.stamina_changed.emit(GameState.player_stamina, GameState.player_max_stamina)
-			GameState.set_clock_minutes(GameState.day_start_minutes, false)
+			GameState.advance_day_preserving_tasks()
 			load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
 	else:
 		# Ato III: preserva integralmente a realidade sem filtro (_is_act3_unfiltered())
 		GameState.player_hp = GameState.player_max_hp
-		GameState.player_stamina = GameState.player_max_stamina
 		GameState.hp_changed.emit(GameState.player_hp, GameState.player_max_hp)
-		GameState.stamina_changed.emit(GameState.player_stamina, GameState.player_max_stamina)
 		GameState.set_perception_mode(GameState.PerceptionMode.UNFILTERED_ACT3)
-		GameState.set_clock_minutes(GameState.day_start_minutes, false)
+		GameState.advance_day_preserving_tasks()
 		load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
 
 

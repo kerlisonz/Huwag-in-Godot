@@ -41,15 +41,15 @@ func _ready() -> void:
 		player.position = Vector2(540, 220)
 		player.facing_dir = Vector2.LEFT
 	elif GameState.spawn_tag == "from_nightmare":
-		player.position = Vector2(250, 205)
+		player.position = Vector2(288, 224)
 		player.facing_dir = Vector2.DOWN
 		GameState.advance_to_act_3()
 		call_deferred("_trigger_act3_wake_monologue")
 	else:
-		player.position = Vector2(250, 205)
+		player.position = Vector2(288, 224)
 		player.facing_dir = Vector2.DOWN
 
-	player.set_camera_limits(Rect2i(0, 0, 640, 360))
+	player.set_camera_limits(Rect2i(105, 55, 542, 305))
 
 	_build_tilemaps()
 	_build_room_props_and_lights()
@@ -113,99 +113,101 @@ func _build_tilemaps() -> void:
 		layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else NORMAL_TS
 	for layer in [floor_distorted, walls_distorted]:
 		layer.tile_set = DISTORTED_TS
+		layer.collision_enabled = false
 
-	# Fundo void limpo em torno do quarto (40x23) e estrutura provincial filipina v2 (16x16)
+	# Fundo void limpo em torno do quarto compacto (21x10 tiles úteis: x=13..33, y=10..19)
 	for fl in [floor_normal, floor_distorted]:
 		fl.clear()
-		V2TileCatalog.fill_rect(fl, Rect2i(6, 8, 29, 13), t_cat["wood_floor_dark"])
-		V2TileCatalog.fill_rect(fl, Rect2i(7, 10, 27, 10), t_cat["wood_floor_warm"])
+		V2TileCatalog.fill_rect(fl, Rect2i(12, 8, 23, 13), t_cat["wood_floor_dark"])
+		V2TileCatalog.fill_rect(fl, Rect2i(13, 10, 21, 10), t_cat["wood_floor_warm"])
 
-		# Tábuas mais escuras alternadas para textura de madeira filipina
+		# Tábuas mais escuras alternadas para textura contínua de madeira filipina
 		for y in range(10, 20):
-			for x in range(7, 34):
+			for x in range(13, 34):
 				if (x + y * 2) % 4 == 0:
 					fl.set_cell(Vector2i(x, y), 0, t_cat["wood_floor_dark"])
 
-		# Área de dormir oeste com esteira Banig filipina (3x2) abaixo da cama
-		V2TileCatalog.stamp_rect(fl, Vector2i(8, 14), t_cat["banig_tl"], Vector2i(3, 2))
-		V2TileCatalog.stamp_rect(fl, Vector2i(11, 14), t_cat["banig_tl"], Vector2i(3, 2))
+		# Área de dormir oeste com UMA esteira Banig limpa ao pé da cama (100% caminhável)
+		V2TileCatalog.stamp_rect(fl, Vector2i(13, 14), t_cat["banig_tl"], Vector2i(3, 2))
 
-		# Zona central de estudo/refeição com ladrilho claro e tapete tecido filipino
-		for cy in range(12, 18):
-			for cx in range(16, 26):
-				var ctile: Vector2i = t_cat["checker_clinic"] if (cx + cy) % 2 == 0 else t_cat["checker_clinic_alt"]
-				fl.set_cell(Vector2i(cx, cy), 0, ctile)
-		V2TileCatalog.stamp_rect(fl, Vector2i(19, 14), t_cat["rug_crimson_tl"], Vector2i(2, 2))
-		V2TileCatalog.stamp_rect(fl, Vector2i(21, 14), t_cat["rug_crimson_tl"], Vector2i(2, 2))
+		# Tapete vermelho central tecido na sala de estar sob a janela (livres os trilhos ao redor da mesa)
+		V2TileCatalog.stamp_rect(fl, Vector2i(18, 14), t_cat["rug_crimson_tl"], Vector2i(2, 2))
+		V2TileCatalog.stamp_rect(fl, Vector2i(20, 14), t_cat["rug_crimson_tl"], Vector2i(2, 2))
 
-		# Canto nordeste de cozinha/pia com piso de cimento queimado
-		V2TileCatalog.fill_rect(fl, Rect2i(28, 10, 6, 3), t_cat["concrete_station"])
-
-		# Capacho Banig na soleira da porta leste
-		V2TileCatalog.stamp_rect(fl, Vector2i(31, 13), t_cat["banig_tl"], Vector2i(3, 2))
+		# Canto nordeste de cozinha compacta com piso terracota e tábuas contínuas na entrada
+		V2TileCatalog.fill_rect(fl, Rect2i(26, 10, 8, 3), t_cat["concrete_station"])
 
 	# Paredes perimetrais Sawali + Madeira + Sombra projetada nas camadas normal e distorcida
 	for wl in [walls_normal, walls_distorted]:
 		wl.clear()
-		V2TileCatalog.fill_rect(wl, Rect2i(7, 8, 27, 1), t_cat["wall_sawali_m"])
-		V2TileCatalog.fill_rect(wl, Rect2i(7, 9, 27, 1), t_cat["wall_wood_mid"])
-		wl.set_cell(Vector2i(7, 8), 0, t_cat["wall_sawali_l"])
+		V2TileCatalog.fill_rect(wl, Rect2i(13, 8, 21, 1), t_cat["wall_sawali_m"])
+		V2TileCatalog.fill_rect(wl, Rect2i(13, 9, 21, 1), t_cat["wall_wood_mid"])
+		wl.set_cell(Vector2i(13, 8), 0, t_cat["wall_sawali_l"])
 		wl.set_cell(Vector2i(33, 8), 0, t_cat["wall_sawali_r"])
-		wl.set_cell(Vector2i(7, 9), 0, t_cat["wall_wood_left"])
+		wl.set_cell(Vector2i(13, 9), 0, t_cat["wall_wood_left"])
 		wl.set_cell(Vector2i(33, 9), 0, t_cat["wall_wood_right"])
 
 		# Sombras projetadas pelas paredes sobre o piso (profundidade 16x16)
-		for sx in range(8, 34):
+		for sx in range(14, 34):
 			wl.set_cell(Vector2i(sx, 10), 0, t_cat["shadow_top"])
 		for sy in range(11, 20):
-			wl.set_cell(Vector2i(7, sy), 0, t_cat["shadow_left"])
-		wl.set_cell(Vector2i(7, 10), 0, t_cat["shadow_corner"])
+			wl.set_cell(Vector2i(13, sy), 0, t_cat["shadow_left"])
+		wl.set_cell(Vector2i(13, 10), 0, t_cat["shadow_corner"])
 
-		# Parede oeste (x=6, y=8..19) + borda sul (y=20) + parede leste com vão da porta livre
-		V2TileCatalog.fill_rect(wl, Rect2i(6, 8, 1, 12), t_cat["wall_wood_left"])
-		V2TileCatalog.fill_rect(wl, Rect2i(6, 20, 29, 1), t_cat["wall_trim_gold"])
-		V2TileCatalog.fill_rect(wl, Rect2i(34, 8, 1, 4), t_cat["wall_wood_right"])
-		V2TileCatalog.fill_rect(wl, Rect2i(34, 18, 1, 2), t_cat["wall_wood_right"])
+		# Parede oeste (x=12) + borda sul (y=20) + parede leste com vão compacto de porta (y=13..15)
+		V2TileCatalog.fill_rect(wl, Rect2i(12, 8, 1, 12), t_cat["wall_wood_left"])
+		V2TileCatalog.fill_rect(wl, Rect2i(12, 20, 23, 1), t_cat["wall_trim_gold"])
+		V2TileCatalog.fill_rect(wl, Rect2i(34, 8, 1, 5), t_cat["wall_wood_right"])
+		V2TileCatalog.fill_rect(wl, Rect2i(34, 16, 1, 4), t_cat["wall_wood_right"])
 
-	# Camada dedicada para mobiliário multi-tile v2 (sem apagar paredes nem bloquear a porta)
+	# Camada Y-sorted com colisão real para mobiliário multi-tile v2 (sem apagar paredes nem bloquear a porta)
 	if _furniture_layer == null:
 		_furniture_layer = TileMapLayer.new()
 		_furniture_layer.name = "V2FurnitureLayer"
 		_furniture_layer.z_index = 0
+		_furniture_layer.y_sort_enabled = true
 		_furniture_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		_furniture_layer.collision_enabled = false
-		add_child(_furniture_layer)
+		_furniture_layer.collision_enabled = true
+		if ysort_root != null:
+			ysort_root.add_child(_furniture_layer)
+		else:
+			add_child(_furniture_layer)
 	if ysort_root != null:
 		ysort_root.z_index = 2
 	_furniture_layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
 	_furniture_layer.clear()
 
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(20, 8), t_cat["window_day_tl"], Vector2i(2, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(8, 10), t_cat["bed_huwag"], Vector2i(3, 4))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(12, 8), t_cat["bookshelf_a"], Vector2i(2, 2))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(15, 8), t_cat["wardrobe"], Vector2i(2, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(23, 8), t_cat["fridge_sari"], Vector2i(3, 2))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(27, 8), t_cat["radio_pc_bfp"], Vector2i(1, 2))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(29, 8), t_cat["kitchen_counter"], Vector2i(4, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(25, 11), t_cat["table_dining"], Vector2i(3, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(8, 16), t_cat["indoor_palm"], Vector2i(2, 3))
+	# Zona de descanso (canto NO) + Estudo/Armário alinhados abaixo da parede superior + Janela na parede + Cozinha NE + Mesa com 4 cadeiras
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(13, 10), t_cat["bed_huwag"], Vector2i(3, 4))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(16, 8), t_cat["wardrobe"], Vector2i(2, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(18, 9), t_cat["bookshelf_a"], Vector2i(2, 2))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(21, 8), t_cat["window_day_tl"], Vector2i(2, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(24, 8), t_cat["radio_pc_bfp"], Vector2i(1, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(26, 8), t_cat["fridge_sari"], Vector2i(2, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(29, 9), t_cat["kitchen_counter"], Vector2i(4, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(24, 14), t_cat["table_dining"], Vector2i(3, 3))
+	_furniture_layer.set_cell(Vector2i(25, 13), 0, t_cat["chair_down"])
+	_furniture_layer.set_cell(Vector2i(25, 17), 0, t_cat["chair_up"])
+	_furniture_layer.set_cell(Vector2i(23, 15), 0, t_cat["chair_right"])
+	_furniture_layer.set_cell(Vector2i(27, 15), 0, t_cat["chair_left"])
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(13, 17), t_cat["indoor_palm"], Vector2i(2, 3))
 
 
 func _build_room_props_and_lights() -> void:
-	# Gato Pusa no canto sudeste (mobiliário agora vem 100% do atlas interiors_v2 sem sobreposição)
-	_add_dual_prop("pusa_cat", Vector2(509, 308), Vector2(1.25, 1.25), -4)
+	# Gato Pusa no canto sudeste do quarto compacto
+	_add_dual_prop("pusa_cat", Vector2(504, 298), Vector2(1.25, 1.25), -4)
 
-	# Decais exclusivos do estado distorcido (Yume Nikki + manchas de sangue/fuligem)
-	_add_distorted_decal("floor_stain", Vector2(226, 224), Vector2(1.5, 1.3))
-	_add_distorted_decal("floor_stain", Vector2(424, 182), Vector2(1.2, 1.1))
-	_add_distorted_decal("yume_eye_rune", Vector2(180, 272), Vector2(1.1, 1.1))
-	_add_distorted_decal("yume_eye_rune", Vector2(342, 134), Vector2(1.0, 1.0))
-	_add_distorted_decal("yume_eye_rune", Vector2(492, 134), Vector2(1.0, 1.0))
+	# Decais exclusivos do estado distorcido (Yume Nikki + manchas dentro dos novos limites x=224..528)
+	_add_distorted_decal("floor_stain", Vector2(288, 224), Vector2(1.4, 1.2))
+	_add_distorted_decal("floor_stain", Vector2(456, 200), Vector2(1.2, 1.1))
+	_add_distorted_decal("yume_eye_rune", Vector2(280, 272), Vector2(1.1, 1.1))
+	_add_distorted_decal("yume_eye_rune", Vector2(360, 146), Vector2(1.0, 1.0))
+	_add_distorted_decal("yume_eye_rune", Vector2(492, 146), Vector2(1.0, 1.0))
 
-	# Ventilador compacto de parede (alinhado dentro do painel de madeira norte, sem invadir a borda)
+	# Ventilador compacto na parede norte entre a estante (x=18..19) e a janela (x=21..22)
 	var fan_root := Node2D.new()
 	fan_root.name = "WallFan"
-	fan_root.position = Vector2(296, 146)
+	fan_root.position = Vector2(328, 138)
 	fan_root.z_index = 2
 	ysort_root.add_child(fan_root)
 
@@ -228,11 +230,16 @@ func _build_room_props_and_lights() -> void:
 		_fan_blades.add_child(blade)
 	fan_root.add_child(_fan_blades)
 
-	# Luzes PointLight2D atmosféricas estilo FNAF
-	_window_light = RetroLevelHelpers.create_point_light(Vector2(332, 195), Color(0.76, 0.85, 0.98), 0.72, 2.2)
-	_lamp_light = RetroLevelHelpers.create_point_light(Vector2(436, 172), Color(1.0, 0.76, 0.42), 0.92, 1.8)
-	_door_light = RetroLevelHelpers.create_point_light(Vector2(544, 224), Color(0.90, 0.76, 0.48), 0.58, 1.3)
-	_radio_light = RetroLevelHelpers.create_point_light(Vector2(476, 158), Color(0.28, 0.92, 0.52), 0.45, 0.6)
+	if light_shaft != null:
+		light_shaft.polygon = PackedVector2Array([
+			Vector2(336, 144), Vector2(368, 144), Vector2(392, 236), Vector2(312, 236)
+		])
+
+	# Luzes PointLight2D atmosféricas alinhadas ao quarto compacto
+	_window_light = RetroLevelHelpers.create_point_light(Vector2(352, 195), Color(0.76, 0.85, 0.98), 0.72, 2.2)
+	_lamp_light = RetroLevelHelpers.create_point_light(Vector2(408, 240), Color(1.0, 0.76, 0.42), 0.92, 1.8)
+	_door_light = RetroLevelHelpers.create_point_light(Vector2(536, 228), Color(0.90, 0.76, 0.48), 0.58, 1.3)
+	_radio_light = RetroLevelHelpers.create_point_light(Vector2(392, 152), Color(0.28, 0.92, 0.52), 0.45, 0.6)
 	for lt in [_window_light, _lamp_light, _door_light, _radio_light]:
 		lights_layer.add_child(lt)
 
@@ -336,23 +343,20 @@ func _setup_room_collisions() -> void:
 	body.collision_layer = 1
 	add_child(body)
 
-	# Paredes exatas alinhadas com o TileMapLayer (e compatíveis com testes)
-	_add_box_collision(body, Rect2(0, 0, 640, 156))       # Norte (até y=156)
-	_add_box_collision(body, Rect2(0, 324, 640, 36))      # Sul (abaixo de y=324)
-	_add_box_collision(body, Rect2(0, 0, 102, 360))       # Oeste (até x=102)
-	_add_box_collision(body, Rect2(544, 0, 96, 190))      # Leste acima da porta
-	_add_box_collision(body, Rect2(552, 260, 88, 100))    # Leste abaixo da porta
-	_add_box_collision(body, Rect2(554, 190, 86, 98))     # Trava externa do vão da porta (y=190..288)
-
-	# Cama sólida alinhada ao sprite da cama (x=104..228, y=156..244)
-	_add_box_collision(body, Rect2(104, 156, 124, 88))
+	# Paredes exatas alinhadas ao quarto compacto (interior x=208..544, y=160..320; móveis/cama colidem via V2FurnitureLayer)
+	_add_box_collision(body, Rect2(192, 0, 384, 156))       # Norte (até y=156)
+	_add_box_collision(body, Rect2(192, 320, 384, 40))      # Sul (abaixo de y=320)
+	_add_box_collision(body, Rect2(0, 0, 208, 360))         # Oeste (até x=208)
+	_add_box_collision(body, Rect2(544, 0, 96, 208))        # Leste acima da porta
+	_add_box_collision(body, Rect2(544, 256, 96, 104))      # Leste abaixo da porta
+	_add_box_collision(body, Rect2(552, 208, 88, 48))       # Trava externa do vão da porta (y=208..256)
 
 	# Colisão circular do gato dormindo no canto sudeste
 	var cat_shape := CollisionShape2D.new()
 	var cat_circle := CircleShape2D.new()
-	cat_circle.radius = 12.0
+	cat_circle.radius = 11.0
 	cat_shape.shape = cat_circle
-	cat_shape.position = Vector2(509, 308)
+	cat_shape.position = Vector2(504, 298)
 	body.add_child(cat_shape)
 
 
@@ -366,14 +370,14 @@ func _add_box_collision(parent: Node2D, r: Rect2) -> void:
 
 
 func _setup_interactables() -> void:
-	_add_interactable("Cama", "Cama de Bambu", "Descansar", Vector2(236, 205), Vector2(28, 42))
-	_add_interactable("Mesa_Remedios", "Mesa de Remédios", "Examinar", Vector2(424, 190), Vector2(36, 28))
-	_add_interactable("Armario_Uniforme", "Armário do Uniforme", "Abrir", Vector2(258, 168), Vector2(36, 22))
-	_add_interactable("Janela_Norte", "Janela Grades", "Olhar", Vector2(332, 164), Vector2(44, 22))
-	_add_interactable("Radio_Quartel", "Rádio Comunicador BFP", "Checar", Vector2(476, 190), Vector2(28, 30))
-	_add_interactable("Geladeira", "Jarra e Provisões", "Examinar", Vector2(376, 190), Vector2(28, 28))
-	_add_interactable("Porta_Saida", "Porta para Agdangan", "Sair", Vector2(546, 225), Vector2(26, 36))
-	_add_interactable("Gato", "Pusa", "Acariciar", Vector2(509, 304), Vector2(28, 24))
+	_add_interactable("Cama", "Cama de Bambu", "Descansar", Vector2(236, 198), Vector2(68, 66))
+	_add_interactable("Mesa_Remedios", "Mesa de Remédios", "Examinar", Vector2(408, 248), Vector2(56, 48))
+	_add_interactable("Armario_Uniforme", "Armário do Uniforme", "Abrir", Vector2(270, 166), Vector2(36, 20))
+	_add_interactable("Janela_Norte", "Janela Grades", "Olhar", Vector2(352, 166), Vector2(40, 24))
+	_add_interactable("Radio_Quartel", "Rádio Comunicador BFP", "Checar", Vector2(392, 166), Vector2(28, 24))
+	_add_interactable("Geladeira", "Jarra e Provisões", "Examinar", Vector2(432, 166), Vector2(40, 24))
+	_add_interactable("Porta_Saida", "Porta para Agdangan", "Sair", Vector2(546, 228), Vector2(26, 44))
+	_add_interactable("Gato", "Pusa", "Acariciar", Vector2(504, 296), Vector2(28, 24))
 
 
 func _add_interactable(id: String, title_text: String, verb_text: String, pos: Vector2, box_size: Vector2) -> void:

@@ -271,6 +271,11 @@ static func save_atlas_and_tileset(out_dir: String, name_base: String, img: Imag
 		var poly: PackedVector2Array = mt.get("collision_poly", PackedVector2Array([
 			Vector2(-7, -6), Vector2(7, -6), Vector2(7, 8), Vector2(-7, 8)
 		]))
+		if origin_x != 0 and not poly.is_empty():
+			var shifted := PackedVector2Array()
+			for pt in poly:
+				shifted.append(pt - Vector2(float(origin_x), 0.0))
+			poly = shifted
 		_apply_tile_metadata(
 			src,
 			coord,
