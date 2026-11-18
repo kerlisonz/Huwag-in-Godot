@@ -19,17 +19,35 @@ const VHS_TILESET := preload("res://assets/tilesets/v2/interiors_v2_distorted_ti
 @onready var interactables_root: Node2D = $Interactables
 @onready var exit_door: Area2D = $ExitDoor
 
+const MAZE_DIVIDERS: Array[Rect2] = [
+	Rect2(140, 50, 16, 170),
+	Rect2(220, 140, 16, 170),
+	Rect2(310, 50, 16, 160),
+	Rect2(400, 150, 16, 160),
+	Rect2(490, 50, 16, 170),
+]
+
 var _collected_fragments: int = 0
 const TOTAL_FRAGMENTS := 4
 var _hazard_timers: Array[float] = [0.0, 0.4, 0.8, 1.2, 1.6]
 var _shake_intensity: float = 0.0
+var _pulse_time: float = 0.0
 
 func _ready() -> void:
-	# Configura posição inicial de Huwag
+	# Configura posição inicial de Huwag e câmera 1:1 para enquadrar todo o labirinto (640x360)
 	if player:
 		player.position = Vector2(80, 180)
 		if player.has_method("set_camera_limits"):
 			player.set_camera_limits(Rect2i(0, 0, 640, 360))
+		var cam := player.get_node_or_null("Camera2D") as Camera2D
+		if cam != null:
+			cam.zoom = Vector2.ONE
+			cam.reset_smoothing()
+			cam.force_update_scroll()
+
+	# Evita empilhar 2 filtros VHS quando carregado dentro de Main.tscn (que já possui PerceptionLayer)
+	if vhs_filter != null and get_tree().root.find_child("PerceptionLayer", true, false) != null:
+		vhs_filter.visible = false
 
 	# Conecta saída do pesadelo
 	if exit_door:
@@ -39,6 +57,7 @@ func _ready() -> void:
 	_setup_boundaries()
 	_setup_memory_fragments()
 	_update_ui()
+	_update_exit_door_visual()
 
 	# Trilha de memória analógica com wow & flutter
 	if has_node("/root/AudioManager"):
@@ -54,6 +73,10 @@ func _ready() -> void:
 	call_deferred("_trigger_intro_dialogue")
 
 func _process(delta: float) -> void:
+	_pulse_time += delta
+	if objective_label != null:
+		objective_label.visible = not GameState.dialogue_active
+
 	# Atualiza perigos de fogo/fagulhas com aviso visual telegrafado
 	for i in range(_hazard_timers.size()):
 		_hazard_timers[i] += delta
@@ -69,15 +92,59 @@ func _process(delta: float) -> void:
 			cam.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake_intensity * 6.0
 
 func _draw() -> void:
-	# Desenha visual retro minimalista do pesadelo (linhas de fuligem, paredes e fagulhas)
-	# Grade do labirinto
-	var floor_col := Color(0.08, 0.09, 0.11, 1.0)
-	var wall_col := Color(0.20, 0.22, 0.26, 1.0)
-	var ember_warn_col := Color(0.75, 0.35, 0.15, 0.45)
-	var ember_fire_col := Color(0.95, 0.85, 0.40, 0.90)
+	# Preserva o piso de madeira carbonizada (V2VhsFloorLayer, z=-2) e desenha paredes/perigos/orbes do labirinto
+	var wall_shadow_col := Color(0.02, 0.02, 0.03, 0.65)
+	var wall_col := Color(0.16, 0.17, 0.21, 1.0)
+	var wall_top_col := Color(0.28, 0.30, 0.35, 1.0)
+	var wall_edge_col := Color(0.42, 0.44, 0.50, 0.85)
+	var ember_warn_col := Color(0.65, 0.35, 0.20, 0.30)
+	var ember_ring_col := Color(0.88, 0.55, 0.28, 0.65)
+	var ember_fire_col := Color(0.95, 0.85, 0.45, 0.85)
+	var ember_core_col := Color(1.0, 0.96, 0.82, 0.95)
 
-	# Pisos dos corredores
-	draw_rect(Rect2(40, 50, 560, 260), floor_col)
+	# Moldura das paredes externas alinhadas às colisões do labirinto (40..600 x 50..310)
+	draw_rect(Rect2(0, 0, 640, 50), Color(0.04, 0.04, 0.05, 0.92))
+	draw_rect(Rect2(0, 310, 640, 50), Color(0.04, 0.04, 0.05, 0.92))
+	draw_rect(Rect2(0, 50, 40, 260), Color(0.04, 0.04, 0.05, 0.92))
+	draw_rect(Rect2(600, 50, 40, 260), Color(0.04, 0.04, 0.05, 0.92))
+	draw_rect(Rect2(38, 48, 564, 264), wall_edge_col, false, 2.0)
+
+	# Divisórias internas do labirinto de memórias (visuais alinhados às colisões físicas)
+	for wall_rect in MAZE_DIVIDERS:
+		draw_rect(Rect2(wall_rect.position + Vector2(2, 4), wall_rect.size), wall_shadow_col)
+		draw_rect(wall_rect, wall_col)
+		draw_rect(Rect2(wall_rect.position, Vector2(wall_rect.size.x, 4.0)), wall_top_col)
+		var sy := wall_rect.position.y + 16.0
+		while sy < wall_rect.position.y + wall_rect.size.y:
+			draw_line(
+				Vector2(wall_rect.position.x + 1.0, sy),
+				Vector2(wall_rect.position.x + wall_rect.size.x - 1.0, sy),
+				Color(0.09, 0.10, 0.12, 0.8),
+				1.0
+			)
+			sy += 16.0
+		draw_rect(wall_rect, wall_edge_col, false, 1.0)
+
+	# Moldura da porta de saída ao leste (trancada até coletar 4/4 fragmentos)
+	if exit_door != null:
+		var dp := exit_door.position
+		var unlocked := _collected_fragments >= TOTAL_FRAGMENTS
+		var door_rect := Rect2(dp + Vector2(-16, -28), Vector2(32, 56))
+		draw_rect(door_rect, Color(0.85, 0.88, 0.92, 0.9) if unlocked else Color(0.45, 0.47, 0.52, 0.75), false, 2.0)
+		if not unlocked:
+			for bx in [-8.0, 0.0, 8.0]:
+				draw_line(dp + Vector2(bx, -26), dp + Vector2(bx, 26), Color(0.32, 0.34, 0.38, 0.75), 1.5)
+		else:
+			var glow := 0.55 + 0.35 * sin(_pulse_time * 5.0)
+			draw_rect(door_rect.grow(3.0), Color(0.95, 0.92, 0.72, glow * 0.45), false, 2.0)
+
+	# Halo pulsante nos fragmentos de memória ativos
+	if interactables_root != null:
+		for child in interactables_root.get_children():
+			if child is Node2D and child.visible:
+				var fp: Vector2 = child.position
+				var pulse_r := 11.0 + sin(_pulse_time * 4.5 + fp.x * 0.05) * 2.5
+				draw_arc(fp, pulse_r, 0.0, TAU, 16, Color(0.92, 0.92, 0.78, 0.60), 1.2)
 
 	# Fagulhas periódicas telegrafadas em pontos do labirinto
 	var hazard_pos = [
@@ -89,11 +156,15 @@ func _draw() -> void:
 		var p: Vector2 = hazard_pos[i]
 		var t: float = _hazard_timers[i]
 		if t < 1.2:
-			# Fase de aviso (telegraph sutil): poça de fumaça e faíscas fracas
-			draw_circle(p, 16.0, ember_warn_col)
+			# Fase de aviso (telegraph claro com anel externo em contração)
+			var progress := t / 1.2
+			draw_circle(p, 15.0, ember_warn_col)
+			draw_arc(p, lerpf(20.0, 8.0, progress), 0.0, TAU, 20, ember_ring_col, 1.4)
 		else:
 			# Fase de chamas ativas (dá dano se o jogador tocar)
-			draw_circle(p, 20.0, ember_fire_col)
+			draw_circle(p, 19.0, ember_fire_col)
+			draw_circle(p, 10.0, ember_core_col)
+			draw_arc(p, 21.0, 0.0, TAU, 24, Color(1.0, 0.98, 0.90, 0.75), 1.2)
 			if player and player.position.distance_to(p) < 22.0:
 				_damage_player_hazard()
 
@@ -131,9 +202,9 @@ func _build_vhs_v2_tiles() -> void:
 	layer.tile_set = VHS_TILESET
 	add_child(layer)
 	V2TileCatalog.fill_rect(layer, Rect2i(0, 0, 40, 23), t_cat["void"])
-	V2TileCatalog.fill_rect(layer, Rect2i(2, 3, 36, 16), t_cat["wood_floor_dark"])
+	V2TileCatalog.fill_rect(layer, Rect2i(2, 3, 36, 17), t_cat["wood_floor_dark"])
 	V2TileCatalog.fill_rect(layer, Rect2i(2, 2, 36, 1), t_cat["wall_station_mid"])
-	for dx in [6, 14, 22, 30]:
+	for dx in [5, 11, 16, 22, 27, 33]:
 		V2TileCatalog.stamp_rect(layer, Vector2i(dx, 4), t_cat["debris_broken"], Vector2i(2, 2))
 
 
@@ -150,11 +221,8 @@ func _setup_boundaries() -> void:
 	_add_box(body, Rect2(600, 50, 40, 260))
 
 	# Divisórias internas do labirinto de memórias
-	_add_box(body, Rect2(140, 50, 16, 170))
-	_add_box(body, Rect2(220, 140, 16, 170))
-	_add_box(body, Rect2(310, 50, 16, 160))
-	_add_box(body, Rect2(400, 150, 16, 160))
-	_add_box(body, Rect2(490, 50, 16, 170))
+	for wall_rect in MAZE_DIVIDERS:
+		_add_box(body, wall_rect)
 
 func _add_box(body: StaticBody2D, rect: Rect2) -> void:
 	var col := CollisionShape2D.new()
@@ -184,12 +252,18 @@ func _create_fragment(id: String, pos: Vector2, title_text: String) -> void:
 	col.shape = shape
 	inter.add_child(col)
 
-	# Visual do fragmento (orbe de luz trêmula)
-	var sprite := ColorRect.new()
-	sprite.custom_minimum_size = Vector2(12, 12)
-	sprite.position = Vector2(-6, -6)
-	sprite.color = Color(0.95, 0.82, 0.45, 0.85)
-	inter.add_child(sprite)
+	# Visual do fragmento (eco luminoso em camadas nítidas)
+	var outer := ColorRect.new()
+	outer.custom_minimum_size = Vector2(12, 12)
+	outer.position = Vector2(-6, -6)
+	outer.color = Color(0.88, 0.86, 0.72, 0.75)
+	inter.add_child(outer)
+
+	var core := ColorRect.new()
+	core.custom_minimum_size = Vector2(6, 6)
+	core.position = Vector2(-3, -3)
+	core.color = Color(1.0, 0.98, 0.88, 0.98)
+	inter.add_child(core)
 
 	inter.interacted.connect(func(_i: Interactable): _on_fragment_interacted(id, inter))
 	interactables_root.add_child(inter)
@@ -238,6 +312,16 @@ func _unlock_exit() -> void:
 		objective_label.modulate = Color(0.95, 0.90, 0.50, 1.0)
 	if exit_door:
 		exit_door.monitoring = true
+	_update_exit_door_visual()
+
+func _update_exit_door_visual() -> void:
+	if exit_door == null:
+		return
+	var door_vis := exit_door.get_node_or_null("ExitDoorVisual") as ColorRect
+	if door_vis == null:
+		return
+	var unlocked := _collected_fragments >= TOTAL_FRAGMENTS
+	door_vis.color = Color(0.95, 0.92, 0.72, 0.85) if unlocked else Color(0.32, 0.34, 0.38, 0.35)
 
 func _on_exit_door_entered(body: Node2D) -> void:
 	if body.is_in_group("player") and _collected_fragments >= TOTAL_FRAGMENTS:

@@ -173,15 +173,16 @@ func _build_clearing_tilemaps() -> void:
 				for gl in [ground_normal, ground_distorted]:
 					gl.set_cell(Vector2i(x, y), 0, f_cat["water_shore_center"])
 			else:
+				var dx := (float(x) - 30.5) / 7.5
+				var dy := (float(y) - 14.8) / 5.2
+				var r2 := dx * dx + dy * dy
 				var gtile: Vector2i = f_cat["grass_a"]
 				if (x * 5 + y) % 6 == 0:
 					gtile = f_cat["grass_b"]
-				if x >= 27 and x <= 35 and y >= 11 and y <= 18:
+				if r2 <= 0.65:
 					gtile = f_cat["needle_grass_a"] if (x + y) % 2 == 0 else f_cat["needle_grass_b"]
-				elif x >= 23 and x <= 39 and y >= 8 and y <= 21:
-					gtile = f_cat["mud_patch_center"] if (x == 24 or x == 38 or y == 9 or y == 20) else f_cat["needle_grass_b"]
-				elif x >= 25 and x <= 36 and y >= 25 and y <= 29:
-					gtile = f_cat["soil_b"]
+				elif r2 <= 1.0:
+					gtile = f_cat["needle_grass_b"] if (x * 3 + y) % 3 != 0 else f_cat["grass_b"]
 				for gl in [ground_normal, ground_distorted]:
 					gl.set_cell(Vector2i(x, y), 0, gtile)
 
@@ -228,9 +229,11 @@ func _setup_v2_clearing_canopy_and_fog(walkable: Array) -> void:
 	_canopy_layer.tile_set = active_ts
 	_canopy_layer.clear()
 
-	# Samambaias, cogumelos e pedras musgosas no sub-bosque (sobre piso opaco)
+	# Samambaias, cogumelos e pedras musgosas no sub-bosque (sobre piso opaco, evitando água/cachoeira)
 	for gx in range(2, MAP_W - 2, 2):
 		for gy in range(2, MAP_H - 2, 2):
+			if walls_normal.get_cell_source_id(Vector2i(gx, gy)) != -1:
+				continue
 			if walkable[gx][gy]:
 				if (gx >= 26 and gx <= 36 and gy >= 10 and gy <= 19) and not (gx >= 28 and gx <= 33 and gy >= 12 and gy <= 17):
 					if (gx + gy) % 3 == 0:
@@ -244,7 +247,7 @@ func _setup_v2_clearing_canopy_and_fog(walkable: Array) -> void:
 			elif h == 2:
 				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["mushrooms_a"])
 
-	# Anel florestal denso em torno de toda a Clareira da Lagoa Azul (abraçando de perto a trilha oeste e o santuário)
+	# Anel florestal denso e orgânico abraçando toda a clareira da Lagoa Azul e Árvore Anciã
 	for gy in range(0, MAP_H - 5, 3):
 		var row_shift := (gy % 2) * 2
 		for gx in range(0, MAP_W - 4, 3):
@@ -253,10 +256,15 @@ func _setup_v2_clearing_canopy_and_fog(walkable: Array) -> void:
 				continue
 			var base_y := gy + 5
 			var in_west_path := (tx <= 23 and base_y >= 13 and base_y <= 17)
-			var in_lagoon_sanctuary := (tx + 2 >= 23 and tx <= 39 and base_y >= 8 and base_y <= 22)
-			var in_east_glade := (tx >= 39 and tx <= 45 and base_y >= 12 and base_y <= 18)
-			var in_ancient_tree_trunk := (tx >= 45 and tx <= 55 and base_y >= 11 and base_y <= 20)
-			if in_west_path or in_lagoon_sanctuary or in_east_glade or in_ancient_tree_trunk:
+			var near_signpost := (tx >= 11 and tx <= 14 and base_y >= 11 and base_y <= 14)
+			var in_waterfall := (tx >= 28 and tx <= 33 and base_y >= 9 and base_y <= 13)
+			var ldx := (float(tx + 1) - 30.5) / 7.8
+			var ldy := (float(base_y) - 15.5) / 5.4
+			var in_lagoon_sanctuary := (ldx * ldx + ldy * ldy <= 1.0) or in_waterfall
+			var in_east_glade := (tx >= 37 and tx <= 46 and base_y >= 12 and base_y <= 20)
+			var in_ancient_tree_trunk := (tx >= 44 and tx <= 56 and base_y >= 10 and base_y <= 20)
+			var near_rocks := (tx >= 17 and tx <= 21 and base_y >= 20 and base_y <= 23) or (tx >= 40 and tx <= 44 and base_y >= 9 and base_y <= 12)
+			if in_west_path or near_signpost or in_lagoon_sanctuary or in_east_glade or in_ancient_tree_trunk or near_rocks:
 				continue
 			var pick := (tx * 5 + gy * 7) % 5
 			var target_layer: TileMapLayer = _canopy_layer if ((tx + gy) % 2 == 0) else _understory_layer

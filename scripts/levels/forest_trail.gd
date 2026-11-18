@@ -291,6 +291,8 @@ func _setup_v2_canopy_and_fog(walkable: Array) -> void:
 
 	for gx in range(2, MAP_W - 3, 2):
 		for gy in range(2, MAP_H - 3, 2):
+			if walls_normal.get_cell_source_id(Vector2i(gx, gy)) != -1:
+				continue
 			if walkable[gx][gy]:
 				if (gx * 11 + gy * 7) % 19 == 0 and gy > 4 and gy < MAP_H - 4:
 					_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["pebbles"])
@@ -302,9 +304,9 @@ func _setup_v2_canopy_and_fog(walkable: Array) -> void:
 				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_b"])
 			elif h == 2:
 				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["mushrooms_a"])
-			elif h == 3 and gx + 1 < MAP_W and gy + 1 < MAP_H and not walkable[gx + 1][gy + 1]:
+			elif h == 3 and gx + 1 < MAP_W and gy + 1 < MAP_H and not walkable[gx + 1][gy + 1] and walls_normal.get_cell_source_id(Vector2i(gx + 1, gy + 1)) == -1:
 				V2TileCatalog.stamp_rect(_understory_layer, Vector2i(gx, gy), f_cat["stump_rooted"], Vector2i(2, 2))
-			elif h == 4 and gx + 1 < MAP_W and gy + 1 < MAP_H and not walkable[gx + 1][gy + 1]:
+			elif h == 4 and gx + 1 < MAP_W and gy + 1 < MAP_H and not walkable[gx + 1][gy + 1] and walls_normal.get_cell_source_id(Vector2i(gx + 1, gy + 1)) == -1:
 				V2TileCatalog.stamp_rect(_understory_layer, Vector2i(gx, gy), f_cat["moss_boulder"], Vector2i(2, 2))
 
 	# Preenchimento denso em 2 camadas de árvores escalonadas (cobrindo todas as margens fora da trilha de terra!)
