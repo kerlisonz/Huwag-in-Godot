@@ -32,6 +32,17 @@ var _heart_pulse_time: float = 0.0
 var _hp_segments: int = 6
 var _ui_mode: String = "normal"
 
+enum SleepFlowState {
+	NORMAL = 0,
+	EXHAUSTION_LOCK = 1,
+	FADE_OUT = 2,
+	WAKE_TRANSITION = 3,
+}
+
+var _sleep_state: SleepFlowState = SleepFlowState.NORMAL
+var _sleep_timer: float = 0.0
+var _sleep_fade_rect: ColorRect = null
+
 func _ready() -> void:
 	_heart_textures = HuwagUiTheme.build_heart_textures()
 	for h in _get_heart_nodes():
@@ -39,12 +50,20 @@ func _ready() -> void:
 	if status_label:
 		status_label.visible = false
 
+	_ensure_sleep_fade_overlay()
+
 	GameState.perception_changed.connect(_on_perception_changed)
 	GameState.switch_changed.connect(func(_k: String, _v: bool) -> void: _update_hud())
 	GameState.variable_changed.connect(func(_k: String, _v: Variant) -> void: _update_hud())
 	GameState.hp_changed.connect(func(_c: int, _m: int) -> void: _update_hud())
 	if GameState.has_signal("stamina_changed"):
 		GameState.stamina_changed.connect(func(_c: float, _m: float) -> void: _update_stamina_hud())
+	if GameState.has_signal("clock_minute_changed"):
+		GameState.clock_minute_changed.connect(_on_clock_minute_changed)
+	if GameState.has_signal("day_period_changed"):
+		GameState.day_period_changed.connect(_on_day_period_changed)
+	if GameState.has_signal("sleep_curfew_triggered"):
+		GameState.sleep_curfew_triggered.connect(_on_sleep_curfew_triggered)
 	GameState.outfit_changed.connect(func(_o: String) -> void: _refresh_outfit_button())
 	GameState.notification_requested.connect(_on_notification_requested)
 	dialogue_box.dialogue_finished.connect(_on_dialogue_finished)
@@ -58,9 +77,12 @@ func _ready() -> void:
 
 	_apply_hud_style(GameState.perception_mode)
 	_apply_shader_mode(GameState.perception_mode)
-	load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
+	var start_scene := GameState.current_scene_path if not GameState.current_scene_path.is_empty() else "res://scenes/levels/RoomHuwag.tscn"
+	var start_tag := GameState.spawn_tag if not GameState.spawn_tag.is_empty() else "initial"
+	load_level(start_scene, start_tag)
 
 func _process(delta: float) -> void:
+	_process_sleep_fsm(delta)
 	if status_label:
 		if _toast_timer > 0.0:
 			_toast_timer -= delta
@@ -122,9 +144,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_on_notification_requested("Progresso salvo")
 		elif event.keycode == KEY_F9:
 			if GameState.load_game():
-				load_level(_current_scene_path, GameState.spawn_tag)
+				load_level(GameState.current_scene_path, GameState.spawn_tag)
 				_on_notification_requested("Estado carregado")
-		elif event.keycode == KEY_F10:
+		elif event.keycode == KEY_F10 and OS.is_debug_build():
 			GameState.advance_act()
 			load_level(_current_scene_path, GameState.spawn_tag)
 			get_viewport().set_input_as_handled()
@@ -181,6 +203,8 @@ func _on_request_level_change(target_scene: String, spawn_tag: String) -> void:
 	call_deferred("load_level", target_scene, spawn_tag)
 
 func _on_request_dialogue(pages: Array, callback: Callable) -> void:
+	if dialogue_box != null and dialogue_box.is_open():
+		return
 	_pending_dialogue_callback = callback
 	dialogue_box.start_dialogue(pages)
 	_update_hud_visibility()
@@ -226,6 +250,120 @@ func _on_higher_dose_changed(active: bool) -> void:
 			AudioManager.play_sfx("vhs_glitch")
 
 
+func _on_clock_minute_changed(_mins: int, _hhmm: String) -> void:
+	_apply_shader_mode(GameState.perception_mode)
+	_update_hud()
+
+
+func _on_day_period_changed(_period: String) -> void:
+	_apply_shader_mode(GameState.perception_mode)
+	_update_hud()
+
+
+func _ensure_sleep_fade_overlay() -> void:
+	var canvas := get_node_or_null("CanvasLayer") as CanvasLayer
+	if canvas == null:
+		return
+	_sleep_fade_rect = canvas.get_node_or_null("SleepFadeOverlay") as ColorRect
+	if _sleep_fade_rect == null:
+		_sleep_fade_rect = ColorRect.new()
+		_sleep_fade_rect.name = "SleepFadeOverlay"
+		_sleep_fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_sleep_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_sleep_fade_rect.color = Color(0.02, 0.02, 0.04, 0.0)
+		_sleep_fade_rect.visible = false
+		_sleep_fade_rect.z_index = 50
+		canvas.add_child(_sleep_fade_rect)
+
+
+func get_sleep_state() -> int:
+	return int(_sleep_state)
+
+
+func _on_sleep_curfew_triggered(_act: int) -> void:
+	if _sleep_state != SleepFlowState.NORMAL:
+		return
+	if _current_scene_path.ends_with("vhs_memory_minigame.tscn") or _current_scene_path.ends_with("EndingCredits.tscn"):
+		return
+	_begin_curfew_sleep_sequence()
+
+
+func _begin_curfew_sleep_sequence() -> void:
+	_ensure_sleep_fade_overlay()
+	_sleep_state = SleepFlowState.EXHAUSTION_LOCK
+	_sleep_timer = 0.20
+	GameState.sleep_transition_active = true
+	GameState.dialogue_active = true
+	if controls_modal != null and controls_modal.visible:
+		controls_modal.visible = false
+	if dialogue_box != null and is_instance_valid(dialogue_box) and dialogue_box.is_open():
+		_pending_dialogue_callback = Callable()
+		dialogue_box.close_dialogue()
+	if _sleep_fade_rect != null:
+		_sleep_fade_rect.visible = true
+		_sleep_fade_rect.color.a = 0.0
+	_on_notification_requested("23:00 — A exaustão toma conta...")
+
+
+func _process_sleep_fsm(delta: float) -> void:
+	if _sleep_state == SleepFlowState.NORMAL:
+		return
+	_sleep_timer = maxf(0.0, _sleep_timer - delta)
+	match _sleep_state:
+		SleepFlowState.EXHAUSTION_LOCK:
+			GameState.sleep_transition_active = true
+			GameState.dialogue_active = true
+			if _sleep_timer <= 0.0:
+				_sleep_state = SleepFlowState.FADE_OUT
+				_sleep_timer = 0.30
+		SleepFlowState.FADE_OUT:
+			if _sleep_fade_rect != null:
+				_sleep_fade_rect.visible = true
+				_sleep_fade_rect.color.a = clampf(1.0 - (_sleep_timer / 0.30), 0.0, 1.0)
+			if _sleep_timer <= 0.0:
+				_sleep_state = SleepFlowState.WAKE_TRANSITION
+				_perform_curfew_wake_transition()
+				_sleep_timer = 0.25
+		SleepFlowState.WAKE_TRANSITION:
+			if _sleep_fade_rect != null:
+				_sleep_fade_rect.color.a = clampf(_sleep_timer / 0.25, 0.0, 1.0)
+			if _sleep_timer <= 0.0:
+				if _sleep_fade_rect != null:
+					_sleep_fade_rect.color.a = 0.0
+					_sleep_fade_rect.visible = false
+				_sleep_state = SleepFlowState.NORMAL
+				GameState.sleep_transition_active = false
+				GameState.dialogue_active = (dialogue_box != null and is_instance_valid(dialogue_box) and dialogue_box.is_open())
+
+
+func _perform_curfew_wake_transition() -> void:
+	var ato: int = int(GameState.get_var("Ato", 1))
+	if ato == 1:
+		GameState.set_switch("005_Chefe_liberou_cidade", true)
+		GameState.advance_to_act_2()
+		load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
+	elif ato == 2:
+		if GameState.get_switch("019_Ato2_concluido"):
+			load_level("res://scenes/levels/vhs_memory_minigame.tscn", "from_curfew")
+		else:
+			GameState.set_switch("006c_Dose_escolhida_Ato2", false)
+			GameState.player_hp = GameState.player_max_hp
+			GameState.player_stamina = GameState.player_max_stamina
+			GameState.hp_changed.emit(GameState.player_hp, GameState.player_max_hp)
+			GameState.stamina_changed.emit(GameState.player_stamina, GameState.player_max_stamina)
+			GameState.set_clock_minutes(GameState.day_start_minutes, false)
+			load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
+	else:
+		# Ato III: preserva integralmente a realidade sem filtro (_is_act3_unfiltered())
+		GameState.player_hp = GameState.player_max_hp
+		GameState.player_stamina = GameState.player_max_stamina
+		GameState.hp_changed.emit(GameState.player_hp, GameState.player_max_hp)
+		GameState.stamina_changed.emit(GameState.player_stamina, GameState.player_max_stamina)
+		GameState.set_perception_mode(GameState.PerceptionMode.UNFILTERED_ACT3)
+		GameState.set_clock_minutes(GameState.day_start_minutes, false)
+		load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
+
+
 func _apply_shader_mode(mode: int) -> void:
 	if perception_rect == null or perception_rect.material == null:
 		return
@@ -233,20 +371,27 @@ func _apply_shader_mode(mode: int) -> void:
 	if mat == null:
 		return
 	var higher_dose: bool = GameState.has_method("is_higher_dose") and GameState.is_higher_dose()
+	var is_act3_unfiltered: bool = (mode == GameState.PerceptionMode.UNFILTERED_ACT3) or (GameState.has_method("is_unfiltered_act3") and GameState.is_unfiltered_act3())
 	var is_vhs_scene := _current_scene_path.ends_with("vhs_memory_minigame.tscn")
-	match mode:
-		GameState.PerceptionMode.FILTERED_MORNING:
-			mat.set_shader_parameter("afternoon_mix", 0.0)
-			mat.set_shader_parameter("night_mix", 0.18 if higher_dose else 0.0)
-			mat.set_shader_parameter("unfiltered_mix", 0.0)
-		GameState.PerceptionMode.FILTERED_AFTERNOON:
-			mat.set_shader_parameter("afternoon_mix", 0.55 if not higher_dose else 0.25)
-			mat.set_shader_parameter("night_mix", 0.35 if higher_dose else 0.08)
-			mat.set_shader_parameter("unfiltered_mix", 0.0)
-		GameState.PerceptionMode.UNFILTERED_ACT3:
-			mat.set_shader_parameter("afternoon_mix", 0.0)
-			mat.set_shader_parameter("night_mix", 0.0)
-			mat.set_shader_parameter("unfiltered_mix", 1.0)
+	if is_act3_unfiltered:
+		mat.set_shader_parameter("afternoon_mix", 0.0)
+		mat.set_shader_parameter("night_mix", 0.0)
+		mat.set_shader_parameter("unfiltered_mix", 1.0)
+		mat.set_shader_parameter("corruption_mix", 0.0)
+	else:
+		var aft_f: float = GameState.get_afternoon_factor() if GameState.has_method("get_afternoon_factor") else 0.0
+		var night_f: float = GameState.get_night_factor() if GameState.has_method("get_night_factor") else 0.0
+		if mode == GameState.PerceptionMode.FILTERED_AFTERNOON:
+			aft_f = maxf(aft_f, 0.55)
+		mat.set_shader_parameter("unfiltered_mix", 0.0)
+		if higher_dose:
+			mat.set_shader_parameter("afternoon_mix", aft_f * 0.30)
+			mat.set_shader_parameter("night_mix", minf(0.16, night_f * 0.18 + 0.05))
+			mat.set_shader_parameter("corruption_mix", 0.65)
+		else:
+			mat.set_shader_parameter("afternoon_mix", aft_f)
+			mat.set_shader_parameter("night_mix", night_f * 0.36)
+			mat.set_shader_parameter("corruption_mix", 0.0)
 	if is_vhs_scene:
 		mat.set_shader_parameter("vhs_scanline_alpha", 0.14)
 		mat.set_shader_parameter("vhs_noise_intensity", 0.07)
@@ -258,16 +403,16 @@ func _apply_shader_mode(mode: int) -> void:
 		mat.set_shader_parameter("vhs_tear", 0.06)
 		mat.set_shader_parameter("vhs_crt_vignette", 0.42)
 	elif higher_dose:
-		# Ato 2 dose maior: interferência analógica sutil contínua + bursts estratégicos
-		mat.set_shader_parameter("vhs_scanline_alpha", 0.085)
-		mat.set_shader_parameter("vhs_noise_intensity", 0.032)
-		mat.set_shader_parameter("vhs_chromatic_aberration", 0.002)
+		# Modo Corrompido legível: interferência sutil + vinheta controlada
+		mat.set_shader_parameter("vhs_scanline_alpha", 0.065)
+		mat.set_shader_parameter("vhs_noise_intensity", 0.024)
+		mat.set_shader_parameter("vhs_chromatic_aberration", 0.0018)
 		mat.set_shader_parameter("vhs_tracking_jitter", 0.0)
-		mat.set_shader_parameter("vhs_tracking_band", 0.09)
-		mat.set_shader_parameter("vhs_head_switch", 0.04)
+		mat.set_shader_parameter("vhs_tracking_band", 0.06)
+		mat.set_shader_parameter("vhs_head_switch", 0.03)
 		mat.set_shader_parameter("vhs_dropout", 0.0)
 		mat.set_shader_parameter("vhs_tear", 0.0)
-		mat.set_shader_parameter("vhs_crt_vignette", 0.36)
+		mat.set_shader_parameter("vhs_crt_vignette", 0.22)
 	else:
 		# Visual-base limpo estilo minigame retrô de arcade (sem VHS excessivo)
 		mat.set_shader_parameter("vhs_scanline_alpha", 0.035)
@@ -278,7 +423,7 @@ func _apply_shader_mode(mode: int) -> void:
 		mat.set_shader_parameter("vhs_head_switch", 0.0)
 		mat.set_shader_parameter("vhs_dropout", 0.0)
 		mat.set_shader_parameter("vhs_tear", 0.0)
-		mat.set_shader_parameter("vhs_crt_vignette", 0.38 if mode == GameState.PerceptionMode.UNFILTERED_ACT3 else 0.16)
+		mat.set_shader_parameter("vhs_crt_vignette", 0.38 if is_act3_unfiltered else 0.16)
 
 func _get_heart_nodes() -> Array[TextureRect]:
 	var arr: Array[TextureRect] = []
@@ -427,10 +572,5 @@ func _update_hud() -> void:
 		elif _current_scene_path.find("vhs_memory") != -1:
 			place_name = "Memória / Pesadelo"
 
-		var ato: int = int(GameState.get_var("Ato", 1))
-		var roman := "I"
-		if ato == 2:
-			roman = "II"
-		elif ato >= 3 or GameState.is_unfiltered_act3():
-			roman = "III"
-		act_place_label.text = "Ato %s · %s" % [roman, place_name]
+		var clock_str: String = GameState.get_formatted_time() if GameState.has_method("get_formatted_time") else "06:30"
+		act_place_label.text = "%s · %s" % [clock_str, place_name]

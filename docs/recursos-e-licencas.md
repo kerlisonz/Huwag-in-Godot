@@ -15,13 +15,17 @@ Pacotes em uso permanecem em `res://assets/third_party/`. Pacotes arquivados ant
 
 | Pacote | Autor / Origem | Licença / Termos | Uso no projeto |
 | :--- | :--- | :--- | :--- |
-| **`Modern_Interiors_Free_v2.2`** | **LimeZu** (https://limezu.itch.io) | Gratuito para projetos não-comerciais. Edição de sprites permitida. | Mobiliário contemporâneo, personagens e adereços do quartel e interiores. |
+| **`Modern_Interiors_Free_v2.2`** | **LimeZu** (https://limezu.itch.io) | Gratuito para projetos não-comerciais. Edição de sprites permitida. | Mobiliário contemporâneo, paredes (`Room_Builder_free_16x16`), eletrônicos, balcões BFP e adereços em `interiors_v2`. |
 | **`Pixel Art Top Down - Basic v1.2.3`** | **Cainos** | Uso livre em projetos de jogos. | Grama, plantas, pedras e adereços de exterior. |
 | **`Pixel Crawler - Free Pack (Exterior 0.1)`** | **Pixel Crawler / variados** | Uso livre com termos específicos. | Pedras (`ForestRock.tscn`) e props da floresta. |
-| **`Serene_Village_revamped_v1.9`** | **LimeZu** | Não-comercial livre. | Telhados, pontes e elementos de vilarejo na rua e clareira. |
+| **`Serene_Village_revamped_v1.9`** | **LimeZu** | Não-comercial livre. | Grama, areia, píer, cercas, floreiras, falésias e árvores costeiras em `agdangan_town_v2` e clareira retrô. |
 | **`Top-Down_Retro_Interior`** | **Pack comunitário** | Uso livre. | Pisos, paredes e móveis dos tilesets retrô. |
+| **`town_rpg_pack`** | **Luis Zuno (`@ansimuz`)** (`ansimuz.com`) | **CC0** (`http://creativecommons.org/publicdomain/zero/1.0/`, `license.txt`). | Pinheiro fino (`1×6`), cachoeira animada e detalhes rurais em `forest_v2` e `agdangan_town_v2`. |
+| **`lpc-tileset-16x16`** | **adrix89** (`tiled-terrains`), **buch** (`orthographic-outdoor-tiles` CC0 / `outdoor-tiles-again` CC-BY 3.0), **Lanea Zimmerman (Sharm)**, **Tuomo Untinen**, **George_** e contribuidores LPC (`attribution.txt` / `LPC_Terrain_Attribution.txt`) | **CC-BY-SA 3.0** / **GNU GPL 3.0** (subcomponentes em CC-BY 3.0 / CC0). | Bordas de lama/penhasco, água animada (3 quadros), grama alta, pinheiros e arbustos em `forest_v2` e mar animado em `agdangan_town_v2`. |
+| **`tileset_16x16_interior`** | **Bonsaiheldin** (`http://bonsaiheld.org`) | **CC-BY-SA 3.0** (`http://creativecommons.org/licenses/by-sa/3.0/`, `Credits.txt`). | Camas, mesas, portas, janelas, tapetes, cadeiras, cozinha, cortinas e castiçal em `interiors_v2`. |
+| **`oga_16x16_jrpg_forest`** (`dark_forest.png`) | **`bart`** (OpenGameArt: `https://opengameart.org/content/oga-16x16-jrpg-sprites-tiles` / `16x16-jrpg-tilesets-enlarged-2x`) | **CC-BY 3.0** (`ATTRIBUTION.txt`). | Platô de penhascos e gruta, árvore retorcida, Árvore Ancestral `14×18`, pontes e cercas de madeira em `forest_v2`. |
 
-> **Fonte da verdade:** todo novo pacote externo colocado em `assets/third_party/` deve ter licença verificada e registrada nesta tabela antes de ser referenciado em cenas ou scripts.
+> **Fonte da verdade e triagem `16×16`:** todo novo pacote externo colocado em `assets/third_party/` deve ter licença verificada e registrada nesta tabela antes de ser referenciado em cenas ou scripts. Pacotes em escala `32×32`/`64×64`, mistos (`oga_lpc_mixed_32x32`) ou avulsos não utilizados (`oga_16x16_jrpg_unselected`) foram segregados em `res://assets/_archive/` com `.gdignore` (pastas `__MACOSX` e metadados `._*` removidos) para garantir grid estrito de `16×16` pixels sem mixels.
 
 ### 1.2 Arquivados removidos na higienização pré-GitHub
 
@@ -281,6 +285,37 @@ Reconstrução estética, narrativa e estrutural dos 4 cenários principais segu
   - `HudTopRight`, notificações toast (`StatusLabel`), modal `[F1]` (`ControlsModal`) e modal de opções da tela inicial (`OptionsModal`) unificados no mesmo padrão minimalista `1px` / `0px`.
 - **Etapa 2 (Staging — Aguardando Aprovação Visual):**
   - Scripts `scripts/tools/corrupted_v4/corrupted_v4_builder.gd`, `corrupted_v4_designs.gd` e `build_corrupted_v4_preview.gd` geram todas as 12 entidades corrompidas reconstruídas (silhuetas anatômicas grotescas em `48×48`, âncora `y = 39`, contorno `1px`, `toby` restrito a 16 animações sem `attack`/`death`) isoladas em `assets/sprites/corrupted_v4_preview/` para aprovação antes de substituir `assets/sprites/npcs/*/distorted/`.
+
+### 2.21 Spritesheets VFX 16-bit (`patch-gg/pixelfx` v0.3.1)
+- **Origem & Licença:** Efeitos pré-renderizados offline via `patch-gg/pixelfx` v`0.3.1` (`https://github.com/patch-gg/pixelfx`), licenciado sob **MIT License** (permite uso comercial, modificação e redistribuição sem restrição de copyleft). Repositório Node.js gerador mantido externamente em `scratch/pixelfx` (nenhum código JavaScript ou plugin terceiro adicionado em `addons/`, respeitando a diretriz de solução nativa Godot 4 em `AGENTS.md`).
+- **Assets Gerados & Adaptados em `res://assets/vfx/`:**
+  - `axe_slash_amber.png` + `axe_slash_amber_spriteframes.tres` (`melee/sword-slash`, `radius: 26`, paleta âmbar/aço BFP, 13f @ 24fps).
+  - `axe_slash_crimson.png` + `axe_slash_crimson_spriteframes.tres` (`melee/sword-slash`, `radius: 28`, paleta carmesim/distorção, 13f @ 24fps).
+  - `claw_swipe_horror.png` + `claw_swipe_horror_spriteframes.tres` (`melee/claw-swipe`, paleta horror carmesim, 15f @ 20fps).
+  - `hit_spark.png` + `hit_spark_spriteframes.tres` (`impacts/hit-spark`, `height: 10`, faísca direcional de combate, 11f @ 24fps).
+  - `blunt_hit.png` + `blunt_hit_spriteframes.tres` (`impacts/blunt-hit`, `height: 8`, impacto pesado com poeira escura, 18f @ 20fps).
+  - `impact_dust.png` + `impact_dust_spriteframes.tres` (`impacts/heavy-landing`, nuvem de poeira/cinzas de esquiva/queda, 27f @ 18fps).
+  - `water_jet.png` + `water_jet_spriteframes.tres` (`water/water-jet`, `length: 56`, jato da habilidade de água, 18f @ 18fps loop).
+  - `water_splash.png` + `water_splash_spriteframes.tres` (`water/splash`, `stone: false`, respingo/extinção por água, 40f @ 18fps).
+  - `water_ripples.png` + `water_ripples_spriteframes.tres` (`water/ripples`, anéis na água top-down 3/4, 24f @ 12fps loop).
+  - `santelmo_flame.png` + `santelmo_flame_spriteframes.tres` (`fire/spirit-flame`, chamas espectrais laranja-âmbar do Santelmo, 36f @ 12fps loop).
+  - `shadow_flames.png` + `shadow_flames_spriteframes.tres` (`shadow/shadow-flames`, chamas sombrias carmesim de núcleo preto para distorção/Ato II, 29f @ 12fps loop).
+  - `grasping_hands.png` + `grasping_hands_spriteframes.tres` (`shadow/grasping-hands`, erupção de mãos sombrias em poça carmesim, 39f @ 14fps).
+  - `campfire_ember.png` + `campfire_ember_spriteframes.tres` (`fire/campfire`, `height: 16`, fogueira/brasas com fumaça e faíscas, 36f @ 12fps loop).
+  - `candle_flicker.png` + `candle_flicker_spriteframes.tres` (`fire/candle`, vela tremulante com halo quente para interiores/vigília, 40f @ 10fps loop).
+  - `vfx_manifest.json` (metadados de grid, FPS, pivô e offset centralizado), `scripts/tools/build_pixelfx_spriteframes.gd` (conversor nativo para `SpriteFrames`/`AtlasTexture`) e `scripts/vfx/vfx_library.gd` (`VfxLibrary` com reprodução via `AnimatedSprite2D` + `TEXTURE_FILTER_NEAREST`).
+- **Integração Atual:** Integrado ao combate do protagonista (`scripts/characters/player.gd` — corte de machado normal/combo/Ato III dessaturado, faísca de acerto, jato e respingo de água, poeira de esquiva) e ao `Santelmo` (`scripts/enemies/santelmo.gd` — chama animada acoplada + respingo/dispersão ao morrer). Efeitos ambientais/horror adicionais (`water_ripples`, `shadow_flames`, `grasping_hands`, `claw_swipe_horror`, `campfire_ember`, `candle_flicker`) estão prontos para a reconstrução dos mapas e novos inimigos.
+
+### 2.22 Pipeline de Atlases 16×16 v2 e Iluminação Atmosférica (Fase 1)
+- **Origem & Licença:** Assets originais/sintetizados em pixel art `16×16` + composições derivadas dos pacotes `third_party/` documentados na Seção 1.1 (preservando `CC0`, `CC-BY 3.0`, `CC-BY-SA 3.0 / GPL 3.0` e termos não-comerciais de LimeZu).
+- **Geradores e Catálogo Nativo (Godot 4.7 GDScript):**
+  - `scripts/tools/v2_tilesets/atlas_painter.gd` (`V2AtlasPainter`): Blit `16×16`, color-keying branco para folhas sem canal alfa (`dark_forest.png`), gradação cromática por Ato (`normal`, `distorted`, `act3`), faixas de sombra projetada (`add_shadow_strips`), animação de água (3 quadros) e configuração de `TileSet` (`PhysicsLayer 0`, `CustomData` `surface_type`/`is_water`/`blocks_light`, `texture_origin` e `y_sort_origin` calibrados).
+  - `scripts/tools/v2_tilesets/agdangan_pixel_props.gd` (`AgdanganPixelProps`): Síntese pixel art 16-bit de identidade costeira filipina adaptada ao tom sombrio de Huwag: asfalto rachado com poças/meio-fio/praça, reboco e madeira *kahoy*, janelas *capiz/jalousie*, telhados *yero* cinza e enferrujado, paredes/garagem BFP, coqueiros inclinados `3×6`, bananeira `2×3`, postes de luz `1×5`, fachada *Sari-Sari Store* `5×4`, casas provinciais `6×5`, viatura BFP `5×3`, triciclo filipino `3×2`, barco *banca/katig* `4×2`, paredes *sawali* e esteira *banig*.
+  - `scripts/tools/build_v2_world_tilesets.gd` e `scripts/levels/v2_tile_catalog.gd` (`V2TileCatalog`): Emitem e catalogam 9 folhas/recursos em `res://assets/tilesets/v2/` — `forest_v2_{normal,distorted,act3}`, `agdangan_town_v2_{normal,distorted,act3}` e `interiors_v2_{normal,distorted,act3}` (`.png` + `*_tileset.tres` com `[ext_resource]`).
+- **Shaders e Rig Atmosférico 2D:**
+  - `shaders/fog_drift.gdshader`: Névoa pixelada quantizada compatível com `gl_compatibility` e filtro `Nearest`, com mistura para névoa rubra no modo distorcido (`distortion_mix`).
+  - `shaders/canopy_proximity.gdshader`: Balanço sutil pixel-snapped para copas e atenuação suave (`proximity_fade_enabled`) ao passar atrás da vegetação (`player_world_pos`).
+  - `scripts/levels/atmosphere_rig.gd` (`AtmosphereRig`): Presets de `CanvasModulate`, `PointLight2D` com `SHADOW_FILTER_NONE`, `LightOccluder2D` e `attach_lit_vfx()` (integrado ao `VfxLibrary`, preservando supressão automática de fogs/chamas sobrenaturais no Ato III via `is_act3`).
 
 
 

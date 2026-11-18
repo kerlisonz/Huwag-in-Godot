@@ -8,6 +8,10 @@ extends SceneTree
 ##   ataque do NpcEntity contra Player (apply_hit/take_damage/receive_damage), guarda contra alvo nulo e derrota segura.
 
 func _init() -> void:
+	create_timer(15.0).timeout.connect(func() -> void:
+		push_error("TIMEOUT: test_phase3_npc_distortion_combat excedeu 15s")
+		quit(1)
+	)
 	call_deferred("_run")
 
 
@@ -84,7 +88,27 @@ func _run() -> void:
 	_assert_ok(int(gs.call("get_intoxication_level")) == 2, "Intoxicacao == 2 em Dose Maior")
 	_assert_ok(feirante.is_distorted == true, "NPC_Feirante entra em distorção com Intoxicacao == 2")
 	_assert_ok(float(shader_mat.get_shader_parameter("distortion_intensity")) > 0.5, "Shader de distorção ativo no NPC distorcido")
-	print("[PASS] Variável Intoxicacao e npc_distortion.gdshader ativados dinamicamente no Ato 2.")
+	_assert_ok(street.canvas_mod.color.r >= 0.54 and street.canvas_mod.color.g >= 0.49, "Modo Corrompido mantém CanvasModulate legível (>= 0.54): %s" % street.canvas_mod.color)
+	print("[PASS] Variável Intoxicacao, legibilidade do Modo Corrompido e npc_distortion.gdshader validados.")
+
+	# 2b. Validar Olhos Dinâmicos (WatchingEye) seguindo player.global_position com clamp e pixel-snap
+	var watching_eyes: Array[WatchingEye] = []
+	for dec in street._distorted_decals:
+		if dec is WatchingEye:
+			watching_eyes.append(dec as WatchingEye)
+	_assert_ok(watching_eyes.size() >= 6, "StreetPreview deve instanciar WatchingEye nos decais distorcidos (encontrados=%d)" % watching_eyes.size())
+	var test_eye: WatchingEye = watching_eyes[0]
+	_assert_ok(test_eye.visible == true and test_eye.pupil_sprite != null, "WatchingEye visível no Modo Corrompido com PupilSprite")
+	_assert_ok(test_eye.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST and test_eye.pupil_sprite.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "WatchingEye usa TEXTURE_FILTER_NEAREST")
+
+	var off_right := test_eye.update_tracking_for_position(test_eye.global_position + Vector2(200.0, 0.0))
+	var off_left := test_eye.update_tracking_for_position(test_eye.global_position + Vector2(-200.0, 0.0))
+	var off_diag := test_eye.update_tracking_for_position(test_eye.global_position + Vector2(95.3, -82.7))
+	_assert_ok(off_right.x > 0.0 and off_right.x <= test_eye.max_offset.x, "Pupila acompanha alvo à direita respeitando clamp")
+	_assert_ok(off_left.x < 0.0 and off_left.x >= -test_eye.max_offset.x, "Pupila acompanha alvo à esquerda respeitando clamp")
+	_assert_ok(absf(off_diag.x) <= test_eye.max_offset.x and absf(off_diag.y) <= test_eye.max_offset.y, "Pupila respeita clamp elíptico/retangular máximo")
+	_assert_ok(is_equal_approx(off_diag.x, roundf(off_diag.x)) and is_equal_approx(off_diag.y, roundf(off_diag.y)), "Deslocamento da pupila é pixel-snapped para inteiros: %s" % off_diag)
+	print("[PASS] WatchingEye rastreando player.global_position com clamp e pixel-snap validado.")
 
 	# 3. Escalonamento hostil + ataque do NPC no Player + ataque do Player no NPC (sem crash!)
 	feirante.turn_hostile()

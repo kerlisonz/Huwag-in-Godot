@@ -8,8 +8,11 @@ signal request_level_change(target_scene: String, spawn_tag: String)
 signal request_dialogue(pages: Array, callback: Callable)
 
 const RetroLevelHelpers := preload("res://scripts/levels/retro_level_helpers.gd")
-const NORMAL_TS := preload("res://assets/tilesets/retro/forest_fnaf_normal_tileset.tres")
-const DISTORTED_TS := preload("res://assets/tilesets/retro/forest_fnaf_distorted_tileset.tres")
+const V2TileCatalog := preload("res://scripts/levels/v2_tile_catalog.gd")
+const AtmosphereRig := preload("res://scripts/levels/atmosphere_rig.gd")
+const NORMAL_TS := preload("res://assets/tilesets/v2/forest_v2_normal_tileset.tres")
+const DISTORTED_TS := preload("res://assets/tilesets/v2/forest_v2_distorted_tileset.tres")
+const ACT3_TS := preload("res://assets/tilesets/v2/forest_v2_act3_tileset.tres")
 
 const MAP_W := 60
 const MAP_H := 36
@@ -35,6 +38,10 @@ var _distorted_decals: Array[Node2D] = []
 var _lights: Array[PointLight2D] = []
 var _pond_light: PointLight2D = null
 var _clearing_mist: CPUParticles2D = null
+var _understory_layer: TileMapLayer = null
+var _canopy_layer: TileMapLayer = null
+var _canopy_material: ShaderMaterial = null
+var _fog_overlay: ColorRect = null
 var _time_acc: float = 0.0
 
 
@@ -55,8 +62,13 @@ func _ready() -> void:
 		exit_area.body_entered.connect(_on_exit_area_body_entered)
 	if nest_interactable:
 		nest_interactable.interacted.connect(_on_nest_interaction)
-	if creature and creature.has_signal("interaction_requested"):
-		creature.interaction_requested.connect(_on_creature_interaction)
+	if creature:
+		if creature.has_signal("interaction_requested"):
+			creature.interaction_requested.connect(_on_creature_interaction)
+		if creature.has_signal("boss_phase_dialogue_requested"):
+			creature.connect("boss_phase_dialogue_requested", _on_boss_phase_dialogue)
+		if creature.has_signal("boss_defeated"):
+			creature.connect("boss_defeated", _on_boss_defeated)
 
 	var ato: int = int(GameState.get_var("Ato", 1))
 	if ato == 2 and not GameState.get_switch("017_Gatinho_encontrado"):
@@ -66,20 +78,27 @@ func _ready() -> void:
 
 	GameState.perception_changed.connect(func(_m: int) -> void: _sync_clearing_atmosphere())
 	GameState.switch_changed.connect(func(_k: String, _v: bool) -> void: _sync_clearing_atmosphere())
+	if GameState.has_signal("day_period_changed"):
+		GameState.day_period_changed.connect(func(_p: String) -> void: _sync_clearing_atmosphere())
 	if GameState.has_signal("higher_dose_changed"):
 		GameState.higher_dose_changed.connect(func(active: bool) -> void: apply_higher_dose_world(active))
 
 	_sync_clearing_atmosphere()
 
 	if has_node("/root/AudioManager"):
-		if GameState.is_unfiltered_act3():
-			get_node("/root/AudioManager").play_ambience("act3_ambience")
+		var am = get_node("/root/AudioManager")
+		if am.has_method("sync_adaptive_soundtrack"):
+			am.call("sync_adaptive_soundtrack", "forest_clearing", false)
+		elif GameState.is_unfiltered_act3():
+			am.play_ambience("act3_ambience")
 		else:
-			get_node("/root/AudioManager").play_ambience("night_forest")
+			am.play_ambience("night_forest")
 
 
 func _process(delta: float) -> void:
 	_time_acc += delta
+	if _canopy_material != null and player != null and is_instance_valid(player):
+		_canopy_material.set_shader_parameter("player_world_pos", player.global_position)
 	if _pond_light != null and is_instance_valid(_pond_light):
 		var higher := _is_higher_dose_active()
 		var base_e := 0.85 if not higher else 0.72
@@ -98,8 +117,9 @@ func _is_higher_dose_active() -> bool:
 
 
 func _build_clearing_tilemaps() -> void:
+	var f_cat := V2TileCatalog.FOREST_TILES
 	for layer in [ground_normal, walls_normal]:
-		layer.tile_set = NORMAL_TS
+		layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else NORMAL_TS
 	for layer in [ground_distorted, walls_distorted]:
 		layer.tile_set = DISTORTED_TS
 
@@ -120,75 +140,144 @@ func _build_clearing_tilemaps() -> void:
 	carve.call(8, 5, 44, 24)
 	carve.call(20, 27, 22, 5)
 
-	# Bacia sagrada da lagoa centrada em (495, 240) -> tiles x=29..32, y=13..16 (raio visual <= 48px)
+	# Bacia sagrada da Lagoa Azul centrada em (495, 240) -> tiles x=29..32, y=13..16 + cachoeira norte
 	for x in range(MAP_W):
 		for y in range(MAP_H):
+			var base_grass: Vector2i = f_cat["grass_a"] if ((x + y) % 2 == 0) else f_cat["grass_b"]
 			for gl in [ground_normal, ground_distorted]:
-				gl.set_cell(Vector2i(x, y), 0, Vector2i(3, 0))
+				gl.set_cell(Vector2i(x, y), 0, base_grass)
 
 			var in_pond_core := (x >= 29 and x <= 32 and y >= 13 and y <= 16)
 			if not walkable[x][y]:
-				var wcoord := Vector2i(0, 1)
-				if y > 2 and y < MAP_H - 3 and x > 1 and x < MAP_W - 2:
-					if y + 1 < MAP_H and walkable[x][y + 1]:
-						wcoord = Vector2i(2, 1)
-					elif y - 1 >= 0 and walkable[x][y - 1]:
-						wcoord = Vector2i(1, 1)
-				for wl in [walls_normal, walls_distorted]:
-					wl.set_cell(Vector2i(x, y), 0, wcoord)
+				var near_walkable := false
+				for dy in range(-1, 2):
+					for dx in range(-1, 2):
+						var nx: int = x + dx
+						var ny: int = y + dy
+						if nx >= 0 and nx < MAP_W and ny >= 0 and ny < MAP_H and walkable[nx][ny]:
+							near_walkable = true
+							break
+					if near_walkable:
+						break
+				if near_walkable:
+					var wcoord: Vector2i = f_cat["cliff_face_mid"] if (y + 1 < MAP_H and walkable[x][y + 1]) else f_cat["cliff_top_mid"]
+					for wl in [walls_normal, walls_distorted]:
+						wl.set_cell(Vector2i(x, y), 0, wcoord)
 			elif in_pond_core:
 				var is_edge := (x == 29 or x == 32 or y == 13 or y == 16)
-				var water_tile := Vector2i(4, 1) if is_edge else Vector2i(3, 1)
+				var water_tile: Vector2i = f_cat["water_ripple_anim"] if is_edge else f_cat["water_deep_anim"]
+				if y == 13 and (x == 30 or x == 31):
+					water_tile = f_cat["waterfall_foam"]
 				for wl in [walls_normal, walls_distorted]:
 					wl.set_cell(Vector2i(x, y), 0, water_tile)
 				for gl in [ground_normal, ground_distorted]:
-					gl.set_cell(Vector2i(x, y), 0, Vector2i(8, 0))
+					gl.set_cell(Vector2i(x, y), 0, f_cat["water_shore_center"])
 			else:
-				var gtile := Vector2i(1, 0)
-				if (x * 5 + y) % 8 == 0:
-					gtile = Vector2i(2, 0)
+				var gtile: Vector2i = f_cat["grass_a"]
+				if (x * 5 + y) % 6 == 0:
+					gtile = f_cat["grass_b"]
 				if x >= 27 and x <= 35 and y >= 11 and y <= 18:
-					gtile = Vector2i(8, 0) if (x + y) % 4 != 0 else Vector2i(9, 0)
+					gtile = f_cat["needle_grass_a"] if (x + y) % 2 == 0 else f_cat["needle_grass_b"]
 				elif x >= 23 and x <= 39 and y >= 8 and y <= 21:
-					gtile = Vector2i(11, 0) if (x == 24 or x == 38 or y == 9 or y == 20) else Vector2i(6, 0)
+					gtile = f_cat["mud_patch_center"] if (x == 24 or x == 38 or y == 9 or y == 20) else f_cat["needle_grass_b"]
 				elif x >= 25 and x <= 36 and y >= 25 and y <= 29:
-					gtile = Vector2i(11, 0)
+					gtile = f_cat["soil_b"]
 				for gl in [ground_normal, ground_distorted]:
 					gl.set_cell(Vector2i(x, y), 0, gtile)
 
+	# Cachoeira sagrada norte desaguando na Lagoa Azul
+	for wl in [walls_normal, walls_distorted]:
+		for wx in [30, 31]:
+			wl.set_cell(Vector2i(wx, 10), 0, f_cat["waterfall_top"])
+			wl.set_cell(Vector2i(wx, 11), 0, f_cat["waterfall_mid"])
+			wl.set_cell(Vector2i(wx, 12), 0, f_cat["waterfall_foam"])
+
 	# Trilha oeste + píer de madeira até a margem da Guardiã + margem leste dos ovos
 	for gl in [ground_normal, ground_distorted]:
-		RetroLevelHelpers.paint_rect(gl, 0, 14, 24, 2, Vector2i(4, 0))
-		RetroLevelHelpers.paint_rect(gl, 24, 14, 4, 2, Vector2i(10, 0))  # Píer oeste até x=448
-		RetroLevelHelpers.paint_rect(gl, 35, 14, 5, 2, Vector2i(8, 0))   # Margem dos ovos (x=560..640)
+		V2TileCatalog.fill_rect(gl, Rect2i(0, 14, 24, 2), f_cat["soil_a"])
+		V2TileCatalog.fill_rect(gl, Rect2i(24, 14, 4, 2), f_cat["bridge_h_mid_t"])
+		V2TileCatalog.fill_rect(gl, Rect2i(35, 14, 5, 2), f_cat["needle_grass_a"])
 
+	_setup_v2_clearing_canopy_and_fog(walkable)
 	walls_distorted.collision_enabled = false
 
 
+func _setup_v2_clearing_canopy_and_fog(walkable: Array) -> void:
+	var f_cat := V2TileCatalog.FOREST_TILES
+	var active_ts: TileSet = ACT3_TS if GameState.is_unfiltered_act3() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
+
+	if _understory_layer == null:
+		_understory_layer = TileMapLayer.new()
+		_understory_layer.name = "V2UnderstoryLayer"
+		_understory_layer.z_index = 1
+		_understory_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_understory_layer.collision_enabled = false
+		add_child(_understory_layer)
+	_understory_layer.tile_set = active_ts
+	_understory_layer.clear()
+
+	if _canopy_layer == null:
+		_canopy_layer = TileMapLayer.new()
+		_canopy_layer.name = "V2CanopyLayer"
+		_canopy_layer.z_index = 4
+		_canopy_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_canopy_layer.collision_enabled = false
+		_canopy_material = AtmosphereRig.create_canopy_material(38.0, 0.36)
+		_canopy_layer.material = _canopy_material
+		add_child(_canopy_layer)
+	_canopy_layer.tile_set = active_ts
+	_canopy_layer.clear()
+
+	# Samambaias, cogumelos e pedras musgosas no sub-bosque (sobre piso opaco)
+	for gx in range(2, MAP_W - 2, 2):
+		for gy in range(2, MAP_H - 2, 2):
+			if walkable[gx][gy]:
+				if (gx >= 26 and gx <= 36 and gy >= 10 and gy <= 19) and not (gx >= 28 and gx <= 33 and gy >= 12 and gy <= 17):
+					if (gx + gy) % 3 == 0:
+						_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_a" if gx % 2 == 0 else "mushrooms_a"])
+				continue
+			var h := (gx * 11 + gy * 17) % 6
+			if h == 0:
+				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_a"])
+			elif h == 1:
+				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_b"])
+			elif h == 2:
+				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["mushrooms_a"])
+
+	# Anel florestal denso em torno de toda a Clareira da Lagoa Azul (abraçando de perto a trilha oeste e o santuário)
+	for gy in range(0, MAP_H - 5, 3):
+		var row_shift := (gy % 2) * 2
+		for gx in range(0, MAP_W - 4, 3):
+			var tx := gx + row_shift
+			if tx >= MAP_W - 3:
+				continue
+			var base_y := gy + 5
+			var in_west_path := (tx <= 23 and base_y >= 13 and base_y <= 17)
+			var in_lagoon_sanctuary := (tx + 2 >= 23 and tx <= 39 and base_y >= 8 and base_y <= 22)
+			var in_east_glade := (tx >= 39 and tx <= 45 and base_y >= 12 and base_y <= 18)
+			var in_ancient_tree_trunk := (tx >= 45 and tx <= 55 and base_y >= 11 and base_y <= 20)
+			if in_west_path or in_lagoon_sanctuary or in_east_glade or in_ancient_tree_trunk:
+				continue
+			var pick := (tx * 5 + gy * 7) % 5
+			var target_layer: TileMapLayer = _canopy_layer if ((tx + gy) % 2 == 0) else _understory_layer
+			if pick == 0 or pick == 1:
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, gy), f_cat["pine_dark"], Vector2i(3, 6))
+			elif pick == 2:
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, gy), f_cat["pine_withered"], Vector2i(3, 6))
+			elif pick == 3 and tx + 4 < MAP_W:
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, gy), f_cat["tree_gnarled_mid"], Vector2i(5, 6))
+			else:
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx + 1, gy), f_cat["pine_slender"], Vector2i(1, 6))
+
+	# Árvore Anciã Sagrada (14x18) no extremo leste da clareira
+	V2TileCatalog.stamp_rect(_canopy_layer, Vector2i(44, 2), f_cat["ancient_tree"], Vector2i(14, 18))
+
+	if _fog_overlay == null:
+		_fog_overlay = AtmosphereRig.create_fog_overlay(Rect2(0, 0, MAP_W * 16, MAP_H * 16), Color(0.18, 0.28, 0.30, 1.0), 0.14)
+		add_child(_fog_overlay)
+
+
 func _build_clearing_props_and_lights() -> void:
-	var canopy_ring := [
-		Vector2(140, 96), Vector2(260, 82), Vector2(495, 76), Vector2(720, 86),
-		Vector2(835, 140), Vector2(852, 260), Vector2(840, 390),
-		Vector2(740, 480), Vector2(240, 486), Vector2(130, 396)
-	]
-	for pos in canopy_ring:
-		_add_dual_prop("pine_canopy_cluster", pos, ysort_obstacles, Vector2(0, -24))
-
-	for pos in [Vector2(210, 118), Vector2(790, 116), Vector2(780, 420)]:
-		_add_dual_prop("dead_gnarled_tree", pos, ysort_obstacles, Vector2(0, -20))
-
-	for shrub_pos in [
-		Vector2(170, 148), Vector2(340, 110), Vector2(640, 112), Vector2(795, 200),
-		Vector2(805, 340), Vector2(660, 462), Vector2(350, 464), Vector2(165, 340)
-	]:
-		_add_dual_prop("corner_shrub", shrub_pos, ysort_obstacles, Vector2(0, -10))
-
-	for weed_pos in [
-		Vector2(280, 200), Vector2(340, 285), Vector2(560, 142), Vector2(665, 195),
-		Vector2(655, 310), Vector2(520, 390), Vector2(365, 385), Vector2(180, 290)
-	]:
-		_add_dual_prop("overgrown_weeds", weed_pos, ysort_obstacles, Vector2(0, -6))
-
 	_clearing_mist = CPUParticles2D.new()
 	_clearing_mist.name = "ClearingMistParticles"
 	_clearing_mist.position = Vector2(480, 288)
@@ -211,11 +300,6 @@ func _build_clearing_props_and_lights() -> void:
 	_add_dual_prop("wooden_signpost", Vector2(215, 200), ysort_obstacles, Vector2(0, -10))
 
 	for pos in [Vector2(380, 240), Vector2(495, 336), Vector2(610, 256), Vector2(495, 168)]:
-		var st_n := RetroLevelHelpers.create_prop_sprite("floor_stain", false)
-		st_n.position = pos
-		decals_layer.add_child(st_n)
-		_normal_props.append(st_n)
-
 		var st_d := RetroLevelHelpers.create_prop_sprite("floor_stain", true)
 		st_d.position = pos
 		st_d.visible = false
@@ -268,6 +352,13 @@ func _sync_clearing_atmosphere() -> void:
 	var act3 := GameState.is_unfiltered_act3()
 	var higher := _is_higher_dose_active()
 
+	var active_base_ts: TileSet = ACT3_TS if act3 else NORMAL_TS
+	ground_normal.tile_set = active_base_ts
+	walls_normal.tile_set = active_base_ts
+	if _understory_layer != null:
+		_understory_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
+	if _canopy_layer != null:
+		_canopy_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
 	ground_normal.visible = not higher
 	walls_normal.visible = not higher
 	ground_distorted.visible = higher
@@ -297,23 +388,26 @@ func _sync_clearing_atmosphere() -> void:
 			nest_interactable.monitoring = not act3
 			nest_interactable.monitorable = not act3
 
+	var period: String = GameState.get_day_period() if GameState.has_method("get_day_period") else ("afternoon" if GameState.is_afternoon else "morning")
 	if canvas_mod:
 		if act3:
 			canvas_mod.color = Color(0.64, 0.66, 0.69, 1.0)
 		elif higher:
-			canvas_mod.color = Color(0.34, 0.21, 0.27, 1.0)
+			canvas_mod.color = Color(0.56, 0.52, 0.58, 1.0)
 		elif ato == 2 and GameState.get_switch("015_Floresta_em_chamas"):
-			canvas_mod.color = Color(0.52, 0.38, 0.36, 1.0)
-		elif GameState.is_afternoon:
-			canvas_mod.color = Color(0.50, 0.44, 0.48, 1.0)
+			canvas_mod.color = Color(0.58, 0.44, 0.40, 1.0)
+		elif period == "night":
+			canvas_mod.color = Color(0.42, 0.46, 0.56, 1.0)
+		elif period == "afternoon" or GameState.is_afternoon:
+			canvas_mod.color = Color(0.64, 0.58, 0.62, 1.0)
 		else:
-			canvas_mod.color = Color(0.42, 0.46, 0.54, 1.0)
+			canvas_mod.color = Color(0.76, 0.80, 0.82, 1.0)
 
 	if _pond_light and is_instance_valid(_pond_light):
 		if act3:
 			_pond_light.color = Color(0.84, 0.87, 0.90)
 		elif higher:
-			_pond_light.color = Color(0.88, 0.15, 0.22)
+			_pond_light.color = Color(0.92, 0.46, 0.52)
 		else:
 			_pond_light.color = Color(0.45, 0.85, 0.96)
 
@@ -455,19 +549,56 @@ func _on_creature_interaction() -> void:
 				}
 			], Callable())
 		elif choice == 2:
-			if creature:
-				creature.call("take_damage", 70)
-			GameState.set_switch("004_Ovos_e_derrotou", true)
-			GameState.set_switch("016_Magia_de_agua_obtida", true)
-			GameState.trigger_turn_afternoon()
 			request_dialogue.emit([
+				{
+					"speaker": "Guardiã da Lagoa",
+					"text": "As águas da Lagoa Azul erguem-se em colunas turquesa e carmesim!\n\"Se trazes o ferro e a cinza ao santuário da montanha, provarás a fúria da correnteza!\""
+				},
 				{
 					"speaker": "Huwag Matitiis",
 					"expression": "angry",
-					"text": "O golpe de machado estilhaçou a calmaria da água! A criatura recuou para o fundo da lagoa, deixando uma onda de choque que impregnou meu machado de energia aquática."
+					"text": "Firmei o cabo do machado BFP. Preciso observar os anéis de aviso na água e esquivar (Z/L) antes de contra-atacar!"
 				}
-			], Callable())
+			], func(_c: int) -> void:
+				if creature and creature.has_method("start_boss_fight"):
+					creature.call("start_boss_fight")
+			)
 	)
+
+
+func _on_boss_phase_dialogue(phase_id: String) -> void:
+	if phase_id == "phase_2":
+		request_dialogue.emit([
+			{
+				"speaker": "Guardiã da Lagoa",
+				"text": "O redemoinho da lagoa acelera!\n\"Por que golpeias a água que poderia apagar o incêndio dentro do teu próprio peito, bombeiro?!\""
+			}
+		], Callable())
+	elif phase_id == "phase_3":
+		request_dialogue.emit([
+			{
+				"speaker": "Huwag Matitiis",
+				"expression": "worried",
+				"text": "As escamas dela brilham como sirenes sob a neblina... Mais alguns golpes certeiros e a tormenta da lagoa vai ceder!"
+			}
+		], Callable())
+
+
+func _on_boss_defeated() -> void:
+	GameState.set_switch("004_Ovos_e_derrotou", true)
+	GameState.set_switch("016_Magia_de_agua_obtida", true)
+	GameState.trigger_turn_afternoon()
+	request_dialogue.emit([
+		{
+			"speaker": "Guardiã da Lagoa",
+			"text": "A criatura afunda lentamente nas águas agora serenas da Lagoa Azul.\n\"Venceste pela força... mas a água que levas contigo ainda carrega o peso do que recusas lembrar.\""
+		},
+		{
+			"speaker": "Huwag Matitiis",
+			"expression": "tired",
+			"text": "A onda final impregnou meu machado e minhas mãos com a essência fria da lagoa.\n(Magia de Água obtida! O fim de tarde já tingiu o céu — preciso voltar ao Quartel BFP)."
+		}
+	], Callable())
 
 
 func _setup_act2_cat_rescue() -> void:
@@ -521,7 +652,7 @@ func _setup_act3_pond_mirror() -> void:
 	mirror.name = "PondMirrorInteractable"
 	mirror.interaction_id = "Espelho_Lagoa"
 	mirror.title = "Reflexo das Águas da Lagoa"
-	mirror.verb = "Observar Reflexo (Ato III)"
+	mirror.verb = "Observar Reflexo"
 	mirror.position = Vector2(436, 240)
 	mirror.collision_layer = 4
 	mirror.collision_mask = 2

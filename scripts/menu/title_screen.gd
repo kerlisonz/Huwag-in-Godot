@@ -119,6 +119,7 @@ func _ready() -> void:
 
 	_apply_options_modal_style()
 	_apply_vhs_setting()
+	_refresh_vhs_timestamp()
 	_check_save_state()
 	_update_selection_visuals()
 
@@ -157,12 +158,23 @@ func _update_osd(delta: float) -> void:
 	if _osd_accum >= 1.0:
 		_osd_accum -= 1.0
 		_osd_seconds += 1
-		if osd_timecode_label:
-			osd_timecode_label.text = _format_timecode(_osd_seconds)
+		_refresh_vhs_timestamp()
 
 	# Piscar do ponto REC
 	if osd_rec_dot:
 		osd_rec_dot.modulate.a = 1.0 if fmod(_clock, 1.2) < 0.7 else 0.12
+
+func _refresh_vhs_timestamp() -> void:
+	var dt := Time.get_datetime_dict_from_system()
+	var hh: int = int(dt.get("hour", 6))
+	var mm: int = int(dt.get("minute", 30))
+	var ss: int = int(dt.get("second", 0))
+	var day: int = int(dt.get("day", 18))
+	var month: int = int(dt.get("month", 11))
+	if osd_timecode_label:
+		osd_timecode_label.text = "%02d:%02d:%02d" % [hh, mm, ss]
+	if osd_tape_label:
+		osd_tape_label.text = "SP · %02d/%02d · %02d:%02d" % [day, month, hh, mm]
 
 func _format_timecode(total_seconds: int) -> String:
 	var s := total_seconds
@@ -260,10 +272,10 @@ func _check_save_state() -> void:
 
 	if has_save:
 		var summary := GameState.get_save_summary()
-		var ato_roman := "I" if summary.get("ato", 1) == 1 else ("II" if summary.get("ato", 1) == 2 else "III")
+		var clock_hhmm: String = str(summary.get("clock_hhmm", "06:30"))
 		var place: String = summary.get("place", "Quarto de Huwag")
 		var hp: int = summary.get("hp", 100)
-		save_info_label.text = "Progresso salvo: Ato %s · %s (%d HP)" % [ato_roman, place, hp]
+		save_info_label.text = "Progresso salvo: %s · %s (%d HP)" % [clock_hhmm, place, hp]
 		save_info_label.modulate = Color(0.75, 0.85, 0.70, 0.85)
 		_selected_index = 1 # Seleciona Continuar por padrão se houver save
 		btn_continue.grab_focus()
@@ -275,7 +287,7 @@ func _check_save_state() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F10:
+		if event.keycode == KEY_F10 and OS.is_debug_build():
 			GameState.advance_act()
 			_check_save_state()
 			get_viewport().set_input_as_handled()

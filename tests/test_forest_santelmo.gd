@@ -1,6 +1,10 @@
 extends SceneTree
 
 func _init() -> void:
+	create_timer(15.0).timeout.connect(func() -> void:
+		push_error("TIMEOUT: test_forest_santelmo excedeu 15s")
+		quit(1)
+	)
 	call_deferred("_run_forest_suite")
 
 func _run_forest_suite() -> void:
@@ -53,8 +57,13 @@ func _run_forest_suite() -> void:
 	var s1 = trail.get_node_or_null("ObstaclesYsort/Santelmo1")
 	var s2 = trail.get_node_or_null("ObstaclesYsort/Santelmo2")
 	var s3 = trail.get_node_or_null("ObstaclesYsort/Santelmo3")
-	assert(s1 != null and s2 != null and s3 != null, "Três inimigos Santelmo devem estar na trilha!")
-	print("[PASS] Santelmo 1, 2 e 3 instanciados nas posições: %s, %s, %s" % [s1.position, s2.position, s3.position])
+	var s4 = trail.get_node_or_null("ObstaclesYsort/Santelmo4")
+	var s5 = trail.get_node_or_null("ObstaclesYsort/Santelmo5")
+	assert(s1 != null and s2 != null and s3 != null and s4 != null and s5 != null, "Inimigos Santelmo originais e expandidos devem estar na trilha!")
+	assert(trail.ground_normal.tile_set.resource_path.ends_with("forest_v2_normal_tileset.tres"), "ForestTrail deve usar forest_v2_normal_tileset.tres!")
+	assert(trail.get_node_or_null("V2CanopyLayer") != null, "ForestTrail deve conter V2CanopyLayer com shader de copa!")
+	assert(trail._santelmos.size() >= 8, "ForestTrail deve ter >= 8 Santelmos distribuídos (atual=%d)!" % trail._santelmos.size())
+	print("[PASS] ForestTrail v2 + %d Santelmos (wander/patrol/ambush) confirmados!" % trail._santelmos.size())
 
 	# ----------------------------------------------------
 	# 3. TESTE DE COMBATE DO SANTELMO & FRAQUEZA ELEMENTAL À ÁGUA
@@ -130,6 +139,24 @@ func _run_forest_suite() -> void:
 	clearing._on_creature_interaction()
 	assert(tracker["dialogue_requested"], "Interação pacífica com a criatura deve disparar diálogo narrativo!")
 	print("[PASS] Diálogo narrativo da Guardiã da Lagoa acionado com sucesso!")
+
+	# Teste da Boss Fight da Lagoa Azul (Fases, Telégrafos e Derrota)
+	var phase_signals: Array[String] = []
+	var boss_defeated_flag := {"done": false}
+	creature.boss_phase_dialogue_requested.connect(func(pid: String) -> void: phase_signals.append(pid))
+	creature.boss_defeated.connect(func() -> void: boss_defeated_flag["done"] = true)
+
+	creature.start_boss_fight()
+	assert(creature.is_hostile == true and creature.current_hp == 180, "Boss Fight deve iniciar com 180 HP e estado hostil!")
+	creature._begin_wave_telegraph(Vector2(420, 240))
+	assert(creature.boss_state == creature.BossState.TELEGRAPH_WAVE, "Boss deve entrar em TELEGRAPH_WAVE antes do ataque de onda!")
+	creature.receive_melee_hit(80, Vector2(440, 240)) # 180 -> 100 HP (<= 62% -> Fase 2)
+	assert(creature.current_phase == 2 and "phase_2" in phase_signals, "Boss deve entrar na Fase 2 e emitir diálogo de transição em <= 62% HP!")
+	creature.receive_water_hit(65, Vector2(440, 240)) # 100 -> 22 HP (<= 28% -> Fase 3, com bônus staggered)
+	assert(creature.current_phase == 3 and "phase_3" in phase_signals, "Boss deve entrar na Fase 3 e emitir diálogo em <= 28% HP!")
+	creature.receive_melee_hit(50, Vector2(440, 240)) # -> 0 HP (Derrota)
+	assert(creature.is_defeated == true and boss_defeated_flag["done"] == true, "Boss deve ser derrotado ao chegar a 0 HP e conceder Magia de Água!")
+	print("[PASS] Boss Fight da Lagoa Azul (telégrafos, fases 1->2->3 e resolução) validada com sucesso!")
 
 	# Salva captura da Clareira
 	for i in range(5):

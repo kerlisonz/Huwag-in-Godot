@@ -105,7 +105,7 @@ Ato · Santos · Esquadrão Voluntário de Quezon
 \"Sobreviver não é esquecer.
 É escolher continuar protegendo a vida a cada novo amanhecer.\"
 
-FIM DO ATO III"
+FIM"
 horizontal_alignment = 1
 
 [node name="PromptLabel" type="Label" parent="."]

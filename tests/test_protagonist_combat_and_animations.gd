@@ -13,6 +13,10 @@ const ARTIFACT_DIR := "C:/Users/SnyX/.gemini/antigravity/brain/6f04634a-b7d4-4d6
 
 
 func _init() -> void:
+	create_timer(15.0).timeout.connect(func() -> void:
+		push_error("TIMEOUT: test_protagonist_combat_and_animations excedeu 15s")
+		quit(1)
+	)
 	call_deferred("_run_all")
 
 
@@ -116,10 +120,11 @@ func _run_all() -> void:
 		player.call("_update_character_sprite_state")
 		cs.frame = 0
 		await _wait_frames(8)
-		var shot_street := root.get_viewport().get_texture().get_image()
-		if shot_street != null:
-			shot_street.save_png(ARTIFACT_DIR + "/ingame_street_walk_and_npc.png")
-			print("[SHOT] Salvo ingame_street_walk_and_npc.png")
+		if DisplayServer.get_name() != "headless":
+			var shot_street := root.get_viewport().get_texture().get_image()
+			if shot_street != null:
+				shot_street.save_png(ARTIFACT_DIR + "/ingame_street_walk_and_npc.png")
+				print("[SHOT] Salvo ingame_street_walk_and_npc.png")
 
 	street.queue_free()
 	await _wait_frames(3)
@@ -169,10 +174,11 @@ func _run_all() -> void:
 	# Captura screenshot durante o Combo em ação na Floresta!
 	f_cs.frame = 1
 	await _wait_frames(4)
-	var shot_combo := root.get_viewport().get_texture().get_image()
-	if shot_combo != null:
-		shot_combo.save_png(ARTIFACT_DIR + "/ingame_forest_combo_combat.png")
-		print("[SHOT] Salvo ingame_forest_combo_combat.png")
+	if DisplayServer.get_name() != "headless":
+		var shot_combo := root.get_viewport().get_texture().get_image()
+		if shot_combo != null:
+			shot_combo.save_png(ARTIFACT_DIR + "/ingame_forest_combo_combat.png")
+			print("[SHOT] Salvo ingame_forest_combo_combat.png")
 
 	# Encadeia Golpe 3 Finalizador (combo3_right, 45 de dano -> derrota Santelmo1!)
 	santelmo1.global_position = f_player.global_position + Vector2(30, 0)
@@ -195,10 +201,11 @@ func _run_all() -> void:
 
 	f_cs.frame = 1
 	await _wait_frames(3)
-	var shot_dodge := root.get_viewport().get_texture().get_image()
-	if shot_dodge != null:
-		shot_dodge.save_png(ARTIFACT_DIR + "/ingame_forest_dodge_action.png")
-		print("[SHOT] Salvo ingame_forest_dodge_action.png")
+	if DisplayServer.get_name() != "headless":
+		var shot_dodge := root.get_viewport().get_texture().get_image()
+		if shot_dodge != null:
+			shot_dodge.save_png(ARTIFACT_DIR + "/ingame_forest_dodge_action.png")
+			print("[SHOT] Salvo ingame_forest_dodge_action.png")
 	print("[PASS] Mecânica de Esquiva (Dodge) e i-frames validados.")
 
 	# Valida Recebimento de Dano (Hurt) e Morte (Death)

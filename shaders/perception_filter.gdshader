@@ -9,6 +9,7 @@ uniform sampler2D screen_tex : hint_screen_texture, filter_nearest;
 uniform float afternoon_mix : hint_range(0.0, 1.0) = 0.0;
 uniform float night_mix : hint_range(0.0, 1.0) = 0.0;
 uniform float unfiltered_mix : hint_range(0.0, 1.0) = 0.0;
+uniform float corruption_mix : hint_range(0.0, 1.0) = 0.0;
 
 // Parâmetros de estética VHS (ajustáveis em tempo real por scripts e eventos)
 uniform float vhs_scanline_alpha : hint_range(0.0, 1.0) = 0.08;
@@ -99,6 +100,16 @@ void fragment() {
 
 	vec3 base_col = mix(filtered_col, drained_col, unfiltered_mix);
 
+	// 6a. Modo Corrompido legível: paleta fria/dessaturada com subtom rubro sutil e meio-tons preservados
+	if (corruption_mix > 0.001 && unfiltered_mix < 0.5) {
+		float lifted_luma = clamp(pow(max(luma, 0.001), 0.86) * 1.08 + 0.04, 0.06, 1.0);
+		vec3 cold_ash = mix(base_col, vec3(lifted_luma), 0.42);
+		vec3 corrupt_shadow = vec3(0.62, 0.48, 0.56);
+		vec3 corrupt_highlight = vec3(1.02, 0.90, 0.94);
+		vec3 corrupt_col = cold_ash * mix(corrupt_shadow, corrupt_highlight, clamp(lifted_luma * 1.25, 0.0, 1.0));
+		base_col = mix(base_col, corrupt_col, corruption_mix);
+	}
+
 	// 6b. Ruído de comutação de cabeça na base da fita (head-switching noise)
 	if (vhs_head_switch > 0.001) {
 		float hb = smoothstep(0.90, 1.0, uv.y);
@@ -132,10 +143,15 @@ void fragment() {
 		base_col += noise * vhs_noise_intensity;
 	}
 
-	// 9. Vinheta suave de tela CRT
+	// 9. Vinheta suave de tela CRT (com borda periférica rubra controlada no Modo Corrompido)
 	vec2 center_uv = uv * 2.0 - 1.0;
-	float vignette = clamp(1.0 - dot(center_uv, center_uv) * 0.28 * vhs_crt_vignette, 0.60, 1.0);
+	float edge_dist = dot(center_uv, center_uv);
+	float vignette = clamp(1.0 - edge_dist * 0.24 * vhs_crt_vignette, 0.68, 1.0);
 	base_col *= vignette;
+	if (corruption_mix > 0.001 && unfiltered_mix < 0.5) {
+		float periph = smoothstep(0.55, 1.65, edge_dist) * corruption_mix * 0.28;
+		base_col = mix(base_col, vec3(0.24, 0.07, 0.11), periph);
+	}
 
 	COLOR = vec4(clamp(base_col, 0.0, 1.0), 1.0);
 }

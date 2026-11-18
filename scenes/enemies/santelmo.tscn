@@ -4,6 +4,7 @@
 [ext_resource type="Texture2D" uid="uid://ckt066u32l1oh" path="res://assets/enemies/santelmo.png" id="2_santelmo_tex"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 7.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_hurt"]
 radius = 14.0
@@ -50,6 +51,7 @@ scale_amount_max = 3.5
 color = Color(1, 0.65, 0.2, 0.7)
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1655094793]
+texture_filter = 0
 texture = ExtResource("2_santelmo_tex")
 
 [node name="Hurtbox" type="Area2D" parent="." unique_id=1668304685 groups=["enemy_hurtbox"]]

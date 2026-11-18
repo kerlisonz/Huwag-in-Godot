@@ -9,9 +9,13 @@ signal request_level_change(target_scene: String, spawn_tag: String)
 signal request_dialogue(pages: Array, callback: Callable)
 
 const RetroLevelHelpers := preload("res://scripts/levels/retro_level_helpers.gd")
+const V2TileCatalog := preload("res://scripts/levels/v2_tile_catalog.gd")
+const AtmosphereRig := preload("res://scripts/levels/atmosphere_rig.gd")
 const NPC_SCENE := preload("res://scenes/characters/NpcEntity.tscn")
-const NORMAL_TS := preload("res://assets/tilesets/retro/forest_fnaf_normal_tileset.tres")
-const DISTORTED_TS := preload("res://assets/tilesets/retro/forest_fnaf_distorted_tileset.tres")
+const SANTELMO_SCENE := preload("res://scenes/enemies/santelmo.tscn")
+const NORMAL_TS := preload("res://assets/tilesets/v2/forest_v2_normal_tileset.tres")
+const DISTORTED_TS := preload("res://assets/tilesets/v2/forest_v2_distorted_tileset.tres")
+const ACT3_TS := preload("res://assets/tilesets/v2/forest_v2_act3_tileset.tres")
 
 const MAP_W := 160
 const MAP_H := 48
@@ -37,6 +41,10 @@ var _lights: Array[PointLight2D] = []
 var _santelmos: Array[Node] = []
 var _stalker_npc: NpcEntity = null
 var _ambient_dust: CPUParticles2D = null
+var _understory_layer: TileMapLayer = null
+var _canopy_layer: TileMapLayer = null
+var _canopy_material: ShaderMaterial = null
+var _fog_overlay: ColorRect = null
 var _time_acc: float = 0.0
 
 
@@ -53,6 +61,7 @@ func _ready() -> void:
 	_build_forest_tilemaps()
 	_build_forest_props_and_lights()
 	_setup_interactables_and_pickups()
+	_spawn_expanded_forest_enemies()
 	_collect_santelmos()
 	_spawn_higher_dose_stalker()
 
@@ -63,23 +72,31 @@ func _ready() -> void:
 
 	GameState.perception_changed.connect(func(_m: int) -> void: _sync_forest_atmosphere())
 	GameState.switch_changed.connect(func(_k: String, _v: bool) -> void: _sync_forest_atmosphere())
+	if GameState.has_signal("day_period_changed"):
+		GameState.day_period_changed.connect(func(_p: String) -> void: _sync_forest_atmosphere())
 	if GameState.has_signal("higher_dose_changed"):
 		GameState.higher_dose_changed.connect(func(active: bool) -> void: apply_higher_dose_world(active))
 
 	_sync_forest_atmosphere()
 
 	if has_node("/root/AudioManager"):
-		var ato: int = int(GameState.get_var("Ato", 1))
-		if GameState.is_unfiltered_act3():
-			get_node("/root/AudioManager").play_ambience("act3_ambience")
-		elif ato == 2 and GameState.get_switch("015_Floresta_em_chamas"):
-			get_node("/root/AudioManager").play_ambience("afternoon_ambience")
+		var am = get_node("/root/AudioManager")
+		if am.has_method("sync_adaptive_soundtrack"):
+			am.call("sync_adaptive_soundtrack", "forest_trail", false)
 		else:
-			get_node("/root/AudioManager").play_ambience("night_forest")
+			var ato: int = int(GameState.get_var("Ato", 1))
+			if GameState.is_unfiltered_act3():
+				am.play_ambience("act3_ambience")
+			elif ato == 2 and GameState.get_switch("015_Floresta_em_chamas"):
+				am.play_ambience("afternoon_ambience")
+			else:
+				am.play_ambience("night_forest")
 
 
 func _process(delta: float) -> void:
 	_time_acc += delta
+	if _canopy_material != null and player != null and is_instance_valid(player):
+		_canopy_material.set_shader_parameter("player_world_pos", player.global_position)
 	var higher := _is_higher_dose_active()
 	for i in range(_lights.size()):
 		var lt := _lights[i]
@@ -145,12 +162,13 @@ func _build_forest_tilemaps() -> void:
 	carve.call(156, 21, 4, 6)
 
 	# Obstáculos internos (rochedos & poço seco) preservando amplas rotas de desvio
+	var f_cat := V2TileCatalog.FOREST_TILES
 	var solid_rock := func(x0: int, y0: int, w: int, h: int) -> void:
 		for x in range(x0, x0 + w):
 			for y in range(y0, y0 + h):
 				walkable[x][y] = false
 				for wl in [walls_normal, walls_distorted]:
-					wl.set_cell(Vector2i(x, y), 0, Vector2i(5, 1))
+					wl.set_cell(Vector2i(x, y), 0, f_cat["rock_round_a"])
 
 	solid_rock.call(50, 10, 2, 2)
 	solid_rock.call(69, 11, 2, 2)
@@ -158,116 +176,183 @@ func _build_forest_tilemaps() -> void:
 	solid_rock.call(114, 33, 2, 2)
 	solid_rock.call(126, 36, 2, 2)
 
-	# Riachos cortando a Rota Sul em x=52..53 e x=68..69, cruzados por pontes em y=35..37
+	# Riachos animados cortando a Rota Sul em x=52..53 e x=68..69, cruzados por pontes em y=35..37
 	for sx in [52, 53, 68, 69]:
 		for sy in range(30, 43):
 			if sy >= 35 and sy <= 37:
 				continue
 			walkable[sx][sy] = false
-			var water_coord := Vector2i(3, 1) if (sy <= 31 or sy >= 41) else Vector2i(4, 1)
+			var water_coord: Vector2i = f_cat["waterfall_top"] if sy == 30 else (f_cat["waterfall_mid"] if sy == 31 else f_cat["water_deep_anim"])
 			for wl in [walls_normal, walls_distorted]:
 				wl.set_cell(Vector2i(sx, sy), 0, water_coord)
 
-	# Preenchimento do piso e barreiras vegetais/basalto
+	# Preenchimento 100% opaco do piso e barreiras de penhasco com forest_v2 (16x16, zero buracos!)
 	for x in range(MAP_W):
 		for y in range(MAP_H):
+			var base_grass: Vector2i = f_cat["grass_a"] if ((x + y) % 2 == 0) else f_cat["grass_b"]
 			for gl in [ground_normal, ground_distorted]:
-				gl.set_cell(Vector2i(x, y), 0, Vector2i(3, 0))
+				gl.set_cell(Vector2i(x, y), 0, base_grass)
 			if not walkable[x][y]:
 				var already_special := walls_normal.get_cell_source_id(Vector2i(x, y)) != -1
 				if not already_special:
-					var wall_coord := Vector2i(0, 1)
-					if y > 2 and y < MAP_H - 3 and x > 1 and x < MAP_W - 2:
-						if y + 1 < MAP_H and walkable[x][y + 1]:
-							wall_coord = Vector2i(2, 1)  # Paredão basalto acima da trilha
-						elif y - 1 >= 0 and walkable[x][y - 1]:
-							wall_coord = Vector2i(1, 1)  # Crista de pedra abaixo da trilha
-					for wl in [walls_normal, walls_distorted]:
-						wl.set_cell(Vector2i(x, y), 0, wall_coord)
+					# Apenas as células de borda junto à trilha recebem penhasco com colisão física; o interior recebe vegetação densa
+					var near_walkable := false
+					for dy in range(-1, 2):
+						for dx in range(-1, 2):
+							var nx: int = x + dx
+							var ny: int = y + dy
+							if nx >= 0 and nx < MAP_W and ny >= 0 and ny < MAP_H and walkable[nx][ny]:
+								near_walkable = true
+								break
+						if near_walkable:
+							break
+					if near_walkable:
+						var wall_coord: Vector2i = f_cat["cliff_face_mid"] if (y + 1 < MAP_H and walkable[x][y + 1]) else f_cat["cliff_top_mid"]
+						for wl in [walls_normal, walls_distorted]:
+							wl.set_cell(Vector2i(x, y), 0, wall_coord)
 			else:
-				# Seleciona tipo de chão walkable por bioma local
-				var tile := Vector2i(1, 0)
-				if (x + y * 3) % 7 == 0:
-					tile = Vector2i(2, 0)
+				var tile: Vector2i = f_cat["grass_a"]
+				if (x + y * 3) % 5 == 0:
+					tile = f_cat["grass_b"]
+				elif (x * 5 + y) % 7 == 0:
+					tile = f_cat["needle_grass_a"]
 				if x >= 34 and x <= 87 and y <= 16:
-					tile = Vector2i(7, 0) if (x + y) % 5 != 0 else Vector2i(4, 0)
+					tile = f_cat["soil_dark"] if (x + y) % 4 != 0 else f_cat["soil_a"]
 				elif x >= 84 and x <= 103 and y >= 15 and y <= 33:
-					tile = Vector2i(6, 0)
+					tile = f_cat["needle_grass_b"]
 					if x >= 90 and x <= 96 and y >= 21 and y <= 27:
-						tile = Vector2i(11, 0)
+						tile = f_cat["mud_patch_center"]
 				elif (x == 52 or x == 53 or x == 68 or x == 69) and y >= 35 and y <= 37:
-					tile = Vector2i(10, 0) # Pontes de madeira sobre o riacho
+					tile = f_cat["bridge_v_mid_l"] if x in [52, 68] else f_cat["bridge_v_mid_r"]
 				elif x >= 49 and x <= 72 and y >= 31 and y <= 42:
-					tile = Vector2i(8, 0) if (x + y) % 3 != 0 else Vector2i(9, 0)
+					tile = f_cat["grass_c"] if (x + y) % 3 != 0 else f_cat["needle_grass_a"]
 				elif x >= 115 and x <= 122 and y >= 7 and y <= 13:
-					tile = Vector2i(11, 0)
+					tile = f_cat["mud_patch_center"]
 				for gl in [ground_normal, ground_distorted]:
 					gl.set_cell(Vector2i(x, y), 0, tile)
 
-	# Trilhas principais marcadas (leitura clara estilo Pokémon GB / Chrono Trigger)
+	# Trilhas principais marcadas com terra batida e lama (forest_v2)
 	var paint_trail := func(x0: int, y0: int, w: int, h: int, coord: Vector2i) -> void:
 		for gl in [ground_normal, ground_distorted]:
-			RetroLevelHelpers.paint_rect(gl, x0, y0, w, h, coord)
+			V2TileCatalog.fill_rect(gl, Rect2i(x0, y0, w, h), coord)
 
-	paint_trail.call(0, 23, 28, 3, Vector2i(4, 0))
-	paint_trail.call(26, 11, 3, 26, Vector2i(4, 0))
-	paint_trail.call(29, 11, 56, 3, Vector2i(4, 0))   # Trilha Norte
-	paint_trail.call(29, 35, 56, 3, Vector2i(5, 0))   # Trilha Sul até riacho
+	paint_trail.call(0, 23, 28, 3, f_cat["soil_a"])
+	paint_trail.call(26, 11, 3, 26, f_cat["soil_a"])
+	paint_trail.call(29, 11, 56, 3, f_cat["soil_b"])
+	paint_trail.call(29, 35, 56, 3, f_cat["soil_a"])
 	for gx in [52, 53, 68, 69]:
-		paint_trail.call(gx, 35, 1, 3, Vector2i(10, 0)) # Reforça tábuas da ponte acima do chão
-	paint_trail.call(85, 12, 3, 25, Vector2i(5, 0))   # Ligação na Bacia Central
-	paint_trail.call(88, 23, 14, 3, Vector2i(4, 0))
-	paint_trail.call(94, 10, 3, 14, Vector2i(5, 0))
-	paint_trail.call(97, 10, 37, 2, Vector2i(5, 0))   # Ligação Poço Seco
-	paint_trail.call(132, 11, 3, 18, Vector2i(4, 0))
-	paint_trail.call(101, 35, 34, 3, Vector2i(7, 0))  # Desfiladeiro Leste em cinzas
-	paint_trail.call(134, 23, 26, 3, Vector2i(4, 0))  # Reta final até o lago
+		var b_coord: Vector2i = f_cat["bridge_v_mid_l"] if gx in [52, 68] else f_cat["bridge_v_mid_r"]
+		paint_trail.call(gx, 35, 1, 3, b_coord)
+	paint_trail.call(85, 12, 3, 25, f_cat["soil_b"])
+	paint_trail.call(88, 23, 14, 3, f_cat["soil_a"])
+	paint_trail.call(94, 10, 3, 14, f_cat["soil_b"])
+	paint_trail.call(97, 10, 37, 2, f_cat["soil_b"])
+	paint_trail.call(132, 11, 3, 18, f_cat["soil_a"])
+	paint_trail.call(101, 35, 34, 3, f_cat["soil_dark"])
+	paint_trail.call(134, 23, 26, 3, f_cat["soil_a"])
 
-	# Decals do fundo do poço seco na Clareira Morta (visual sem alterar colisão de borda)
-	for gl in [ground_normal, ground_distorted]:
-		RetroLevelHelpers.paint_rect(gl, 118, 10, 2, 1, Vector2i(0, 0))
+	# Camada de sub-bosque + copas de árvores em múltiplas camadas densas + neblina fog_drift
+	_setup_v2_canopy_and_fog(walkable)
 
 	walls_distorted.collision_enabled = false
 
 
+func _setup_v2_canopy_and_fog(walkable: Array) -> void:
+	var f_cat := V2TileCatalog.FOREST_TILES
+	var active_ts: TileSet = ACT3_TS if GameState.is_unfiltered_act3() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
+
+	if _understory_layer == null:
+		_understory_layer = TileMapLayer.new()
+		_understory_layer.name = "V2UnderstoryLayer"
+		_understory_layer.z_index = 1
+		_understory_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_understory_layer.collision_enabled = false
+		add_child(_understory_layer)
+	_understory_layer.tile_set = active_ts
+	_understory_layer.clear()
+
+	if _canopy_layer == null:
+		_canopy_layer = TileMapLayer.new()
+		_canopy_layer.name = "V2CanopyLayer"
+		_canopy_layer.z_index = 4
+		_canopy_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_canopy_layer.collision_enabled = false
+		_canopy_material = AtmosphereRig.create_canopy_material(36.0, 0.36)
+		_canopy_layer.material = _canopy_material
+		add_child(_canopy_layer)
+	_canopy_layer.tile_set = active_ts
+	_canopy_layer.clear()
+
+	# Cercas de madeira rústica e vegetação rasteira (samambaias, cogumelos, pedras e tocos) no sub-bosque
+	for fx in range(4, 22, 3):
+		_understory_layer.set_cell(Vector2i(fx, 22), 0, f_cat["fence_left"])
+		_understory_layer.set_cell(Vector2i(fx + 1, 22), 0, f_cat["fence_mid"])
+		_understory_layer.set_cell(Vector2i(fx + 2, 22), 0, f_cat["fence_right"])
+
+	for gx in range(2, MAP_W - 3, 2):
+		for gy in range(2, MAP_H - 3, 2):
+			if walkable[gx][gy]:
+				if (gx * 11 + gy * 7) % 19 == 0 and gy > 4 and gy < MAP_H - 4:
+					_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["pebbles"])
+				continue
+			var h := (gx * 13 + gy * 17) % 9
+			if h == 0:
+				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_a"])
+			elif h == 1:
+				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_b"])
+			elif h == 2:
+				_understory_layer.set_cell(Vector2i(gx, gy), 0, f_cat["mushrooms_a"])
+			elif h == 3 and gx + 1 < MAP_W and gy + 1 < MAP_H and not walkable[gx + 1][gy + 1]:
+				V2TileCatalog.stamp_rect(_understory_layer, Vector2i(gx, gy), f_cat["stump_rooted"], Vector2i(2, 2))
+			elif h == 4 and gx + 1 < MAP_W and gy + 1 < MAP_H and not walkable[gx + 1][gy + 1]:
+				V2TileCatalog.stamp_rect(_understory_layer, Vector2i(gx, gy), f_cat["moss_boulder"], Vector2i(2, 2))
+
+	# Preenchimento denso em 2 camadas de árvores escalonadas (cobrindo todas as margens fora da trilha de terra!)
+	for gy in range(0, MAP_H - 5, 3):
+		var row_shift := (gy % 2) * 2
+		for gx in range(0, MAP_W - 4, 3):
+			var tx := gx + row_shift
+			if tx >= MAP_W - 3:
+				continue
+			# Mantém livres apenas as trilhas principais de terra/pontes e um buffer de 1 tile ao redor delas
+			var on_main_path := false
+			for by in range(maxi(0, gy + 2), mini(MAP_H, gy + 6)):
+				for bx in range(maxi(0, tx - 1), mini(MAP_W, tx + 4)):
+					var gcell := ground_normal.get_cell_atlas_coords(Vector2i(bx, by))
+					var wcell := walls_normal.get_cell_atlas_coords(Vector2i(bx, by))
+					if gcell in [f_cat["soil_a"], f_cat["soil_b"], f_cat["soil_dark"], f_cat["bridge_v_mid_l"], f_cat["bridge_v_mid_r"]]:
+						on_main_path = true
+						break
+					if wcell in [f_cat["water_deep_anim"], f_cat["waterfall_top"], f_cat["waterfall_mid"], f_cat["rock_round_a"]]:
+						on_main_path = true
+						break
+				if on_main_path:
+					break
+			if on_main_path:
+				continue
+
+			var pick := (tx * 7 + gy * 5) % 6
+			var target_layer: TileMapLayer = _canopy_layer if ((tx + gy) % 2 == 0) else _understory_layer
+			if pick == 0 or pick == 1:
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, gy), f_cat["pine_dark"], Vector2i(3, 6))
+			elif pick == 2:
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, gy), f_cat["pine_withered"], Vector2i(3, 6))
+			elif pick == 3 and tx + 4 < MAP_W:
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, gy), f_cat["tree_gnarled_mid"], Vector2i(5, 6))
+			else:
+				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx + 1, gy), f_cat["pine_slender"], Vector2i(1, 6))
+
+	# Árvores Anciãs monumentais (14x18) nos grandes bolsões da floresta
+	V2TileCatalog.stamp_rect(_canopy_layer, Vector2i(34, 16), f_cat["ancient_tree"], Vector2i(14, 18))
+	V2TileCatalog.stamp_rect(_canopy_layer, Vector2i(104, 14), f_cat["ancient_tree"], Vector2i(14, 18))
+
+	if _fog_overlay == null:
+		_fog_overlay = AtmosphereRig.create_fog_overlay(Rect2(0, 0, MAP_W * 16, MAP_H * 16), Color(0.16, 0.22, 0.20, 1.0), 0.14)
+		add_child(_fog_overlay)
+
+
 func _build_forest_props_and_lights() -> void:
-	# Árvores de copa densa nas bordas e divisórias internas (fora das áreas caminháveis)
-	var canopy_spots := [
-		Vector2(110, 210), Vector2(210, 220), Vector2(360, 210),
-		Vector2(760, 330), Vector2(880, 350), Vector2(1010, 330), Vector2(1150, 360),
-		Vector2(1190, 420), Vector2(1290, 330), Vector2(1540, 140),
-		Vector2(1820, 330), Vector2(1960, 350), Vector2(2080, 340),
-		Vector2(180, 560), Vector2(330, 570), Vector2(1420, 620),
-		Vector2(2260, 140), Vector2(2460, 260), Vector2(2460, 520)
-	]
-	for pos in canopy_spots:
-		_add_dual_prop("pine_canopy_cluster", pos, ysort_obstacles, Vector2(0, -24))
-
-	# Árvores secas retorcidas em torno da serra das cinzas e poço seco
-	var dead_spots := [
-		Vector2(670, 95), Vector2(1100, 95), Vector2(1300, 265),
-		Vector2(1790, 110), Vector2(1960, 96), Vector2(2120, 115),
-		Vector2(1760, 620), Vector2(2040, 610)
-	]
-	for pos in dead_spots:
-		_add_dual_prop("dead_gnarled_tree", pos, ysort_obstacles, Vector2(0, -20))
-
-	# Vegetação invasiva e arbustos nas bordas da trilha (balançando com o shader de vento)
-	for shrub_pos in [
-		Vector2(180, 340), Vector2(310, 444), Vector2(590, 224), Vector2(960, 224),
-		Vector2(1420, 310), Vector2(1560, 442), Vector2(1840, 224), Vector2(2160, 442),
-		Vector2(2310, 336), Vector2(720, 620), Vector2(1240, 620)
-	]:
-		_add_dual_prop("corner_shrub", shrub_pos, ysort_obstacles, Vector2(0, -10))
-
-	for weed_pos in [
-		Vector2(250, 424), Vector2(490, 220), Vector2(760, 145), Vector2(920, 520),
-		Vector2(1140, 520), Vector2(1480, 460), Vector2(1740, 145), Vector2(2060, 215),
-		Vector2(2260, 424), Vector2(2420, 424)
-	]:
-		_add_dual_prop("overgrown_weeds", weed_pos, ysort_obstacles, Vector2(0, -6))
-
-	# Poeira e esporos flutuantes contínuos na floresta
+	# Poeira e esporos flutuantes contínuos na floresta (árvores e vegetação vêm 100% das camadas v2)
 	_ambient_dust = CPUParticles2D.new()
 	_ambient_dust.name = "ForestAmbientDust"
 	_ambient_dust.position = Vector2(1280, 384)
@@ -293,11 +378,6 @@ func _build_forest_props_and_lights() -> void:
 		Vector2(1904, 176), Vector2(2240, 384), Vector2(2360, 384)
 	]
 	for pos in stain_spots:
-		var st_n := RetroLevelHelpers.create_prop_sprite("floor_stain", false)
-		st_n.position = pos
-		decals_layer.add_child(st_n)
-		_normal_props.append(st_n)
-
 		var st_d := RetroLevelHelpers.create_prop_sprite("floor_stain", true)
 		st_d.position = pos
 		st_d.visible = false
@@ -506,6 +586,46 @@ func _on_sign_interacted(id: String) -> void:
 				], Callable())
 
 
+func _spawn_expanded_forest_enemies() -> void:
+	if ysort_obstacles == null:
+		return
+	var extra_spawns := [
+		{"name": "Santelmo4", "pos": Vector2(310, 384), "mode": "patrol", "waypoints": [Vector2(240, 384), Vector2(390, 384)], "alpha": false},
+		{"name": "Santelmo5", "pos": Vector2(440, 280), "mode": "ambush", "waypoints": [], "alpha": false},
+		{"name": "Santelmo6", "pos": Vector2(680, 192), "mode": "patrol", "waypoints": [Vector2(580, 192), Vector2(780, 192)], "alpha": false},
+		{"name": "Santelmo7", "pos": Vector2(1120, 192), "mode": "patrol", "waypoints": [Vector2(1010, 192), Vector2(1240, 192)], "alpha": true},
+		{"name": "Santelmo8", "pos": Vector2(640, 576), "mode": "patrol", "waypoints": [Vector2(540, 576), Vector2(760, 576)], "alpha": false},
+		{"name": "Santelmo9", "pos": Vector2(960, 576), "mode": "ambush", "waypoints": [], "alpha": false},
+		{"name": "Santelmo10", "pos": Vector2(1220, 576), "mode": "patrol", "waypoints": [Vector2(1150, 576), Vector2(1310, 576)], "alpha": true},
+		{"name": "Santelmo11", "pos": Vector2(1376, 280), "mode": "patrol", "waypoints": [Vector2(1376, 210), Vector2(1376, 480)], "alpha": false},
+		{"name": "Santelmo12", "pos": Vector2(1480, 384), "mode": "wander", "waypoints": [], "alpha": true},
+		{"name": "Santelmo13", "pos": Vector2(1580, 440), "mode": "ambush", "waypoints": [], "alpha": false},
+		{"name": "Santelmo14", "pos": Vector2(1780, 176), "mode": "patrol", "waypoints": [Vector2(1660, 176), Vector2(1980, 176)], "alpha": false},
+		{"name": "Santelmo15", "pos": Vector2(2040, 576), "mode": "patrol", "waypoints": [Vector2(1900, 576), Vector2(2140, 576)], "alpha": true},
+		{"name": "Santelmo16", "pos": Vector2(2320, 384), "mode": "patrol", "waypoints": [Vector2(2200, 384), Vector2(2420, 384)], "alpha": false},
+	]
+	for spec in extra_spawns:
+		if ysort_obstacles.has_node(str(spec["name"])):
+			continue
+		var enemy := SANTELMO_SCENE.instantiate() as SantelmoEnemy
+		if enemy == null:
+			continue
+		enemy.name = str(spec["name"])
+		enemy.position = spec["pos"] as Vector2
+		enemy.behavior_mode = str(spec["mode"])
+		var wps: Array[Vector2] = []
+		for wp in spec["waypoints"]:
+			wps.append(wp as Vector2)
+		enemy.patrol_waypoints = wps
+		if bool(spec.get("alpha", false)):
+			enemy.max_health = 90
+			enemy.current_health = 90
+			enemy.chase_speed = 106.0
+			enemy.attack_damage = 16
+			enemy.scale = Vector2(1.22, 1.22)
+		ysort_obstacles.add_child(enemy)
+
+
 func _collect_santelmos() -> void:
 	_santelmos.clear()
 	if ysort_obstacles == null:
@@ -577,6 +697,13 @@ func _sync_forest_atmosphere() -> void:
 	var higher := _is_higher_dose_active()
 	var fire_active := (ato == 2 and GameState.get_switch("015_Floresta_em_chamas"))
 
+	var active_base_ts: TileSet = ACT3_TS if act3 else NORMAL_TS
+	ground_normal.tile_set = active_base_ts
+	walls_normal.tile_set = active_base_ts
+	if _understory_layer != null:
+		_understory_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
+	if _canopy_layer != null:
+		_canopy_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
 	ground_normal.visible = not higher
 	walls_normal.visible = not higher
 	ground_distorted.visible = higher
@@ -592,17 +719,20 @@ func _sync_forest_atmosphere() -> void:
 		if dec and is_instance_valid(dec):
 			dec.visible = higher
 
+	var period: String = GameState.get_day_period() if GameState.has_method("get_day_period") else ("afternoon" if GameState.is_afternoon else "morning")
 	if canvas_mod:
 		if act3:
 			canvas_mod.color = Color(0.62, 0.64, 0.67, 1.0)
 		elif higher:
-			canvas_mod.color = Color(0.35, 0.22, 0.27, 1.0)
+			canvas_mod.color = Color(0.56, 0.52, 0.58, 1.0)
 		elif fire_active:
-			canvas_mod.color = Color(0.54, 0.36, 0.32, 1.0)
-		elif GameState.is_afternoon:
-			canvas_mod.color = Color(0.50, 0.42, 0.46, 1.0)
+			canvas_mod.color = Color(0.58, 0.44, 0.40, 1.0)
+		elif period == "night":
+			canvas_mod.color = Color(0.45, 0.49, 0.58, 1.0)
+		elif period == "afternoon" or GameState.is_afternoon:
+			canvas_mod.color = Color(0.64, 0.58, 0.62, 1.0)
 		else:
-			canvas_mod.color = Color(0.45, 0.49, 0.57, 1.0)
+			canvas_mod.color = Color(0.76, 0.80, 0.82, 1.0)
 
 	if fire_embers:
 		fire_embers.emitting = not act3 and (fire_active or higher)
@@ -622,7 +752,7 @@ func _sync_forest_atmosphere() -> void:
 	for s in _santelmos:
 		if s == null or not is_instance_valid(s):
 			continue
-		var dead: bool = ("current_state" in s and int(s.current_state) == 5)
+		var dead: bool = ("current_state" in s and int(s.current_state) == SantelmoEnemy.State.DEAD)
 		var show_enemy: bool = not act3 and not dead
 		s.visible = show_enemy
 		s.set_physics_process(show_enemy)

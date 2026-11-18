@@ -72,7 +72,7 @@ var _warned_missing_player: bool = false
 
 
 func _ready() -> void:
-	z_index = 2
+	z_index = 0
 	y_sort_enabled = false
 	collision_layer = 1 # Bloqueia movimento do jogador enquanto sólido
 	collision_mask = 1
@@ -321,6 +321,9 @@ func turn_hostile() -> void:
 func _handle_interact(player: Node) -> void:
 	if is_hostile or is_defeated:
 		return
+	var gs := _get_game_state()
+	if gs != null and gs.has_method("is_interaction_blocked") and bool(gs.call("is_interaction_blocked")):
+		return
 	if player is Node2D and is_instance_valid(player):
 		face_toward((player as Node2D).global_position)
 	_talk_anim_timer = 1.6
@@ -485,9 +488,9 @@ func _deliver_attack_to_player(player_node: Node2D, dist: float) -> void:
 
 
 func _set_facing_from_vec(dir: Vector2) -> void:
-	if absf(dir.x) > absf(dir.y):
+	if absf(dir.x) > absf(dir.y) * 1.12:
 		_facing_row = 2 if dir.x >= 0.0 else 1
-	elif absf(dir.y) > 0.05:
+	elif absf(dir.y) > 0.08:
 		_facing_row = 0 if dir.y >= 0.0 else 3
 
 

@@ -1,0 +1,155 @@
+[gd_resource type="SpriteFrames" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/vfx/blunt_hit.png" id="1_fvmng"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_tdr2d"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(0, 0, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_21r5e"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(85, 0, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ys8wu"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(170, 0, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_q2hmq"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(255, 0, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ibiii"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(0, 66, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0m6mx"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(85, 66, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ax13k"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(170, 66, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_8o7qu"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(255, 66, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_yc382"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(0, 132, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ny4ua"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(85, 132, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_48nyd"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(170, 132, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a4m3n"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(255, 132, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_nxci6"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(0, 198, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_y7uiq"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(85, 198, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_pkrvb"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(170, 198, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_sj6xd"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(255, 198, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0bnwy"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(0, 264, 85, 66)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1l6te"]
+atlas = ExtResource("1_fvmng")
+region = Rect2(85, 264, 85, 66)
+filter_clip = true
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_tdr2d")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_21r5e")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ys8wu")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_q2hmq")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ibiii")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0m6mx")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ax13k")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_8o7qu")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_yc382")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ny4ua")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_48nyd")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a4m3n")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_nxci6")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_y7uiq")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_pkrvb")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sj6xd")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0bnwy")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_1l6te")
+}],
+"loop": 0,
+"name": &"play",
+"speed": 20.0
+}]

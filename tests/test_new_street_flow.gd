@@ -1,6 +1,10 @@
 extends SceneTree
 
 func _init() -> void:
+	create_timer(15.0).timeout.connect(func() -> void:
+		push_error("TIMEOUT: test_new_street_flow excedeu 15s")
+		quit(1)
+	)
 	call_deferred("_run_test")
 
 func _run_test() -> void:
@@ -14,6 +18,9 @@ func _run_test() -> void:
 		var gs_inst = gs_class.new()
 		gs_inst.name = "GameState"
 		root.add_child(gs_inst)
+	var gs = root.get_node("GameState")
+	gs.reset_to_new_game()
+	gs.in_game_minutes_per_real_second = 0.0
 
 	# 2. Carrega Main.tscn
 	var main_scene: PackedScene = load("res://scenes/main/Main.tscn")
@@ -148,7 +155,72 @@ func _run_test() -> void:
 	assert(inter_cais != null and inter_cais.name == "Cais_Praia", "Píer da Praia deve ser detectado!")
 	print("[PASS] Interação detectada: %s" % inter_cais.title)
 
+	# Verifica iluminação de manhã vs noite nos postes de luz da rua
+	gs.set_clock_minutes(390, false) # 06:30 manhã
+	await process_frame
+	var morning_lamp_e: float = (street2._lamp_lights[0] as PointLight2D).energy
+	gs.set_clock_minutes(1110, false) # 18:30 noite
+	await process_frame
+	var night_lamp_e: float = (street2._lamp_lights[0] as PointLight2D).energy
+	assert(night_lamp_e > morning_lamp_e * 2.0, "Postes da rua devem acender com mais intensidade à noite (manhã=%f, noite=%f)" % [morning_lamp_e, night_lamp_e])
+	print("[PASS] Acendimento automático dos postes à noite validado (manhã=%.2f -> noite=%.2f)." % [morning_lamp_e, night_lamp_e])
+
+	# 10. Valida Tilesets v2 (interiors_v2 / agdangan_town_v2) + Cooldown anti-loop de diálogo (E / Espaço / Mouse) + Áudio Adaptativo Low-Pass
+	assert(street2.ground_normal.tile_set.resource_path.ends_with("agdangan_town_v2_normal_tileset.tres"), "StreetPreview deve usar agdangan_town_v2_normal_tileset.tres!")
+	print("[PASS] StreetPreview reconstruída com agdangan_town_v2_normal_tileset.tres (16x16).")
+
+	var nena_npc: NpcEntity = street2._npcs["NPC_Aling_Nena"]
+	var nena_ia: Interactable = nena_npc.interact_area as Interactable
+	assert(nena_ia != null and nena_ia.can_interact(), "Aling Nena deve permitir interação antes do diálogo")
+
+	var dlg_open_count := {"n": 0}
+	street2.request_dialogue.connect(func(_pages: Array, _cb: Callable) -> void:
+		dlg_open_count["n"] += 1
+	)
+	nena_ia.trigger_interaction()
+	await process_frame
+	assert(gs.dialogue_active == true and dbox.is_open() == true, "Diálogo com Aling Nena deve abrir")
+	assert(dlg_open_count["n"] == 1, "Diálogo deve abrir exatamente 1 vez")
+	assert(nena_ia.can_interact() == false, "Interactable deve bloquear novas interações enquanto dialogue_active == true")
+
+	# Tenta clicar/interagir novamente enquanto o diálogo está aberto -> não deve reiniciar!
+	nena_ia.trigger_interaction()
+	assert(dlg_open_count["n"] == 1, "Clicar rápido durante o diálogo NÃO deve reiniciar a conversa!")
+
+	# Fecha o diálogo e verifica o cooldown pós-fechamento (0.28s)
+	dbox.close_dialogue()
+	assert(gs.dialogue_active == false and gs.dialogue_cooldown > 0.20, "Fechar diálogo deve ativar dialogue_cooldown pós-fechamento")
+	assert(gs.is_interaction_blocked() == true, "Durante o cooldown pós-fechamento, o mesmo clique/E não pode reabrir o diálogo!")
+	nena_ia.trigger_interaction()
+	assert(dlg_open_count["n"] == 1, "Interação bloqueada durante o cooldown pós-fechamento (zero loop!)")
+
+	# Simula passagem do cooldown (> 0.30s) -> permite nova conversa normalmente
+	gs._process(0.35)
+	assert(gs.is_interaction_blocked() == false and nena_ia.can_interact() == true, "Após o cooldown de 0.28s, o NPC volta a permitir conversa")
+	nena_ia.trigger_interaction()
+	await process_frame
+	assert(dlg_open_count["n"] == 2, "Após o cooldown de 0.28s, nova conversa deve iniciar normalmente")
+	dbox.close_dialogue()
+	gs._process(0.35)
+	print("[PASS] Correção do bug de loop de interação com NPC (E / Espaço / Mouse + cooldown 0.28s) validada!")
+
+	# Verifica Áudio Adaptativo e Filtro Passa-Baixa (Low-Pass)
+	var am = root.get_node_or_null("AudioManager")
+	if am != null:
+		assert(am.get_bus_lowpass_cutoff("Music") > 0.0 and am.get_bus_lowpass_cutoff("Music") <= 1700.0, "Bus Music deve ter filtro Low-Pass ativo")
+		assert(am.get_bus_lowpass_cutoff("Ambience") > 0.0 and am.get_bus_lowpass_cutoff("Ambience") <= 1500.0, "Bus Ambience deve ter filtro Low-Pass ativo")
+		assert(am.get_bus_lowpass_cutoff("SFX") > 0.0 and am.get_bus_lowpass_cutoff("SFX") <= 2200.0, "Bus SFX deve ter filtro Low-Pass ativo")
+		gs.set_clock_minutes(420, false) # Manhã
+		am.sync_adaptive_soundtrack("street_preview", false)
+		assert(am.get_current_bgm() == "day_theme" and am.get_current_ambience() == "morning_ambience", "Manhã em Agdangan deve tocar day_theme + morning_ambience")
+		gs.advance_to_act_2()
+		gs.set_higher_dose(true)
+		am.sync_adaptive_soundtrack("street_preview", false)
+		assert(am.get_current_bgm() == "corrupted_tension", "Modo Corrompido deve trocar para corrupted_tension")
+		gs.set_higher_dose(false)
+		print("[PASS] AudioManager com Low-Pass Filter e Trilha Sonora Adaptativa validados!")
+
 	print("\n==================================================")
-	print("=== TODOS OS 9 TESTES DE FLUXO E INTERAÇÕES PASSARAM! ===")
+	print("=== TODOS OS TESTES DE FLUXO E INTERAÇÕES PASSARAM! ===")
 	print("==================================================")
 	quit(0)

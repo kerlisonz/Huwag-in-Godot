@@ -1,0 +1,341 @@
+{
+  "generator": "patch-gg/pixelfx v0.3.1 (MIT)",
+  "effects": {
+    "axe_slash_amber": {
+      "source_id": "melee/sword-slash",
+      "fps": 24,
+      "loop": false,
+      "frame_count": 13,
+      "columns": 4,
+      "rows": 4,
+      "frame_size": [
+        97,
+        93
+      ],
+      "sheet_size": [
+        388,
+        372
+      ],
+      "pivot": [
+        33,
+        58
+      ],
+      "offset_centered": [
+        15.5,
+        -11.5
+      ]
+    },
+    "axe_slash_crimson": {
+      "source_id": "melee/sword-slash",
+      "fps": 24,
+      "loop": false,
+      "frame_count": 13,
+      "columns": 4,
+      "rows": 4,
+      "frame_size": [
+        87,
+        93
+      ],
+      "sheet_size": [
+        348,
+        372
+      ],
+      "pivot": [
+        25,
+        58
+      ],
+      "offset_centered": [
+        18.5,
+        -11.5
+      ]
+    },
+    "claw_swipe_horror": {
+      "source_id": "melee/claw-swipe",
+      "fps": 20,
+      "loop": false,
+      "frame_count": 15,
+      "columns": 4,
+      "rows": 4,
+      "frame_size": [
+        73,
+        59
+      ],
+      "sheet_size": [
+        292,
+        236
+      ],
+      "pivot": [
+        41,
+        28
+      ],
+      "offset_centered": [
+        -4.5,
+        1.5
+      ]
+    },
+    "hit_spark": {
+      "source_id": "impacts/hit-spark",
+      "fps": 24,
+      "loop": false,
+      "frame_count": 11,
+      "columns": 3,
+      "rows": 4,
+      "frame_size": [
+        110,
+        62
+      ],
+      "sheet_size": [
+        330,
+        248
+      ],
+      "pivot": [
+        32,
+        37
+      ],
+      "offset_centered": [
+        23,
+        -6
+      ]
+    },
+    "blunt_hit": {
+      "source_id": "impacts/blunt-hit",
+      "fps": 20,
+      "loop": false,
+      "frame_count": 18,
+      "columns": 4,
+      "rows": 5,
+      "frame_size": [
+        85,
+        66
+      ],
+      "sheet_size": [
+        340,
+        330
+      ],
+      "pivot": [
+        42,
+        42
+      ],
+      "offset_centered": [
+        0.5,
+        -9
+      ]
+    },
+    "impact_dust": {
+      "source_id": "impacts/heavy-landing",
+      "fps": 18,
+      "loop": false,
+      "frame_count": 27,
+      "columns": 3,
+      "rows": 9,
+      "frame_size": [
+        139,
+        44
+      ],
+      "sheet_size": [
+        417,
+        396
+      ],
+      "pivot": [
+        71,
+        29
+      ],
+      "offset_centered": [
+        -1.5,
+        -7
+      ]
+    },
+    "water_jet": {
+      "source_id": "water/water-jet",
+      "fps": 18,
+      "loop": true,
+      "frame_count": 18,
+      "columns": 4,
+      "rows": 5,
+      "frame_size": [
+        121,
+        62
+      ],
+      "sheet_size": [
+        484,
+        310
+      ],
+      "pivot": [
+        14,
+        21
+      ],
+      "offset_centered": [
+        46.5,
+        10
+      ]
+    },
+    "water_splash": {
+      "source_id": "water/splash",
+      "fps": 18,
+      "loop": false,
+      "frame_count": 40,
+      "columns": 5,
+      "rows": 8,
+      "frame_size": [
+        128,
+        79
+      ],
+      "sheet_size": [
+        640,
+        632
+      ],
+      "pivot": [
+        67,
+        57
+      ],
+      "offset_centered": [
+        -3,
+        -17.5
+      ]
+    },
+    "water_ripples": {
+      "source_id": "water/ripples",
+      "fps": 12,
+      "loop": true,
+      "frame_count": 24,
+      "columns": 3,
+      "rows": 8,
+      "frame_size": [
+        126,
+        46
+      ],
+      "sheet_size": [
+        378,
+        368
+      ],
+      "pivot": [
+        63,
+        26
+      ],
+      "offset_centered": [
+        0,
+        -3
+      ]
+    },
+    "santelmo_flame": {
+      "source_id": "fire/spirit-flame",
+      "fps": 12,
+      "loop": true,
+      "frame_count": 36,
+      "columns": 7,
+      "rows": 6,
+      "frame_size": [
+        78,
+        99
+      ],
+      "sheet_size": [
+        546,
+        594
+      ],
+      "pivot": [
+        39,
+        71
+      ],
+      "offset_centered": [
+        0,
+        -21.5
+      ]
+    },
+    "shadow_flames": {
+      "source_id": "shadow/shadow-flames",
+      "fps": 12,
+      "loop": true,
+      "frame_count": 29,
+      "columns": 6,
+      "rows": 5,
+      "frame_size": [
+        86,
+        98
+      ],
+      "sheet_size": [
+        516,
+        490
+      ],
+      "pivot": [
+        43,
+        88
+      ],
+      "offset_centered": [
+        0,
+        -39
+      ]
+    },
+    "grasping_hands": {
+      "source_id": "shadow/grasping-hands",
+      "fps": 14,
+      "loop": false,
+      "frame_count": 39,
+      "columns": 6,
+      "rows": 7,
+      "frame_size": [
+        132,
+        92
+      ],
+      "sheet_size": [
+        792,
+        644
+      ],
+      "pivot": [
+        66,
+        76
+      ],
+      "offset_centered": [
+        0,
+        -30
+      ]
+    },
+    "campfire_ember": {
+      "source_id": "fire/campfire",
+      "fps": 12,
+      "loop": true,
+      "frame_count": 36,
+      "columns": 6,
+      "rows": 6,
+      "frame_size": [
+        117,
+        100
+      ],
+      "sheet_size": [
+        702,
+        600
+      ],
+      "pivot": [
+        58,
+        84
+      ],
+      "offset_centered": [
+        0.5,
+        -34
+      ]
+    },
+    "candle_flicker": {
+      "source_id": "fire/candle",
+      "fps": 10,
+      "loop": true,
+      "frame_count": 40,
+      "columns": 7,
+      "rows": 6,
+      "frame_size": [
+        52,
+        62
+      ],
+      "sheet_size": [
+        364,
+        372
+      ],
+      "pivot": [
+        26,
+        55
+      ],
+      "offset_centered": [
+        0,
+        -24
+      ]
+    }
+  }
+}

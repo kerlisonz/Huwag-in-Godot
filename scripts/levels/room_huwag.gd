@@ -4,8 +4,11 @@ signal request_level_change(target_scene: String, spawn_tag: String)
 signal request_dialogue(pages: Array, callback: Callable)
 
 const RetroLevelHelpers := preload("res://scripts/levels/retro_level_helpers.gd")
-const NORMAL_TS := preload("res://assets/tilesets/retro/interior_fnaf_normal_tileset.tres")
-const DISTORTED_TS := preload("res://assets/tilesets/retro/interior_fnaf_distorted_tileset.tres")
+const V2TileCatalog := preload("res://scripts/levels/v2_tile_catalog.gd")
+const AtmosphereRig := preload("res://scripts/levels/atmosphere_rig.gd")
+const NORMAL_TS := preload("res://assets/tilesets/v2/interiors_v2_normal_tileset.tres")
+const DISTORTED_TS := preload("res://assets/tilesets/v2/interiors_v2_distorted_tileset.tres")
+const ACT3_TS := preload("res://assets/tilesets/v2/interiors_v2_act3_tileset.tres")
 
 @onready var canvas_mod: CanvasModulate = $CanvasModulate
 @onready var floor_normal: TileMapLayer = $FloorNormal
@@ -30,6 +33,7 @@ var _radio_light: PointLight2D = null
 var _normal_props: Array[Node2D] = []
 var _distorted_props: Array[Node2D] = []
 var _distorted_decals: Array[Node2D] = []
+var _furniture_layer: TileMapLayer = null
 
 
 func _ready() -> void:
@@ -55,6 +59,8 @@ func _ready() -> void:
 	GameState.time_of_day_changed.connect(func(_v: bool) -> void: _apply_visual_atmosphere())
 	GameState.perception_changed.connect(func(_m: int) -> void: _apply_visual_atmosphere())
 	GameState.outfit_changed.connect(func(_o: String) -> void: _apply_visual_atmosphere())
+	if GameState.has_signal("day_period_changed"):
+		GameState.day_period_changed.connect(func(_p: String) -> void: _apply_visual_atmosphere())
 	if GameState.has_signal("higher_dose_changed"):
 		GameState.higher_dose_changed.connect(func(active: bool) -> void: apply_higher_dose_world(active))
 
@@ -92,102 +98,101 @@ func _is_higher_dose_active() -> bool:
 func _is_night_room() -> bool:
 	if GameState.is_unfiltered_act3():
 		return false
+	if GameState.has_method("is_night_time") and GameState.is_night_time():
+		return true
 	var ato: int = int(GameState.get_var("Ato", 1))
 	return (
-		GameState.is_afternoon
-		or GameState.perception_mode == GameState.PerceptionMode.FILTERED_AFTERNOON
-		or (ato == 1 and GameState.get_switch("005_Chefe_liberou_cidade"))
+		(ato == 1 and GameState.get_switch("005_Chefe_liberou_cidade"))
 		or (ato == 2 and GameState.get_switch("019_Ato2_concluido"))
 	)
 
 
 func _build_tilemaps() -> void:
+	var t_cat := V2TileCatalog.INTERIOR_TILES
 	for layer in [floor_normal, walls_normal]:
-		layer.tile_set = NORMAL_TS
+		layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else NORMAL_TS
 	for layer in [floor_distorted, walls_distorted]:
 		layer.tile_set = DISTORTED_TS
 
-	# Base void em torno do quarto (40x23) para sensação Yume Nikki / FNAF minigame
+	# Fundo void limpo em torno do quarto (40x23) e estrutura provincial filipina v2 (16x16)
 	for fl in [floor_normal, floor_distorted]:
-		RetroLevelHelpers.paint_rect(fl, 0, 0, 40, 23, Vector2i(0, 0))
-		RetroLevelHelpers.paint_rect(fl, 5, 6, 31, 15, Vector2i(1, 0))
+		fl.clear()
+		V2TileCatalog.fill_rect(fl, Rect2i(6, 8, 29, 13), t_cat["wood_floor_dark"])
+		V2TileCatalog.fill_rect(fl, Rect2i(7, 10, 27, 10), t_cat["wood_floor_warm"])
 
-		# Piso de tábuas de madeira desaturada no interior (x: 7..33, y: 10..19)
-		RetroLevelHelpers.paint_rect(fl, 7, 10, 27, 10, Vector2i(4, 0))
-		# Tábuas gastas espalhadas intencionalmente (não aleatório)
-		for pos in [
-			Vector2i(10, 17), Vector2i(11, 18), Vector2i(26, 12), Vector2i(28, 17),
-			Vector2i(30, 15), Vector2i(25, 18), Vector2i(13, 18)
-		]:
-			fl.set_cell(pos, 0, Vector2i(5, 0))
+		# Tábuas mais escuras alternadas para textura de madeira filipina
+		for y in range(10, 20):
+			for x in range(7, 34):
+				if (x + y * 2) % 4 == 0:
+					fl.set_cell(Vector2i(x, y), 0, t_cat["wood_floor_dark"])
 
-		# Área de dormir oeste com esteira Banig filipina
-		RetroLevelHelpers.paint_rect(fl, 7, 10, 7, 6, Vector2i(6, 0))
+		# Área de dormir oeste com esteira Banig filipina (3x2) abaixo da cama
+		V2TileCatalog.stamp_rect(fl, Vector2i(8, 14), t_cat["banig_tl"], Vector2i(3, 2))
+		V2TileCatalog.stamp_rect(fl, Vector2i(11, 14), t_cat["banig_tl"], Vector2i(3, 2))
 
-		# Tapete/Zona central quadriculada estilo FNAF Minigame (x: 15..24, y: 12..17)
-		RetroLevelHelpers.paint_rect(fl, 15, 12, 10, 6, Vector2i(2, 0))
-		for pos in [Vector2i(17, 14), Vector2i(21, 13), Vector2i(20, 16), Vector2i(16, 16)]:
-			fl.set_cell(pos, 0, Vector2i(3, 0))
+		# Zona central de estudo/refeição com ladrilho claro e tapete tecido filipino
+		for cy in range(12, 18):
+			for cx in range(16, 26):
+				var ctile: Vector2i = t_cat["checker_clinic"] if (cx + cy) % 2 == 0 else t_cat["checker_clinic_alt"]
+				fl.set_cell(Vector2i(cx, cy), 0, ctile)
+		V2TileCatalog.stamp_rect(fl, Vector2i(19, 14), t_cat["rug_crimson_tl"], Vector2i(2, 2))
+		V2TileCatalog.stamp_rect(fl, Vector2i(21, 14), t_cat["rug_crimson_tl"], Vector2i(2, 2))
 
-		# Rastros escuros de fuligem da porta em direção à mesa de remédios e cama
-		for pos in [Vector2i(32, 14), Vector2i(30, 14), Vector2i(28, 13), Vector2i(26, 11), Vector2i(14, 15)]:
-			fl.set_cell(pos, 0, Vector2i(13, 0))
+		# Canto nordeste de cozinha/pia com piso de cimento queimado
+		V2TileCatalog.fill_rect(fl, Rect2i(28, 10, 6, 3), t_cat["concrete_station"])
 
-		# Tapete de entrada na porta leste
-		RetroLevelHelpers.paint_rect(fl, 32, 13, 2, 3, Vector2i(12, 0))
+		# Capacho Banig na soleira da porta leste
+		V2TileCatalog.stamp_rect(fl, Vector2i(31, 13), t_cat["banig_tl"], Vector2i(3, 2))
 
-		# Pequenos detalhes surrealistas apenas no piso distorcido
-		if fl == floor_distorted:
-			for pos in [Vector2i(18, 14), Vector2i(22, 15), Vector2i(16, 13), Vector2i(26, 15)]:
-				fl.set_cell(pos, 0, Vector2i(14, 0))
-			for pos in [Vector2i(9, 18), Vector2i(10, 18), Vector2i(29, 11), Vector2i(30, 11)]:
-				fl.set_cell(pos, 0, Vector2i(15, 0))
-			fl.set_cell(Vector2i(23, 14), 0, Vector2i(13, 0))
-			fl.set_cell(Vector2i(15, 11), 0, Vector2i(13, 0))
-
-	# Paredes perimetrais nas camadas normal e distorcida
+	# Paredes perimetrais Sawali + Madeira + Sombra projetada nas camadas normal e distorcida
 	for wl in [walls_normal, walls_distorted]:
-		# Parede norte dupla (y=8 superior sawali/FNAF, y=9 rodapé)
-		RetroLevelHelpers.paint_rect(wl, 7, 8, 27, 1, Vector2i(5, 1))
-		RetroLevelHelpers.paint_rect(wl, 7, 9, 27, 1, Vector2i(6, 1))
+		wl.clear()
+		V2TileCatalog.fill_rect(wl, Rect2i(7, 8, 27, 1), t_cat["wall_sawali_m"])
+		V2TileCatalog.fill_rect(wl, Rect2i(7, 9, 27, 1), t_cat["wall_wood_mid"])
+		wl.set_cell(Vector2i(7, 8), 0, t_cat["wall_sawali_l"])
+		wl.set_cell(Vector2i(33, 8), 0, t_cat["wall_sawali_r"])
+		wl.set_cell(Vector2i(7, 9), 0, t_cat["wall_wood_left"])
+		wl.set_cell(Vector2i(33, 9), 0, t_cat["wall_wood_right"])
 
-		# Detalhes de parede FNAF: faixas verticais de metal, ventilação e janela
-		wl.set_cell(Vector2i(12, 8), 0, Vector2i(3, 1))
-		wl.set_cell(Vector2i(12, 9), 0, Vector2i(4, 1))
-		wl.set_cell(Vector2i(15, 8), 0, Vector2i(15, 1)) # mancha/desgaste na parede
-		wl.set_cell(Vector2i(17, 8), 0, Vector2i(11, 1)) # exaustor / ventilação
-		wl.set_cell(Vector2i(20, 8), 0, Vector2i(10, 1)) # janela norte
-		wl.set_cell(Vector2i(21, 8), 0, Vector2i(10, 1))
-		wl.set_cell(Vector2i(26, 8), 0, Vector2i(3, 1))
-		wl.set_cell(Vector2i(26, 9), 0, Vector2i(4, 1))
-		wl.set_cell(Vector2i(30, 8), 0, Vector2i(14, 1)) # aviso / placa BFP na parede
+		# Sombras projetadas pelas paredes sobre o piso (profundidade 16x16)
+		for sx in range(8, 34):
+			wl.set_cell(Vector2i(sx, 10), 0, t_cat["shadow_top"])
+		for sy in range(11, 20):
+			wl.set_cell(Vector2i(7, sy), 0, t_cat["shadow_left"])
+		wl.set_cell(Vector2i(7, 10), 0, t_cat["shadow_corner"])
 
-		# Parede oeste (x=6, y=8..19) + contorno externo no vazio
-		RetroLevelHelpers.paint_rect(wl, 6, 8, 1, 12, Vector2i(1, 1))
-		# Borda sul do quarto (y=20)
-		RetroLevelHelpers.paint_rect(wl, 6, 20, 29, 1, Vector2i(2, 1))
-		# Parede leste superior e inferior
-		RetroLevelHelpers.paint_rect(wl, 34, 8, 1, 4, Vector2i(1, 1))
-		RetroLevelHelpers.paint_rect(wl, 34, 18, 1, 2, Vector2i(1, 1))
-		# Soleira iluminada / aberta em x=34, y=12..17 + fechamento no vazio x=35
-		RetroLevelHelpers.paint_rect(wl, 34, 12, 1, 6, Vector2i(12, 1))
-		RetroLevelHelpers.paint_rect(wl, 35, 12, 1, 6, Vector2i(1, 1))
+		# Parede oeste (x=6, y=8..19) + borda sul (y=20) + parede leste com vão da porta livre
+		V2TileCatalog.fill_rect(wl, Rect2i(6, 8, 1, 12), t_cat["wall_wood_left"])
+		V2TileCatalog.fill_rect(wl, Rect2i(6, 20, 29, 1), t_cat["wall_trim_gold"])
+		V2TileCatalog.fill_rect(wl, Rect2i(34, 8, 1, 4), t_cat["wall_wood_right"])
+		V2TileCatalog.fill_rect(wl, Rect2i(34, 18, 1, 2), t_cat["wall_wood_right"])
 
-		if wl == walls_distorted:
-			wl.set_cell(Vector2i(13, 8), 0, Vector2i(3, 1))
-			wl.set_cell(Vector2i(24, 8), 0, Vector2i(15, 1))
-			wl.set_cell(Vector2i(28, 8), 0, Vector2i(3, 1))
+	# Camada dedicada para mobiliário multi-tile v2 (sem apagar paredes nem bloquear a porta)
+	if _furniture_layer == null:
+		_furniture_layer = TileMapLayer.new()
+		_furniture_layer.name = "V2FurnitureLayer"
+		_furniture_layer.z_index = 0
+		_furniture_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_furniture_layer.collision_enabled = false
+		add_child(_furniture_layer)
+	if ysort_root != null:
+		ysort_root.z_index = 2
+	_furniture_layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
+	_furniture_layer.clear()
+
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(20, 8), t_cat["window_day_tl"], Vector2i(2, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(8, 10), t_cat["bed_huwag"], Vector2i(3, 4))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(12, 8), t_cat["bookshelf_a"], Vector2i(2, 2))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(15, 8), t_cat["wardrobe"], Vector2i(2, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(23, 8), t_cat["fridge_sari"], Vector2i(3, 2))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(27, 8), t_cat["radio_pc_bfp"], Vector2i(1, 2))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(29, 8), t_cat["kitchen_counter"], Vector2i(4, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(25, 11), t_cat["table_dining"], Vector2i(3, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(8, 16), t_cat["indoor_palm"], Vector2i(2, 3))
 
 
 func _build_room_props_and_lights() -> void:
-	# Cada objeto tem variante normal e variante distorcida Y-sorted
-	_add_dual_prop("bed_huwag", Vector2(170, 195), Vector2(3.6, 2.15), -24)
-	_add_dual_prop("locker_uniform", Vector2(258, 154), Vector2(1.4, 1.35), -8)
-	_add_dual_prop("banig_mat", Vector2(318, 232), Vector2(2.2, 1.8), -80, true) # decal de tapete sob pés
-	_add_dual_prop("pill_table", Vector2(424, 160), Vector2(1.5, 1.45), -6)
-	_add_dual_prop("radio_clock", Vector2(476, 158), Vector2(1.25, 1.25), -6)
-	_add_dual_prop("wooden_signpost", Vector2(376, 160), Vector2(1.0, 0.9), -6)
-	_add_dual_prop("shoe_rack", Vector2(486, 296), Vector2(1.15, 1.15), -6)
+	# Gato Pusa no canto sudeste (mobiliário agora vem 100% do atlas interiors_v2 sem sobreposição)
 	_add_dual_prop("pusa_cat", Vector2(509, 308), Vector2(1.25, 1.25), -4)
 
 	# Decais exclusivos do estado distorcido (Yume Nikki + manchas de sangue/fuligem)
@@ -197,17 +202,17 @@ func _build_room_props_and_lights() -> void:
 	_add_distorted_decal("yume_eye_rune", Vector2(342, 134), Vector2(1.0, 1.0))
 	_add_distorted_decal("yume_eye_rune", Vector2(492, 134), Vector2(1.0, 1.0))
 
-	# Ventilador de parede (mantido para compatibilidade e movimento contínuo)
+	# Ventilador compacto de parede (alinhado dentro do painel de madeira norte, sem invadir a borda)
 	var fan_root := Node2D.new()
 	fan_root.name = "WallFan"
-	fan_root.position = Vector2(280, 134)
+	fan_root.position = Vector2(296, 146)
 	fan_root.z_index = 2
 	ysort_root.add_child(fan_root)
 
 	var cage := Polygon2D.new()
-	cage.color = Color(0.14, 0.16, 0.20, 0.95)
+	cage.color = Color(0.18, 0.20, 0.24, 0.92)
 	cage.polygon = PackedVector2Array([
-		Vector2(-10, -10), Vector2(10, -10), Vector2(10, 10), Vector2(-10, 10)
+		Vector2(-6, -6), Vector2(6, -6), Vector2(6, 6), Vector2(-6, 6)
 	])
 	fan_root.add_child(cage)
 
@@ -215,10 +220,10 @@ func _build_room_props_and_lights() -> void:
 	_fan_blades.name = "FanBlades"
 	for rot_idx in range(4):
 		var blade := Polygon2D.new()
-		blade.color = Color(0.45, 0.48, 0.54, 0.9)
+		blade.color = Color(0.52, 0.56, 0.62, 0.9)
 		blade.rotation = rot_idx * PI * 0.5
 		blade.polygon = PackedVector2Array([
-			Vector2(-2, -1), Vector2(9, -3), Vector2(9, 2), Vector2(-2, 1)
+			Vector2(-1, -1), Vector2(5, -2), Vector2(5, 1), Vector2(-1, 1)
 		])
 		_fan_blades.add_child(blade)
 	fan_root.add_child(_fan_blades)
@@ -268,6 +273,11 @@ func _apply_visual_atmosphere() -> void:
 	var night := _is_night_room()
 	var higher := _is_higher_dose_active()
 
+	var active_base_ts: TileSet = ACT3_TS if act3 else NORMAL_TS
+	floor_normal.tile_set = active_base_ts
+	walls_normal.tile_set = active_base_ts
+	if _furniture_layer != null:
+		_furniture_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
 	floor_normal.visible = not higher
 	walls_normal.visible = not higher
 	floor_distorted.visible = higher
@@ -280,30 +290,35 @@ func _apply_visual_atmosphere() -> void:
 	for d in _distorted_decals:
 		d.visible = higher
 
+	var period: String = GameState.get_day_period() if GameState.has_method("get_day_period") else ("afternoon" if GameState.is_afternoon else "morning")
 	if canvas_mod:
 		if act3:
 			canvas_mod.color = Color(0.60, 0.62, 0.65, 1.0)
 		elif higher:
-			canvas_mod.color = Color(0.28, 0.21, 0.25, 1.0)
-		elif night:
-			canvas_mod.color = Color(0.36, 0.40, 0.56, 1.0)
+			canvas_mod.color = Color(0.54, 0.49, 0.56, 1.0)
+		elif night or period == "night":
+			canvas_mod.color = Color(0.42, 0.46, 0.60, 1.0)
+		elif period == "afternoon" or GameState.is_afternoon:
+			canvas_mod.color = Color(0.68, 0.62, 0.66, 1.0)
 		else:
-			canvas_mod.color = Color(0.54, 0.56, 0.64, 1.0)
+			canvas_mod.color = Color(0.76, 0.78, 0.84, 1.0)
 
 	if _lamp_light:
-		_lamp_light.color = Color(0.86, 0.16, 0.20) if higher else (Color(0.84, 0.84, 0.86) if act3 else Color(1.0, 0.76, 0.42))
+		_lamp_light.color = Color(0.92, 0.46, 0.52) if higher else (Color(0.84, 0.84, 0.86) if act3 else Color(1.0, 0.76, 0.42))
 	if _window_light:
-		_window_light.energy = 0.18 if higher else (0.58 if night else 0.76)
-		_window_light.color = Color(0.65, 0.20, 0.28) if higher else (Color(0.82, 0.84, 0.88) if act3 else Color(0.74, 0.84, 0.96))
+		_window_light.energy = 0.48 if higher else (0.58 if night else 0.82)
+		_window_light.color = Color(0.84, 0.48, 0.56) if higher else (Color(0.82, 0.84, 0.88) if act3 else Color(0.74, 0.84, 0.96))
 	if _radio_light:
-		_radio_light.color = Color(0.95, 0.18, 0.22) if higher else Color(0.28, 0.92, 0.52)
+		_radio_light.color = Color(0.95, 0.36, 0.42) if higher else Color(0.28, 0.92, 0.52)
 	if light_shaft:
 		light_shaft.visible = not higher
 		light_shaft.color = Color(0.75, 0.78, 0.82, 0.05) if act3 else (Color(0.45, 0.56, 0.78, 0.06) if night else Color(0.78, 0.84, 0.94, 0.09))
 
 	if has_node("/root/AudioManager"):
 		var am = get_node("/root/AudioManager")
-		if act3:
+		if am.has_method("sync_adaptive_soundtrack"):
+			am.call("sync_adaptive_soundtrack", "room_huwag", false)
+		elif act3:
 			am.play_ambience("act3_ambience")
 		elif higher:
 			am.play_ambience("night_ambience")
@@ -420,7 +435,7 @@ func _trigger_act2_pill_choice() -> void:
 		{
 			"speaker": "Huwag Matitiis",
 			"expression": "worried",
-			"text": "Amanheceu no Ato 2, mas minha cabeça ainda gira com o silêncio da noite.\nSobre a mesa, os comprimidos aguardam."
+			"text": "Amanheceu um novo dia, mas minha cabeça ainda gira com o silêncio da noite.\nSobre a mesa, os comprimidos aguardam."
 		},
 		{
 			"speaker": "Huwag Matitiis",
@@ -467,7 +482,7 @@ func _on_interactable_triggered(item_name: String) -> void:
 						"speaker": "Huwag Matitiis",
 						"expression": "tired",
 						"text": "O plantão terminou, mas a fumaça ainda arde no peito.\nDormir até amanhã?",
-						"choices": ["Dormir (Avançar para Ato 2)", "Ainda não"]
+						"choices": ["Dormir até o amanhecer", "Ainda não"]
 					}
 				], func(choice: int) -> void:
 					if choice == 0:
@@ -610,8 +625,8 @@ func _on_interactable_triggered(item_name: String) -> void:
 					{
 						"speaker": "Huwag Matitiis",
 						"expression": "tired",
-						"text": "Anoiteceu em Agdangan. Sair para a rua ou descansar e iniciar o Ato 2?",
-						"choices": ["Sair para a rua", "Dormir e avançar para o Ato 2", "Ficar no quarto"]
+						"text": "Anoiteceu em Agdangan. Sair para a rua ou descansar até o próximo turno?",
+						"choices": ["Sair para a rua", "Dormir até o amanhecer", "Ficar no quarto"]
 					}
 				], func(choice: int) -> void:
 					if choice == 0:

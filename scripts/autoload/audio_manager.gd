@@ -1,552 +1,948 @@
 extends Node
 
-# AudioManager - Sistema de Áudio Autoral de Huwag
-# Síntese procedural nativa em GDScript (PCM 16-bit WAV, 22050 Hz)
-# Zero dependências externas proprietárias, volume balanceado e transições suaves.
-
 const MIX_RATE := 22050
+const SFX_POOL_SIZE := 8
+const CROSSFADE_SEC := 1.10
+
+var current_bgm_track: String = ""
+var current_ambience_track: String = ""
+var current_scene_id: String = ""
+var boss_music_active: bool = false
 
 var _bgm_player: AudioStreamPlayer
+var _bgm_fade_player: AudioStreamPlayer
 var _ambience_player: AudioStreamPlayer
-var _sfx_players: Array[AudioStreamPlayer] = []
-var _cache: Dictionary = {}
+var _amb_fade_player: AudioStreamPlayer
+var _bgm_tween: Tween = null
+var _amb_tween: Tween = null
 
-var master_volume: float = 1.0
-var music_volume: float = 0.8
-var sfx_volume: float = 0.9
+var _sfx_pool: Array[AudioStreamPlayer] = []
+var _sfx_index: int = 0
+var _stream_cache: Dictionary = {}
 
-var _current_bgm_track: String = ""
-var _current_ambience_track: String = ""
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_setup_audio_buses()
 
-	# Configura AudioStreamPlayers dedicados
-	_bgm_player = AudioStreamPlayer.new()
-	_bgm_player.name = "BGMPlayer"
-	_bgm_player.bus = "Master"
-	add_child(_bgm_player)
+	_bgm_player = _create_bus_player("BGMPlayerA", "Music", -11.5)
+	_bgm_fade_player = _create_bus_player("BGMPlayerB", "Music", -40.0)
+	_ambience_player = _create_bus_player("AmbiencePlayerA", "Ambience", -13.0)
+	_amb_fade_player = _create_bus_player("AmbiencePlayerB", "Ambience", -40.0)
 
-	_ambience_player = AudioStreamPlayer.new()
-	_ambience_player.name = "AmbiencePlayer"
-	_ambience_player.bus = "Master"
-	add_child(_ambience_player)
+	for i in range(SFX_POOL_SIZE):
+		var p := _create_bus_player("SFXPlayer_%d" % i, "SFX", -7.5)
+		_sfx_pool.append(p)
 
-	# Pool de players para SFX simultâneos
-	for i in range(8):
-		var p := AudioStreamPlayer.new()
-		p.name = "SFXPlayer_%d" % i
-		p.bus = "Master"
-		add_child(p)
-		_sfx_players.append(p)
+	_connect_game_state_signals.call_deferred()
 
-	_update_volumes()
 
-func set_volumes(master: float, music: float, sfx: float) -> void:
-	master_volume = clampf(master, 0.0, 1.0)
-	music_volume = clampf(music, 0.0, 1.0)
-	sfx_volume = clampf(sfx, 0.0, 1.0)
-	_update_volumes()
+func _setup_audio_buses() -> void:
+	_ensure_filtered_bus("Music", 1650.0, 0.34, -1.5)
+	_ensure_filtered_bus("Ambience", 1450.0, 0.30, -2.0)
+	_ensure_filtered_bus("SFX", 2100.0, 0.32, -1.0)
 
-func _update_volumes() -> void:
-	if _bgm_player:
-		_bgm_player.volume_db = _linear_to_db(master_volume * music_volume)
-	if _ambience_player:
-		_ambience_player.volume_db = _linear_to_db(master_volume * music_volume * 0.75)
 
-func _linear_to_db(linear: float) -> float:
-	if linear <= 0.001:
-		return -80.0
-	return 20.0 * log(linear) / log(10.0)
+func _ensure_filtered_bus(bus_name: String, cutoff_hz: float, resonance: float, volume_db: float) -> void:
+	var idx := AudioServer.get_bus_index(bus_name)
+	if idx == -1:
+		AudioServer.add_bus()
+		idx = AudioServer.get_bus_count() - 1
+		AudioServer.set_bus_name(idx, bus_name)
+		AudioServer.set_bus_send(idx, "Master")
+	AudioServer.set_bus_volume_db(idx, volume_db)
 
-# --- REPRODUÇÃO DE MÚSICA E AMBIÊNCIA ---
-
-func play_bgm(track_name: String, fade_duration: float = 1.0) -> void:
-	if _current_bgm_track == track_name and _bgm_player.playing:
-		return
-	_current_bgm_track = track_name
-
-	if track_name == "" or track_name == "none":
-		if _bgm_player.playing:
-			var tw := create_tween()
-			tw.tween_property(_bgm_player, "volume_db", -80.0, fade_duration)
-			tw.tween_callback(_bgm_player.stop)
-		return
-
-	var stream := _get_stream(track_name)
-	if stream == null:
-		return
-
-	if _bgm_player.playing and fade_duration > 0.1:
-		var tw := create_tween()
-		tw.tween_property(_bgm_player, "volume_db", -80.0, fade_duration * 0.5)
-		tw.tween_callback(func():
-			_bgm_player.stream = stream
-			_bgm_player.play()
-			var tw_in := create_tween()
-			tw_in.tween_property(_bgm_player, "volume_db", _linear_to_db(master_volume * music_volume), fade_duration * 0.5)
-		)
-	else:
-		_bgm_player.stream = stream
-		_bgm_player.volume_db = _linear_to_db(master_volume * music_volume)
-		_bgm_player.play()
-
-func play_ambience(track_name: String, fade_duration: float = 1.5) -> void:
-	if _current_ambience_track == track_name and _ambience_player.playing:
-		return
-	_current_ambience_track = track_name
-
-	if track_name == "" or track_name == "none":
-		if _ambience_player.playing:
-			var tw := create_tween()
-			tw.tween_property(_ambience_player, "volume_db", -80.0, fade_duration)
-			tw.tween_callback(_ambience_player.stop)
-		return
-
-	var stream := _get_stream(track_name)
-	if stream == null:
-		return
-
-	_ambience_player.stream = stream
-	_ambience_player.volume_db = _linear_to_db(master_volume * music_volume * 0.75)
-	_ambience_player.play()
-
-func play_sfx(sfx_name: String, volume_mult: float = 1.0, pitch_scale: float = 1.0) -> void:
-	var stream := _get_stream(sfx_name)
-	if stream == null:
-		return
-
-	# Busca um player livre no pool
-	var player: AudioStreamPlayer = null
-	for p in _sfx_players:
-		if not p.playing:
-			player = p
+	var has_lp := false
+	for i in range(AudioServer.get_bus_effect_count(idx)):
+		var eff := AudioServer.get_bus_effect(idx, i)
+		if eff is AudioEffectLowPassFilter:
+			var lpf := eff as AudioEffectLowPassFilter
+			lpf.cutoff_hz = cutoff_hz
+			lpf.resonance = resonance
+			has_lp = true
 			break
-	if player == null:
-		player = _sfx_players[0]
+	if not has_lp:
+		var lpf := AudioEffectLowPassFilter.new()
+		lpf.cutoff_hz = cutoff_hz
+		lpf.resonance = resonance
+		AudioServer.add_bus_effect(idx, lpf)
 
-	player.stream = stream
-	player.pitch_scale = pitch_scale
-	player.volume_db = _linear_to_db(master_volume * sfx_volume * volume_mult)
-	player.play()
 
-# --- SÍNTESE PROCEDURAL DE ÁUDIO (16-BIT PCM WAV) ---
+func _create_bus_player(node_name: String, bus_name: String, vol_db: float) -> AudioStreamPlayer:
+	var p := AudioStreamPlayer.new()
+	p.name = node_name
+	p.volume_db = vol_db
+	p.bus = bus_name if AudioServer.get_bus_index(bus_name) != -1 else "Master"
+	add_child(p)
+	return p
 
-func _get_stream(name: String) -> AudioStreamWAV:
-	if _cache.has(name):
-		return _cache[name] as AudioStreamWAV
+
+func get_bus_lowpass_cutoff(bus_name: String) -> float:
+	var idx := AudioServer.get_bus_index(bus_name)
+	if idx == -1:
+		return -1.0
+	for i in range(AudioServer.get_bus_effect_count(idx)):
+		var eff := AudioServer.get_bus_effect(idx, i)
+		if eff is AudioEffectLowPassFilter:
+			return (eff as AudioEffectLowPassFilter).cutoff_hz
+	return -1.0
+
+
+func get_current_bgm() -> String:
+	return current_bgm_track
+
+
+func get_current_ambience() -> String:
+	return current_ambience_track
+
+
+func _connect_game_state_signals() -> void:
+	if not has_node("/root/GameState"):
+		return
+	var gs := get_node("/root/GameState")
+	if gs.has_signal("day_period_changed") and not gs.is_connected("day_period_changed", _on_environment_state_changed):
+		gs.connect("day_period_changed", _on_environment_state_changed)
+	if gs.has_signal("higher_dose_changed") and not gs.is_connected("higher_dose_changed", _on_higher_dose_changed):
+		gs.connect("higher_dose_changed", _on_higher_dose_changed)
+	if gs.has_signal("perception_changed") and not gs.is_connected("perception_changed", _on_perception_changed):
+		gs.connect("perception_changed", _on_perception_changed)
+
+
+func _on_environment_state_changed(_period: String) -> void:
+	if not current_scene_id.is_empty():
+		sync_adaptive_soundtrack(current_scene_id, boss_music_active)
+
+
+func _on_higher_dose_changed(_active: bool) -> void:
+	if not current_scene_id.is_empty():
+		sync_adaptive_soundtrack(current_scene_id, boss_music_active)
+
+
+func _on_perception_changed(_mode: int) -> void:
+	if not current_scene_id.is_empty():
+		sync_adaptive_soundtrack(current_scene_id, boss_music_active)
+
+
+func sync_adaptive_soundtrack(scene_id: String = "", is_boss_fight: bool = false) -> void:
+	if not scene_id.is_empty():
+		current_scene_id = scene_id
+	boss_music_active = is_boss_fight
+
+	var is_act3 := false
+	var is_corrupted := false
+	var period := "morning"
+	var fire_active := false
+	if has_node("/root/GameState"):
+		var gs := get_node("/root/GameState")
+		if gs.has_method("is_unfiltered_act3"):
+			is_act3 = bool(gs.call("is_unfiltered_act3"))
+		if gs.has_method("is_higher_dose"):
+			is_corrupted = bool(gs.call("is_higher_dose"))
+		elif gs.has_method("is_higher_dose_active"):
+			is_corrupted = bool(gs.call("is_higher_dose_active"))
+		if gs.has_method("get_day_period"):
+			period = str(gs.call("get_day_period"))
+		if gs.has_method("get_switch"):
+			fire_active = bool(gs.call("get_switch", "015_Floresta_em_chamas")) and not bool(gs.call("get_switch", "019_Ato2_concluido"))
+
+	var low_scene := current_scene_id.to_lower()
+	var is_forest := ("forest" in low_scene or "floresta" in low_scene or "clearing" in low_scene or "trail" in low_scene)
+	var is_title := ("title" in low_scene or "menu" in low_scene)
+	var is_vhs := ("vhs" in low_scene)
+
+	if is_title:
+		play_bgm("title_theme", -11.5)
+		play_ambience("night_ambience" if period == "night" else "morning_ambience", -15.5)
+		return
+
+	if is_vhs:
+		play_bgm("vhs_memory_bgm", -11.5)
+		play_ambience("corrupted_ambience", -15.0)
+		return
+
+	if is_act3:
+		stop_bgm()
+		play_ambience("act3_ambience", -13.5)
+		return
+
+	if is_boss_fight:
+		play_bgm("boss_bgm", -9.5)
+		play_ambience("corrupted_ambience", -13.0)
+		return
+
+	if is_corrupted:
+		play_bgm("corrupted_tension", -10.5)
+		play_ambience("corrupted_ambience", -12.0)
+		return
+
+	if is_forest:
+		if fire_active:
+			play_bgm("night_forest", -10.5)
+			play_ambience("fire_hazard", -11.0)
+		elif period == "night":
+			play_bgm("night_forest", -11.0)
+			play_ambience("night_ambience", -12.0)
+		else:
+			play_bgm("forest_theme", -11.5)
+			play_ambience("forest_ambience", -12.5)
+		return
+
+	# Agdangan & Interiores (Manhã / Tarde / Noite)
+	if period == "night":
+		play_bgm("night_forest", -12.0)
+		play_ambience("night_ambience", -12.5)
+	elif period == "afternoon":
+		play_bgm("day_theme", -11.0)
+		play_ambience("afternoon_ambience", -12.5)
+	else:
+		play_bgm("day_theme", -11.5)
+		play_ambience("morning_ambience", -13.0)
+
+
+func play_sfx(sfx_name: String, volume_db: float = -7.5, pitch_scale: float = 1.0) -> void:
+	var stream := _get_or_build_stream("sfx:" + sfx_name)
+	if stream == null or _sfx_pool.is_empty():
+		return
+	var p := _sfx_pool[_sfx_index]
+	_sfx_index = (_sfx_index + 1) % _sfx_pool.size()
+	p.stop()
+	p.stream = stream
+	p.volume_db = volume_db
+	p.pitch_scale = clampf(pitch_scale, 0.55, 1.35)
+	p.play()
+
+
+func play_bgm(track_name: String, volume_db: float = -11.5) -> void:
+	if track_name.is_empty():
+		stop_bgm()
+		return
+	var stream := _get_or_build_stream("bgm:" + track_name)
+	if stream == null:
+		return
+	if current_bgm_track == track_name and _bgm_player.playing and _bgm_player.stream == stream:
+		_bgm_player.volume_db = volume_db
+		return
+
+	current_bgm_track = track_name
+	_crossfade_pair(_bgm_player, _bgm_fade_player, stream, volume_db, true)
+	var tmp := _bgm_player
+	_bgm_player = _bgm_fade_player
+	_bgm_fade_player = tmp
+
+
+func stop_bgm() -> void:
+	current_bgm_track = ""
+	if _bgm_tween != null and _bgm_tween.is_valid():
+		_bgm_tween.kill()
+	_bgm_player.stop()
+	_bgm_fade_player.stop()
+
+
+func play_ambience(track_name: String, volume_db: float = -12.5) -> void:
+	if track_name.is_empty():
+		stop_ambience()
+		return
+	var stream := _get_or_build_stream("amb:" + track_name)
+	if stream == null:
+		return
+	if current_ambience_track == track_name and _ambience_player.playing and _ambience_player.stream == stream:
+		_ambience_player.volume_db = volume_db
+		return
+
+	current_ambience_track = track_name
+	_crossfade_pair(_ambience_player, _amb_fade_player, stream, volume_db, false)
+	var tmp := _ambience_player
+	_ambience_player = _amb_fade_player
+	_amb_fade_player = tmp
+
+
+func stop_ambience() -> void:
+	current_ambience_track = ""
+	if _amb_tween != null and _amb_tween.is_valid():
+		_amb_tween.kill()
+	_ambience_player.stop()
+	_amb_fade_player.stop()
+
+
+func _crossfade_pair(outgoing: AudioStreamPlayer, incoming: AudioStreamPlayer, next_stream: AudioStreamWAV, target_db: float, is_bgm: bool) -> void:
+	if is_bgm:
+		if _bgm_tween != null and _bgm_tween.is_valid():
+			_bgm_tween.kill()
+	else:
+		if _amb_tween != null and _amb_tween.is_valid():
+			_amb_tween.kill()
+
+	incoming.stop()
+	incoming.stream = next_stream
+	incoming.volume_db = -34.0 if outgoing.playing else target_db
+	incoming.play()
+
+	if not is_inside_tree():
+		incoming.volume_db = target_db
+		outgoing.stop()
+		return
+
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(incoming, "volume_db", target_db, CROSSFADE_SEC).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	if outgoing.playing:
+		tw.tween_property(outgoing, "volume_db", -38.0, CROSSFADE_SEC).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tw.chain().tween_callback(func() -> void:
+			if is_instance_valid(outgoing):
+				outgoing.stop()
+		)
+	if is_bgm:
+		_bgm_tween = tw
+	else:
+		_amb_tween = tw
+
+
+func _get_or_build_stream(key: String) -> AudioStreamWAV:
+	if _stream_cache.has(key):
+		return _stream_cache[key] as AudioStreamWAV
 
 	var stream: AudioStreamWAV = null
-	match name:
-		# Interface e Diálogo
-		"ui_hover":
-			stream = _synth_ui_hover()
-		"ui_select":
+	match key:
+		# === UI & Gameplay SFX (timbres quentes e graves, zero agudos estridentes) ===
+		"sfx:ui_hover":
+			stream = _synth_tone(0.045, 220.0, 260.0, 0.22, false, 0.0)
+		"sfx:ui_select":
 			stream = _synth_ui_select()
-		"ui_back":
-			stream = _synth_ui_back()
-		"ui_dialogue":
-			stream = _synth_dialogue_blip()
-		"save_chime":
-			stream = _synth_save_chime()
-
-		# Gameplay e Combate
-		"step":
+		"sfx:ui_back":
+			stream = _synth_tone(0.09, 240.0, 165.0, 0.26, false, 0.04)
+		"sfx:ui_dialogue":
+			stream = _synth_tone(0.032, 196.0, 220.0, 0.16, false, 0.02)
+		"sfx:footstep":
 			stream = _synth_footstep()
-		"swing_miss":
-			stream = _synth_swing_miss()
-		"melee_hit":
-			stream = _synth_melee_hit()
-		"water_cast":
-			stream = _synth_water_cast()
-		"player_hurt":
-			stream = _synth_player_hurt()
-		"extinguish":
-			stream = _synth_extinguish()
-		"santelmo_cry":
-			stream = _synth_santelmo_cry()
-		"vhs_glitch":
+		"sfx:vhs_glitch":
 			stream = _synth_vhs_glitch()
+		"sfx:water_splash":
+			stream = _synth_water_splash()
+		"sfx:water_cast":
+			stream = _synth_water_splash()
+		"sfx:fire_douse":
+			stream = _synth_fire_douse()
+		"sfx:santelmo_cry":
+			stream = _synth_santelmo_cry()
+		"sfx:santelmo_defeat":
+			stream = _synth_santelmo_defeat()
+		"sfx:boss_telegraph":
+			stream = _synth_boss_telegraph()
+		"sfx:boss_roar":
+			stream = _synth_boss_roar()
+		"sfx:act3_shatter":
+			stream = _synth_act3_shatter()
+		"sfx:melee_hit":
+			stream = _synth_melee_hit()
+		"sfx:swing_miss":
+			stream = _synth_swing_whoosh()
+		"sfx:player_hurt":
+			stream = _synth_player_hurt()
 
-		# Trilhas Sonoras e Ambiências em Loop
-		"title_theme":
-			stream = _synth_title_drone()
-		"morning_ambience":
-			stream = _synth_morning_ambience()
-		"afternoon_ambience":
-			stream = _synth_afternoon_ambience()
-		"night_ambience":
-			stream = _synth_night_ambience()
-		"act3_ambience":
-			stream = _synth_act3_ambience()
-		"vhs_memory_bgm":
+		# === BGM Adaptativa (pads graves, melancólicos e filtrados) ===
+		"bgm:title_theme":
+			stream = _synth_title_bgm()
+		"bgm:day_theme":
+			stream = _synth_day_bgm()
+		"bgm:forest_theme":
+			stream = _synth_forest_bgm()
+		"bgm:night_forest":
+			stream = _synth_night_forest_bgm()
+		"bgm:corrupted_tension":
+			stream = _synth_corrupted_tension_bgm()
+		"bgm:boss_bgm":
+			stream = _synth_boss_bgm()
+		"bgm:vhs_memory_bgm":
 			stream = _synth_vhs_memory_bgm()
-		"fire_hazard":
-			stream = _synth_fire_hazard()
+
+		# === Ambiências Filtradas (sem apitos de 2.4–4.8 kHz) ===
+		"amb:morning_ambience":
+			stream = _synth_morning_ambience()
+		"amb:afternoon_ambience":
+			stream = _synth_afternoon_ambience()
+		"amb:night_ambience":
+			stream = _synth_night_ambience()
+		"amb:forest_ambience":
+			stream = _synth_forest_ambience()
+		"amb:corrupted_ambience":
+			stream = _synth_corrupted_ambience()
+		"amb:fire_hazard":
+			stream = _synth_fire_hazard_ambience()
+		"amb:act3_ambience":
+			stream = _synth_act3_ambience()
 
 	if stream != null:
-		_cache[name] = stream
+		_stream_cache[key] = stream
 	return stream
 
-func _create_wav(samples: PackedByteArray, loop: bool = false, loop_begin: int = 0, loop_end: int = 0) -> AudioStreamWAV:
+
+func _make_wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
 	var wav := AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS
 	wav.mix_rate = MIX_RATE
 	wav.stereo = false
-	wav.data = samples
 	if loop:
 		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		wav.loop_begin = loop_begin
-		wav.loop_end = loop_end if loop_end > 0 else (samples.size() / 2)
+		wav.loop_begin = 0
+		wav.loop_end = samples.size()
+
+	var bytes := PackedByteArray()
+	bytes.resize(samples.size() * 2)
+	for i in range(samples.size()):
+		var s := clampf(samples[i], -0.95, 0.95)
+		var pcm := int(round(s * 32767.0))
+		bytes[i * 2] = pcm & 0xFF
+		bytes[i * 2 + 1] = (pcm >> 8) & 0xFF
+	wav.data = bytes
 	return wav
 
-func _write_s16(bytes: PackedByteArray, idx: int, value: float) -> void:
-	var s := clampi(int(value * 32767.0), -32768, 32767)
-	var u := s if s >= 0 else 65536 + s
-	var b0 := u & 0xFF
-	var b1 := (u >> 8) & 0xFF
-	bytes[idx * 2] = b0
-	bytes[idx * 2 + 1] = b1
 
-# --- SINTETIZADORES ESPECÍFICOS ---
-
-func _synth_ui_hover() -> AudioStreamWAV:
-	var duration := 0.04
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
+func _synth_tone(duration: float, f_start: float, f_end: float, amp: float, loop: bool, noise_mix: float) -> AudioStreamWAV:
+	var count := maxi(1, int(duration * MIX_RATE))
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var phase := 0.0
+	var lp := 0.0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(f_start * 100.0 + f_end * 10.0)
 	for i in range(count):
 		var t := float(i) / float(count)
-		var env := sin(t * PI)
-		var freq := lerpf(480.0, 620.0, t)
-		var sig := sin(float(i) * TAU * freq / float(MIX_RATE)) * env * 0.25
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
+		var env := sin(t * PI) if not loop else 1.0
+		if not loop and t < 0.08:
+			env = t / 0.08
+		elif not loop:
+			env = pow(1.0 - t, 1.45)
+		var freq := lerpf(minf(f_start, 520.0), minf(f_end, 520.0), t)
+		phase += TAU * freq / float(MIX_RATE)
+		var sig := sin(phase) * (1.0 - noise_mix) + rng.randf_range(-1.0, 1.0) * noise_mix
+		lp += 0.18 * (sig - lp)
+		arr[i] = lp * amp * env
+	return _make_wav(arr, loop)
+
 
 func _synth_ui_select() -> AudioStreamWAV:
-	var duration := 0.12
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
+	var count := int(0.11 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var phase := 0.0
+	var lp := 0.0
 	for i in range(count):
 		var t := float(i) / float(count)
-		var env := pow(1.0 - t, 2.0)
-		var freq := 880.0 if t < 0.3 else 1320.0
-		var sig := (sin(float(i) * TAU * freq / float(MIX_RATE)) * 0.7 + sin(float(i) * TAU * freq * 1.5 / float(MIX_RATE)) * 0.3) * env * 0.4
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
+		var freq := 220.0 if t < 0.48 else 293.66 # A3 -> D4 (quente e suave)
+		var env := pow(1.0 - t, 1.25)
+		phase += TAU * freq / float(MIX_RATE)
+		var raw := sin(phase) * 0.75 + sin(phase * 0.5) * 0.25
+		lp += 0.22 * (raw - lp)
+		arr[i] = lp * 0.24 * env
+	return _make_wav(arr, false)
 
-func _synth_ui_back() -> AudioStreamWAV:
-	var duration := 0.08
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	for i in range(count):
-		var t := float(i) / float(count)
-		var env := pow(1.0 - t, 1.8)
-		var freq := lerpf(520.0, 310.0, t)
-		var sig := sin(float(i) * TAU * freq / float(MIX_RATE)) * env * 0.3
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
-
-func _synth_dialogue_blip() -> AudioStreamWAV:
-	var duration := 0.035
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	for i in range(count):
-		var t := float(i) / float(count)
-		var env := sin(t * PI)
-		var sig := sin(float(i) * TAU * 360.0 / float(MIX_RATE)) * env * 0.18
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
-
-func _synth_save_chime() -> AudioStreamWAV:
-	var duration := 0.6
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	for i in range(count):
-		var t := float(i) / float(count)
-		var env := pow(1.0 - t, 1.5)
-		var s1 := sin(float(i) * TAU * 523.25 / float(MIX_RATE)) * 0.5
-		var s2 := sin(float(i) * TAU * 659.25 / float(MIX_RATE)) * 0.3
-		var s3 := sin(float(i) * TAU * 783.99 / float(MIX_RATE)) * 0.2
-		var sig := (s1 + s2 + s3) * env * 0.4
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
 
 func _synth_footstep() -> AudioStreamWAV:
-	var duration := 0.07
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
+	var count := int(0.065 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 4421
+	rng.seed = 904
 	var lp := 0.0
-	for i in range(count):
-		var t := float(i) / float(count)
-		var env := sin(t * PI)
-		var n := rng.randf_range(-1.0, 1.0)
-		lp = lerpf(lp, n, 0.35)
-		var sig := lp * env * 0.28
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
-
-func _synth_swing_miss() -> AudioStreamWAV:
-	var duration := 0.12
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 104729
-	var lp := 0.0
-	for i in range(count):
-		var t := float(i) / float(count)
-		var env := sin(t * PI)
-		var freq := lerpf(380.0, 140.0, t)
-		var n := rng.randf_range(-1.0, 1.0)
-		lp = lerpf(lp, n, 0.25)
-		var sig := (sin(float(i) * TAU * freq / float(MIX_RATE)) * 0.35 + lp * 0.65) * env * 0.45
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
-
-func _synth_melee_hit() -> AudioStreamWAV:
-	var duration := 0.16
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 339817
+	var phase := 0.0
 	for i in range(count):
 		var t := float(i) / float(count)
 		var env := pow(1.0 - t, 2.2)
-		var freq := lerpf(240.0, 60.0, pow(t, 0.5))
-		var transient := rng.randf_range(-1.0, 1.0) * exp(-t * 30.0)
-		var body := sin(float(i) * TAU * freq / float(MIX_RATE))
-		var sig := clampf((body * 0.7 + transient * 0.5) * env * 0.7, -0.95, 0.95)
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
-
-func _synth_water_cast() -> AudioStreamWAV:
-	var duration := 0.28
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 819203
-	for i in range(count):
-		var t := float(i) / float(count)
-		var env := sin(t * PI)
-		var bubble := sin(t * TAU * 18.0) * 120.0
-		var freq := lerpf(280.0, 520.0, t) + bubble
-		var sig := (sin(float(i) * TAU * freq / float(MIX_RATE)) * 0.6 + rng.randf_range(-0.4, 0.4)) * env * 0.5
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
-
-func _synth_player_hurt() -> AudioStreamWAV:
-	var duration := 0.22
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 771239
-	for i in range(count):
-		var t := float(i) / float(count)
-		var env := pow(1.0 - t, 1.8)
-		var freq := lerpf(180.0, 80.0, t)
-		var noise := rng.randf_range(-1.0, 1.0) * 0.35
-		var sig := (sin(float(i) * TAU * freq / float(MIX_RATE)) * 0.65 + noise) * env * 0.6
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
-
-func _synth_extinguish() -> AudioStreamWAV:
-	var duration := 0.4
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 551921
-	var lp := 0.0
-	for i in range(count):
-		var t := float(i) / float(count)
-		var env := exp(-t * 4.5)
+		phase += TAU * lerpf(115.0, 58.0, t) / float(MIX_RATE)
 		var n := rng.randf_range(-1.0, 1.0)
-		lp = lerpf(lp, n, 0.45)
-		var hiss := lp * (0.8 + 0.2 * sin(t * TAU * 24.0))
-		var sig := hiss * env * 0.6
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
+		lp += 0.10 * (n - lp)
+		arr[i] = (sin(phase) * 0.45 + lp * 0.55) * 0.22 * env
+	return _make_wav(arr, false)
 
-func _synth_santelmo_cry() -> AudioStreamWAV:
-	var duration := 0.35
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 99881
-	for i in range(count):
-		var t := float(i) / float(count)
-		var env := sin(t * PI)
-		var warble := sin(t * TAU * 14.0) * 160.0
-		var freq := lerpf(680.0, 920.0, t) + warble
-		var n := rng.randf_range(-0.3, 0.3)
-		var sig := (sin(float(i) * TAU * freq / float(MIX_RATE)) * 0.7 + n) * env * 0.5
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
 
 func _synth_vhs_glitch() -> AudioStreamWAV:
-	var duration := 0.18
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
+	var count := int(0.24 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 12093
+	rng.seed = 404
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(count)
+		var env := (1.0 - t * 0.72)
+		var n := rng.randf_range(-1.0, 1.0)
+		lp = lerpf(lp, n, 0.08)
+		var hum := sin(float(i) * TAU * 60.0 / float(MIX_RATE)) * 0.48 + sin(float(i) * TAU * 120.0 / float(MIX_RATE)) * 0.22
+		arr[i] = (lp * 0.42 + hum) * 0.26 * env
+	return _make_wav(arr, false)
+
+
+func _synth_water_splash() -> AudioStreamWAV:
+	var count := int(0.32 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 777
+	var lp := 0.0
+	var phase := 0.0
+	for i in range(count):
+		var t := float(i) / float(count)
+		var env := sin(minf(1.0, t * 4.5) * PI * 0.5) * pow(1.0 - t, 1.2)
+		var n := rng.randf_range(-1.0, 1.0)
+		lp = lerpf(lp, n, 0.09 + 0.08 * (1.0 - t))
+		var freq := lerpf(240.0, 145.0, t)
+		phase += TAU * freq / float(MIX_RATE)
+		arr[i] = (lp * 0.65 + sin(phase) * 0.35) * 0.30 * env
+	return _make_wav(arr, false)
+
+
+func _synth_fire_douse() -> AudioStreamWAV:
+	var count := int(0.45 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 515
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(count)
+		var env := pow(1.0 - t, 1.25)
+		var n := rng.randf_range(-1.0, 1.0)
+		lp = lerpf(lp, n, 0.11)
+		var sub := sin(float(i) * TAU * lerpf(160.0, 72.0, t) / float(MIX_RATE)) * 0.32
+		arr[i] = (lp * 0.68 + sub) * 0.30 * env
+	return _make_wav(arr, false)
+
+
+func _synth_santelmo_cry() -> AudioStreamWAV:
+	# Gemido cavo e grave (sem apito agudo)
+	var count := int(0.34 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var phase := 0.0
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(count)
+		var env := sin(t * PI) * (1.0 - t * 0.35)
+		var vib := sin(t * TAU * 7.0) * 12.0
+		var freq := lerpf(240.0, 155.0, t) + vib
+		phase += TAU * freq / float(MIX_RATE)
+		var raw := sin(phase) * 0.68 + sin(phase * 0.5) * 0.32
+		lp += 0.16 * (raw - lp)
+		arr[i] = lp * 0.25 * env
+	return _make_wav(arr, false)
+
+
+func _synth_santelmo_defeat() -> AudioStreamWAV:
+	var count := int(0.50 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var phase := 0.0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 909
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(count)
+		var env := pow(1.0 - t, 1.35)
+		var freq := lerpf(220.0, 68.0, t)
+		phase += TAU * freq / float(MIX_RATE)
+		var raw := sin(phase) * 0.65 + rng.randf_range(-0.35, 0.35) * 0.35
+		lp += 0.14 * (raw - lp)
+		arr[i] = lp * 0.30 * env
+	return _make_wav(arr, false)
+
+
+func _synth_boss_telegraph() -> AudioStreamWAV:
+	# Pulso sub-grave de aviso antes de investida/onda do Boss
+	var count := int(0.42 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var phase := 0.0
+	var lp := 0.0
 	for i in range(count):
 		var t := float(i) / float(count)
 		var env := sin(t * PI)
-		var noise := rng.randf_range(-1.0, 1.0)
-		var buzz := sin(float(i) * TAU * 60.0 / float(MIX_RATE)) # 60Hz hum elétrico
-		var sig := (noise * 0.7 + buzz * 0.3) * env * 0.4
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes)
+		var freq := lerpf(78.0, 142.0, t)
+		phase += TAU * freq / float(MIX_RATE)
+		var raw := sin(phase) * 0.70 + sin(phase * 1.5) * 0.30
+		lp += 0.15 * (raw - lp)
+		arr[i] = lp * 0.34 * env
+	return _make_wav(arr, false)
 
-# --- SINTETIZADORES DE AMBIÊNCIA E TRILHAS EM LOOP ---
 
-func _synth_title_drone() -> AudioStreamWAV:
-	# Drone atmosférico analógico de 6.0 segundos em loop perfeito
-	var duration := 6.0
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	for i in range(count):
-		var t := float(i) / float(count)
-		var base1 := sin(float(i) * TAU * 55.0 / float(MIX_RATE)) # A1
-		var base2 := sin(float(i) * TAU * 110.0 / float(MIX_RATE)) * 0.4 # A2
-		var fifth := sin(float(i) * TAU * 82.4 / float(MIX_RATE)) * 0.35 # E2
-		var beat := sin(t * TAU * 1.5) * 0.15
-		var tape_hiss := sin(float(i) * 123.45) * 0.04
-		var sig := (base1 + base2 + fifth + beat + tape_hiss) * 0.38
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes, true, 0, count)
-
-func _synth_morning_ambience() -> AudioStreamWAV:
-	# Brisa tropical matinal e leveza
-	var duration := 5.0
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
+func _synth_boss_roar() -> AudioStreamWAV:
+	var count := int(0.68 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 2049
+	rng.seed = 612
+	var phase := 0.0
 	var lp := 0.0
 	for i in range(count):
 		var t := float(i) / float(count)
-		var wind_mod := 0.5 + 0.5 * sin(t * TAU * 0.8)
-		var n := rng.randf_range(-1.0, 1.0)
-		lp = lerpf(lp, n, 0.08)
-		# Suave canto de pássaro periódico
-		var bird := 0.0
-		if fmod(t * 5.0, 1.8) < 0.12:
-			var bt := fmod(t * 5.0, 1.8) / 0.12
-			bird = sin(bt * TAU * lerpf(2400.0, 2900.0, bt)) * sin(bt * PI) * 0.18
-		var sig := (lp * 0.6 * wind_mod + bird) * 0.3
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes, true, 0, count)
+		var env := sin(minf(1.0, t * 4.0) * PI * 0.5) * pow(1.0 - t, 1.15)
+		var freq := lerpf(118.0, 52.0, t) + sin(t * TAU * 6.0) * 6.0
+		phase += TAU * freq / float(MIX_RATE)
+		var raw := sin(phase) * 0.62 + sin(phase * 0.5) * 0.25 + rng.randf_range(-1.0, 1.0) * 0.22
+		lp += 0.10 * (raw - lp)
+		arr[i] = lp * 0.38 * env
+	return _make_wav(arr, false)
 
-func _synth_afternoon_ambience() -> AudioStreamWAV:
-	# Calor opressivo de fim de tarde, insetos/cigarras
-	var duration := 4.5
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	for i in range(count):
-		var t := float(i) / float(count)
-		var cicada := sin(float(i) * TAU * 4200.0 / float(MIX_RATE)) * sin(t * TAU * 6.0) * 0.12
-		var drone := sin(float(i) * TAU * 73.4 / float(MIX_RATE)) * 0.2
-		var heat_pulse := sin(t * TAU * 0.5) * 0.08
-		var sig := (cicada + drone + heat_pulse) * 0.35
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes, true, 0, count)
 
-func _synth_night_ambience() -> AudioStreamWAV:
-	# Noite de Agdangan: grilos, brisa noturna e tensão psicológica sutil
-	var duration := 5.0
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-	for i in range(count):
-		var t := float(i) / float(count)
-		var crickets := sin(float(i) * TAU * 4800.0 / float(MIX_RATE)) * (1.0 if fmod(t * 4.0, 1.0) < 0.4 else 0.0) * 0.08
-		var wind := sin(float(i) * TAU * 65.0 / float(MIX_RATE)) * (0.6 + 0.4 * sin(t * TAU * 0.4)) * 0.22
-		var tension := sin(float(i) * TAU * 98.0 / float(MIX_RATE)) * 0.1
-		var sig := (crickets + wind + tension) * 0.35
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes, true, 0, count)
-
-func _synth_act3_ambience() -> AudioStreamWAV:
-	# Ato 3: Zumbido elétrico desolador, eco de fita VHS gasta e silêncio perturbador
-	var duration := 5.5
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
+func _synth_act3_shatter() -> AudioStreamWAV:
+	var count := int(0.55 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 6612
+	rng.seed = 303
+	var lp := 0.0
 	for i in range(count):
 		var t := float(i) / float(count)
-		var hum := sin(float(i) * TAU * 60.0 / float(MIX_RATE)) * 0.28 # 60Hz hum
-		var low_drone := sin(float(i) * TAU * 41.2 / float(MIX_RATE)) * 0.25 # E1 ultra-baixo
-		var hiss := rng.randf_range(-0.1, 0.1) * (0.8 + 0.2 * sin(t * TAU * 3.0))
-		var dissonant := sin(float(i) * TAU * 63.8 / float(MIX_RATE)) * 0.15 # Dissonância sutil batendo com 60Hz
-		var sig := (hum + low_drone + hiss + dissonant) * 0.4
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes, true, 0, count)
+		var env := pow(1.0 - t, 1.5)
+		var ring := sin(float(i) * TAU * 220.0 / float(MIX_RATE)) * 0.42 + sin(float(i) * TAU * 110.0 / float(MIX_RATE)) * 0.38
+		var n := rng.randf_range(-1.0, 1.0) * pow(1.0 - t, 2.5) * 0.35
+		lp += 0.14 * ((ring + n) - lp)
+		arr[i] = lp * 0.32 * env
+	return _make_wav(arr, false)
+
+
+func _synth_melee_hit() -> AudioStreamWAV:
+	var count := int(0.14 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4111
+	var phase := 0.0
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(count)
+		var env := pow(1.0 - t, 1.9)
+		phase += TAU * lerpf(155.0, 52.0, t) / float(MIX_RATE)
+		var n := rng.randf_range(-1.0, 1.0)
+		lp += 0.16 * (n - lp)
+		arr[i] = (sin(phase) * 0.72 + lp * 0.28) * 0.36 * env
+	return _make_wav(arr, false)
+
+
+func _synth_swing_whoosh() -> AudioStreamWAV:
+	var count := int(0.13 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1337
+	var lp := 0.0
+	var phase := 0.0
+	for i in range(count):
+		var t := float(i) / float(count)
+		var env := sin(t * PI) * (1.0 - 0.3 * t)
+		phase += TAU * lerpf(210.0, 92.0, t) / float(MIX_RATE)
+		lp += 0.12 * (rng.randf_range(-1.0, 1.0) - lp)
+		arr[i] = (lp * 0.58 + sin(phase) * 0.42) * 0.26 * env
+	return _make_wav(arr, false)
+
+
+func _synth_player_hurt() -> AudioStreamWAV:
+	var count := int(0.20 * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var phase := 0.0
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(count)
+		var env := pow(1.0 - t, 1.45)
+		phase += TAU * lerpf(165.0, 68.0, t) / float(MIX_RATE)
+		var raw := sin(phase) * 0.75 + sin(phase * 0.5) * 0.25
+		lp += 0.18 * (raw - lp)
+		arr[i] = lp * 0.34 * env
+	return _make_wav(arr, false)
+
+
+# ==============================================================================
+# TRILHAS SONORAS PROCEDURAIS ADAPTATIVAS (GRAVES, QUENTES E COM LOW-PASS)
+# ==============================================================================
+
+func _synth_title_bgm() -> AudioStreamWAV:
+	# Pad melancólico de fita VHS em Ré menor (D2-A2-F3)
+	var duration := 8.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1997
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var wow := sin(t * TAU * 0.25) * 0.0025
+		var f1 := 73.42 * (1.0 + wow)  # D2
+		var f2 := 110.00 * (1.0 - wow) # A2
+		var f3 := 174.61 * (1.0 + wow) # F3
+		var pad := (
+			sin(t * TAU * f1) * 0.46
+			+ sin(t * TAU * f2) * 0.34
+			+ sin(t * TAU * f3) * 0.20 * (0.65 + 0.35 * sin(t * TAU * 0.125))
+		)
+		var tape := rng.randf_range(-1.0, 1.0) * 0.025
+		lp += 0.08 * ((pad + tape) - lp)
+		arr[i] = lp * 0.26
+	return _make_wav(arr, true)
+
+
+func _synth_day_bgm() -> AudioStreamWAV:
+	# Melodia ambiental calma, melancólica e acolhedora para Agdangan (Dm7 -> Bbmaj7 -> Gm7 -> A7sus4)
+	var duration := 12.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var chords := [
+		[73.42, 110.00, 146.83, 174.61], # Dm
+		[58.27, 116.54, 146.83, 174.61], # Bbmaj7
+		[98.00, 116.54, 146.83, 196.00], # Gm
+		[55.00, 110.00, 146.83, 164.81], # Asus4/E
+	]
+	var notes := [220.00, 196.00, 174.61, 146.83, 164.81, 174.61, 146.83, 130.81]
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var bar := int(floor(t / 3.0)) % chords.size()
+		var chord: Array = chords[bar]
+		var bar_t := fmod(t, 3.0) / 3.0
+		var swell := sin(bar_t * PI)
+		var pad := (
+			sin(t * TAU * float(chord[0])) * 0.42
+			+ sin(t * TAU * float(chord[1])) * 0.28
+			+ sin(t * TAU * float(chord[2])) * 0.18 * swell
+			+ sin(t * TAU * float(chord[3])) * 0.12 * swell
+		)
+		var note_idx := int(floor(t / 1.5)) % notes.size()
+		var note_t := fmod(t, 1.5) / 1.5
+		var note_env := sin(minf(1.0, note_t * 5.0) * PI * 0.5) * pow(1.0 - note_t, 1.6)
+		var warm_pluck := sin(t * TAU * float(notes[note_idx])) * 0.18 * note_env
+		lp += 0.09 * ((pad + warm_pluck) - lp)
+		arr[i] = lp * 0.24
+	return _make_wav(arr, true)
+
+
+func _synth_forest_bgm() -> AudioStreamWAV:
+	# Drone profundo de madeira e brisa suave na mata (D2 / A2 / C3)
+	var duration := 10.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var lfo := 0.55 + 0.45 * sin(t * TAU * 0.10)
+		var bass := sin(t * TAU * 73.42) * 0.48 + sin(t * TAU * 110.00) * 0.30 + sin(t * TAU * 130.81) * 0.22 * lfo
+		lp += 0.07 * (bass - lp)
+		arr[i] = lp * 0.23
+	return _make_wav(arr, true)
+
+
+func _synth_night_forest_bgm() -> AudioStreamWAV:
+	# Ambiência sombria e imersiva com pulso grave (E1 41.2 Hz + E2 82.4 Hz + B2 123.5 Hz)
+	var duration := 8.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var pulse := pow(0.5 + 0.5 * sin(t * TAU * 0.25), 2.0)
+		var sub := sin(t * TAU * 41.20) * 0.50 * (0.65 + 0.35 * pulse)
+		var mid := sin(t * TAU * 82.41) * 0.32 + sin(t * TAU * 123.47) * 0.18 * pulse
+		lp += 0.06 * ((sub + mid) - lp)
+		arr[i] = lp * 0.25
+	return _make_wav(arr, true)
+
+
+func _synth_corrupted_tension_bgm() -> AudioStreamWAV:
+	# Tensão psicológica com sub-bass heartbeat e modulação lenta (zero apito agudo)
+	var duration := 8.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var beat_cycle := fmod(t, 1.6)
+		var hb := 0.0
+		if beat_cycle < 0.18:
+			hb = sin((beat_cycle / 0.18) * PI) * sin(t * TAU * 48.0) * 0.58
+		elif beat_cycle >= 0.26 and beat_cycle < 0.42:
+			hb = sin(((beat_cycle - 0.26) / 0.16) * PI) * sin(t * TAU * 38.0) * 0.42
+		var detune := sin(t * TAU * 0.125) * 0.8
+		var drone := (
+			sin(t * TAU * 55.0) * 0.36
+			+ sin(t * TAU * (82.41 + detune)) * 0.26
+			+ sin(t * TAU * (116.54 - detune)) * 0.18
+		)
+		lp += 0.07 * ((hb + drone) - lp)
+		arr[i] = lp * 0.27
+	return _make_wav(arr, true)
+
+
+func _synth_boss_bgm() -> AudioStreamWAV:
+	# Boss Fight da Lagoa Azul: pulso grave tribal + swell dramático em Ré menor (< 320 Hz)
+	var duration := 8.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var bass_roots := [73.42, 65.41, 58.27, 55.00] # D2 -> C2 -> Bb1 -> A1
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var bar := int(floor(t / 2.0)) % bass_roots.size()
+		var root := float(bass_roots[bar])
+		var step_t := fmod(t, 0.5) / 0.5
+		var pulse_env := pow(1.0 - step_t, 1.8)
+		var drum_sub := sin(t * TAU * lerpf(root * 1.2, root * 0.75, step_t)) * 0.48 * pulse_env
+		var cello := (
+			sin(t * TAU * root) * 0.34
+			+ sin(t * TAU * (root * 1.5)) * 0.24
+			+ sin(t * TAU * (root * 2.0)) * 0.14 * (0.5 + 0.5 * sin(t * TAU * 0.5))
+		)
+		lp += 0.09 * ((drum_sub + cello) - lp)
+		arr[i] = lp * 0.30
+	return _make_wav(arr, true)
+
 
 func _synth_vhs_memory_bgm() -> AudioStreamWAV:
-	# Melodia de caixinha de música fragmentada em 8-bit com wow/flutter de fita VHS
 	var duration := 6.0
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
-
-	# Notas: D4 (293.66), F4 (349.23), A4 (440.0), C5 (523.25), Bb4 (466.16), A4 (440.0)
-	var notes := [293.66, 349.23, 440.0, 523.25, 466.16, 440.0]
-	var note_dur := duration / float(notes.size())
-
-	for i in range(count):
-		var t := float(i) / float(count)
-		var note_idx := clampi(int(t * float(notes.size())), 0, notes.size() - 1)
-		var note_t := fmod(float(i) / float(MIX_RATE), note_dur) / note_dur
-		var env := exp(-note_t * 3.8)
-
-		var wow := sin(t * TAU * 1.2) * 2.5 # Wow & flutter analógico
-		var base_freq: float = notes[note_idx] + wow
-		var chime := sin(float(i) * TAU * base_freq / float(MIX_RATE)) * 0.6
-		var chime_oct := sin(float(i) * TAU * base_freq * 2.0 / float(MIX_RATE)) * 0.25
-
-		var low_pad := sin(float(i) * TAU * 73.41 / float(MIX_RATE)) * 0.15
-		var tape_flutter := sin(float(i) * 55.0) * 0.03
-
-		var sig := ((chime + chime_oct) * env * 0.45 + low_pad + tape_flutter) * 0.5
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes, true, 0, count)
-
-func _synth_fire_hazard() -> AudioStreamWAV:
-	# Fogo rugindo e crepitação contínua
-	var duration := 4.0
-	var count := int(duration * float(MIX_RATE))
-	var bytes := PackedByteArray()
-	bytes.resize(count * 2)
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 91823
+	rng.seed = 1994
 	var lp := 0.0
 	for i in range(count):
-		var t := float(i) / float(count)
+		var t := float(i) / float(MIX_RATE)
+		var drift := sin(t * TAU * 0.33) * 1.2
+		var drone := sin(t * TAU * (65.41 + drift)) * 0.46 + sin(t * TAU * (98.0 - drift * 0.5)) * 0.28
+		var hiss := rng.randf_range(-1.0, 1.0) * 0.03
+		lp = lerpf(lp, drone + hiss, 0.07)
+		arr[i] = lp * 0.24
+	return _make_wav(arr, true)
+
+
+# ==============================================================================
+# AMBIÊNCIAS NATURAIS E PSICOLÓGICAS COM FILTRO PASSA-BAIXA (SEM APITOS AGUDOS)
+# ==============================================================================
+
+func _synth_morning_ambience() -> AudioStreamWAV:
+	# Brisa costeira matinal suave + harmônicos quentes graves (146–220 Hz)
+	var duration := 6.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 101
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
 		var n := rng.randf_range(-1.0, 1.0)
-		lp = lerpf(lp, n, 0.15)
-		var roar := lp * (0.8 + 0.2 * sin(t * TAU * 1.5))
-		var pop := 0.0
-		if rng.randf() < 0.003:
-			pop = rng.randf_range(0.5, 1.0)
-		var sig := (roar * 0.5 + pop * 0.5) * 0.45
-		_write_s16(bytes, i, sig)
-	return _create_wav(bytes, true, 0, count)
+		lp = lerpf(lp, n, 0.035)
+		var breeze := lp * (0.45 + 0.25 * sin(t * TAU * 0.166))
+		var warm_pad := sin(t * TAU * 146.83) * 0.16 + sin(t * TAU * 220.0) * 0.10 * (0.5 + 0.5 * sin(t * TAU * 0.333))
+		arr[i] = (breeze + warm_pad) * 0.20
+	return _make_wav(arr, true)
+
+
+func _synth_afternoon_ambience() -> AudioStreamWAV:
+	# Brisa morna de fim de tarde + ressonância âmbar grave (98–196 Hz, zero cigarra 4200 Hz)
+	var duration := 6.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 202
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var n := rng.randf_range(-1.0, 1.0)
+		lp = lerpf(lp, n, 0.04)
+		var warm_drone := sin(t * TAU * 98.0) * 0.30 + sin(t * TAU * 146.83) * 0.18 + sin(t * TAU * 196.0) * 0.10
+		arr[i] = (lp * 0.38 + warm_drone) * 0.20
+	return _make_wav(arr, true)
+
+
+func _synth_night_ambience() -> AudioStreamWAV:
+	# Vento noturno profundo nas copas + pulso grave (55–110 Hz, zero grilo 4800 Hz)
+	var duration := 6.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 260
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var n := rng.randf_range(-1.0, 1.0)
+		lp = lerpf(lp, n, 0.028)
+		var sub := sin(t * TAU * 55.0) * 0.38 + sin(t * TAU * 82.41) * 0.24 * (0.6 + 0.4 * sin(t * TAU * 0.166))
+		arr[i] = (lp * 0.42 + sub) * 0.22
+	return _make_wav(arr, true)
+
+
+func _synth_forest_ambience() -> AudioStreamWAV:
+	# Riacho filtrado em passa-baixa + farfalhar suave de folhas graves
+	var duration := 6.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 312
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var n := rng.randf_range(-1.0, 1.0)
+		lp = lerpf(lp, n, 0.042 + 0.015 * sin(t * TAU * 0.333))
+		var creek_body := sin(t * TAU * 110.0) * 0.20 + sin(t * TAU * 164.81) * 0.12
+		arr[i] = (lp * 0.55 + creek_body) * 0.20
+	return _make_wav(arr, true)
+
+
+func _synth_corrupted_ambience() -> AudioStreamWAV:
+	# Pulsação sub-grave abafada e respiração sombria filtrada
+	var duration := 6.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 666
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var n := rng.randf_range(-1.0, 1.0)
+		lp = lerpf(lp, n, 0.025)
+		var throb := 0.55 + 0.45 * sin(t * TAU * 0.333)
+		var sub := sin(t * TAU * 46.25) * 0.48 * throb + sin(t * TAU * 69.30) * 0.26
+		arr[i] = (lp * 0.32 + sub) * 0.23
+	return _make_wav(arr, true)
+
+
+func _synth_fire_hazard_ambience() -> AudioStreamWAV:
+	var duration := 4.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 808
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var n := rng.randf_range(-1.0, 1.0)
+		lp = lerpf(lp, n, 0.055)
+		var rumble := sin(t * TAU * 55.0) * 0.42 + sin(t * TAU * 82.41) * 0.24
+		arr[i] = (lp * 0.48 + rumble) * 0.24
+	return _make_wav(arr, true)
+
+
+func _synth_act3_ambience() -> AudioStreamWAV:
+	# Ar-condicionado clínico suave e grave de delegacia/hospital (60 Hz + 120 Hz filtrados)
+	var duration := 6.0
+	var count := int(duration * MIX_RATE)
+	var arr := PackedFloat32Array()
+	arr.resize(count)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 333
+	var lp := 0.0
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var hum := sin(t * TAU * 60.0) * 0.34 + sin(t * TAU * 120.0) * 0.16
+		var air := rng.randf_range(-1.0, 1.0)
+		lp = lerpf(lp, air, 0.022)
+		arr[i] = (hum + lp * 0.28) * 0.16
+	return _make_wav(arr, true)

@@ -1,0 +1,155 @@
+[gd_resource type="SpriteFrames" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/vfx/water_jet.png" id="1_uox84"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hqcb4"]
+atlas = ExtResource("1_uox84")
+region = Rect2(0, 0, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1mrya"]
+atlas = ExtResource("1_uox84")
+region = Rect2(121, 0, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_3ab81"]
+atlas = ExtResource("1_uox84")
+region = Rect2(242, 0, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_of7t0"]
+atlas = ExtResource("1_uox84")
+region = Rect2(363, 0, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hj270"]
+atlas = ExtResource("1_uox84")
+region = Rect2(0, 62, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_n43dq"]
+atlas = ExtResource("1_uox84")
+region = Rect2(121, 62, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hp6yq"]
+atlas = ExtResource("1_uox84")
+region = Rect2(242, 62, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_7o4ep"]
+atlas = ExtResource("1_uox84")
+region = Rect2(363, 62, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_g5hyb"]
+atlas = ExtResource("1_uox84")
+region = Rect2(0, 124, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_lblhx"]
+atlas = ExtResource("1_uox84")
+region = Rect2(121, 124, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_khfqn"]
+atlas = ExtResource("1_uox84")
+region = Rect2(242, 124, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_m47kg"]
+atlas = ExtResource("1_uox84")
+region = Rect2(363, 124, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_wevbo"]
+atlas = ExtResource("1_uox84")
+region = Rect2(0, 186, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0cdlk"]
+atlas = ExtResource("1_uox84")
+region = Rect2(121, 186, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_kxra8"]
+atlas = ExtResource("1_uox84")
+region = Rect2(242, 186, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_5ulnm"]
+atlas = ExtResource("1_uox84")
+region = Rect2(363, 186, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ptp7g"]
+atlas = ExtResource("1_uox84")
+region = Rect2(0, 248, 121, 62)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_8wc85"]
+atlas = ExtResource("1_uox84")
+region = Rect2(121, 248, 121, 62)
+filter_clip = true
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_hqcb4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_1mrya")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_3ab81")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_of7t0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_hj270")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_n43dq")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_hp6yq")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_7o4ep")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_g5hyb")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_lblhx")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_khfqn")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_m47kg")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_wevbo")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0cdlk")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_kxra8")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_5ulnm")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ptp7g")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_8wc85")
+}],
+"loop": 1,
+"name": &"play",
+"speed": 18.0
+}]

@@ -19,9 +19,11 @@ func _ready() -> void:
 func can_interact() -> bool:
 	if not visible:
 		return false
-	if not one_shot_self_switch.is_empty():
-		var gs := _get_game_state()
-		if gs and gs.get_self_switch(interaction_id, one_shot_self_switch):
+	var gs := _get_game_state()
+	if gs:
+		if bool(gs.get("dialogue_active")) or bool(gs.get("sleep_transition_active")):
+			return false
+		if not one_shot_self_switch.is_empty() and gs.get_self_switch(interaction_id, one_shot_self_switch):
 			return false
 	return true
 
@@ -30,6 +32,9 @@ func get_prompt_text() -> String:
 
 func trigger_interaction() -> void:
 	if not can_interact():
+		return
+	var gs_block := _get_game_state()
+	if gs_block and gs_block.has_method("is_interaction_blocked") and bool(gs_block.call("is_interaction_blocked")):
 		return
 	if not one_shot_self_switch.is_empty():
 		var gs := _get_game_state()

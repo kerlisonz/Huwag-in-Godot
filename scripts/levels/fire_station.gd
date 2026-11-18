@@ -4,9 +4,12 @@ signal request_level_change(target_scene: String, spawn_tag: String)
 signal request_dialogue(pages: Array, callback: Callable)
 
 const RetroLevelHelpers := preload("res://scripts/levels/retro_level_helpers.gd")
+const V2TileCatalog := preload("res://scripts/levels/v2_tile_catalog.gd")
+const AtmosphereRig := preload("res://scripts/levels/atmosphere_rig.gd")
 const NPC_SCENE := preload("res://scenes/characters/NpcEntity.tscn")
-const NORMAL_TS := preload("res://assets/tilesets/retro/interior_fnaf_normal_tileset.tres")
-const DISTORTED_TS := preload("res://assets/tilesets/retro/interior_fnaf_distorted_tileset.tres")
+const NORMAL_TS := preload("res://assets/tilesets/v2/interiors_v2_normal_tileset.tres")
+const DISTORTED_TS := preload("res://assets/tilesets/v2/interiors_v2_distorted_tileset.tres")
+const ACT3_TS := preload("res://assets/tilesets/v2/interiors_v2_act3_tileset.tres")
 
 @onready var canvas_mod: CanvasModulate = $CanvasModulate
 @onready var floor_normal: TileMapLayer = $FloorNormal
@@ -25,6 +28,7 @@ var _distorted_props: Array[Node2D] = []
 var _distorted_decals: Array[Node2D] = []
 var _lights: Array[PointLight2D] = []
 var _bay_flicker_light: PointLight2D = null
+var _furniture_layer: TileMapLayer = null
 var _time_acc: float = 0.0
 
 
@@ -41,6 +45,8 @@ func _ready() -> void:
 
 	GameState.perception_changed.connect(func(_m: int) -> void: _apply_station_atmosphere())
 	GameState.switch_changed.connect(func(_k: String, _v: bool) -> void: _apply_station_atmosphere())
+	if GameState.has_signal("day_period_changed"):
+		GameState.day_period_changed.connect(func(_p: String) -> void: _apply_station_atmosphere())
 	if GameState.has_signal("higher_dose_changed"):
 		GameState.higher_dose_changed.connect(func(active: bool) -> void: apply_higher_dose_world(active))
 
@@ -69,141 +75,143 @@ func _is_higher_dose_active() -> bool:
 
 
 func _build_station_tilemaps() -> void:
+	var t_cat := V2TileCatalog.INTERIOR_TILES
 	for layer in [floor_normal, walls_normal]:
-		layer.tile_set = NORMAL_TS
+		layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else NORMAL_TS
 	for layer in [floor_distorted, walls_distorted]:
 		layer.tile_set = DISTORTED_TS
 
-	# Complexo 60x40 tiles (960x640) emoldurado pelo vazio escuro estilo FNAF Minigame
+	# Complexo 60x40 tiles (960x640) reconstruído com interiors_v2 (16x16, zero sobreposição)
 	for fl in [floor_normal, floor_distorted]:
-		RetroLevelHelpers.paint_rect(fl, 0, 0, 60, 40, Vector2i(0, 0))
-		RetroLevelHelpers.paint_rect(fl, 4, 3, 52, 34, Vector2i(1, 0))
+		fl.clear()
+		V2TileCatalog.fill_rect(fl, Rect2i(5, 4, 50, 32), t_cat["wood_floor_dark"])
 
-		# 1. Hall de Recepção e Espera (x: 19..40, y: 21..34) - Quadriculado arcade
-		RetroLevelHelpers.paint_rect(fl, 19, 21, 22, 14, Vector2i(2, 0))
-		for c_pos in [
-			Vector2i(23, 25), Vector2i(33, 27), Vector2i(26, 30), Vector2i(35, 31)
-		]:
-			fl.set_cell(c_pos, 0, Vector2i(3, 0))
-		# Faixa de entrada vermelha BFP sul e transição norte
-		RetroLevelHelpers.paint_rect(fl, 28, 31, 4, 4, Vector2i(12, 0))
-		RetroLevelHelpers.paint_rect(fl, 28, 19, 4, 3, Vector2i(11, 0))
+		# 1. Hall de Recepção e Espera (x: 19..40, y: 21..34) - Ladrilho claro BFP
+		for ry in range(21, 35):
+			for rx in range(19, 41):
+				var rtile: Vector2i = t_cat["checker_clinic"] if (rx + ry) % 2 == 0 else t_cat["checker_clinic_alt"]
+				fl.set_cell(Vector2i(rx, ry), 0, rtile)
+		V2TileCatalog.stamp_rect(fl, Vector2i(28, 31), t_cat["rug_crimson_tl"], Vector2i(2, 2))
+		V2TileCatalog.stamp_rect(fl, Vector2i(30, 31), t_cat["rug_crimson_tl"], Vector2i(2, 2))
+		V2TileCatalog.fill_rect(fl, Rect2i(28, 19, 4, 3), t_cat["concrete_station"])
 
 		# 2. Central de Comando & Despacho (x: 19..40, y: 5..18)
-		RetroLevelHelpers.paint_rect(fl, 19, 5, 22, 14, Vector2i(7, 0))
-		RetroLevelHelpers.paint_rect(fl, 26, 12, 8, 5, Vector2i(2, 0))
-		RetroLevelHelpers.paint_rect(fl, 27, 8, 6, 4, Vector2i(11, 0))
+		V2TileCatalog.fill_rect(fl, Rect2i(19, 6, 22, 13), t_cat["concrete_station"])
+		V2TileCatalog.fill_rect(fl, Rect2i(26, 11, 8, 6), t_cat["wood_floor_warm"])
+		V2TileCatalog.stamp_rect(fl, Vector2i(28, 9), t_cat["rug_crimson_tl"], Vector2i(2, 2))
+		V2TileCatalog.stamp_rect(fl, Vector2i(30, 9), t_cat["rug_crimson_tl"], Vector2i(2, 2))
 
 		# 3. Ala Oeste - Prontidão & Armários (x: 6..16, y: 7..32) + corredores x:17..18
-		RetroLevelHelpers.paint_rect(fl, 6, 7, 11, 26, Vector2i(9, 0))
-		for gy in range(13, 26, 3):
-			fl.set_cell(Vector2i(11, gy), 0, Vector2i(8, 0)) # ralos de drenagem
-		RetroLevelHelpers.paint_rect(fl, 17, 10, 2, 3, Vector2i(11, 0)) # corredor norte <-> comando
-		RetroLevelHelpers.paint_rect(fl, 17, 25, 2, 3, Vector2i(11, 0)) # corredor sul <-> recepção
+		V2TileCatalog.fill_rect(fl, Rect2i(6, 7, 11, 26), t_cat["concrete_station"])
+		for gy in [13, 19, 25]:
+			V2TileCatalog.stamp_rect(fl, Vector2i(10, gy), t_cat["banig_tl"], Vector2i(3, 2))
+		V2TileCatalog.fill_rect(fl, Rect2i(17, 10, 2, 3), t_cat["wood_floor_warm"])
+		V2TileCatalog.fill_rect(fl, Rect2i(17, 25, 2, 3), t_cat["wood_floor_warm"])
 
 		# 4. Ala Leste - Enfermaria & Arquivo Médico (x: 43..53, y: 7..32) + corredores x:41..42
-		RetroLevelHelpers.paint_rect(fl, 43, 7, 11, 26, Vector2i(10, 0))
-		RetroLevelHelpers.paint_rect(fl, 41, 10, 2, 3, Vector2i(11, 0)) # corredor norte <-> comando
-		RetroLevelHelpers.paint_rect(fl, 41, 25, 2, 3, Vector2i(11, 0)) # corredor sul <-> recepção
+		for cy in range(7, 33):
+			for cx in range(43, 54):
+				var ctile: Vector2i = t_cat["checker_clinic"] if (cx + cy) % 2 == 0 else t_cat["checker_clinic_alt"]
+				fl.set_cell(Vector2i(cx, cy), 0, ctile)
+		V2TileCatalog.fill_rect(fl, Rect2i(41, 10, 2, 3), t_cat["wood_floor_warm"])
+		V2TileCatalog.fill_rect(fl, Rect2i(41, 25, 2, 3), t_cat["wood_floor_warm"])
 
-		if fl == floor_distorted:
-			# Pistas visuais surreais no estado distorcido (olhos no corredor + manchas nos ralos)
-			for eye_pos in [
-				Vector2i(29, 20), Vector2i(17, 11), Vector2i(41, 11),
-				Vector2i(17, 26), Vector2i(41, 26), Vector2i(29, 14)
-			]:
-				fl.set_cell(eye_pos, 0, Vector2i(14, 0))
-			for stain_pos in [
-				Vector2i(11, 16), Vector2i(11, 22), Vector2i(47, 19),
-				Vector2i(48, 22), Vector2i(24, 29), Vector2i(30, 11)
-			]:
-				fl.set_cell(stain_pos, 0, Vector2i(13, 0))
-			RetroLevelHelpers.paint_rect(fl, 8, 29, 2, 2, Vector2i(15, 0))
-			RetroLevelHelpers.paint_rect(fl, 50, 28, 2, 2, Vector2i(15, 0))
-
-	# Paredes internas e externas nas camadas normal e distorcida
+	# Paredes internas e externas + sombras projetadas (sem móveis misturados na camada de parede)
 	for wl in [walls_normal, walls_distorted]:
-		# Parede Norte do Comando (y=4..5) com janelas e ventilação
-		RetroLevelHelpers.paint_rect(wl, 18, 4, 24, 1, Vector2i(7, 1))
-		RetroLevelHelpers.paint_rect(wl, 18, 5, 24, 1, Vector2i(8, 1))
-		wl.set_cell(Vector2i(22, 4), 0, Vector2i(10, 1))
-		wl.set_cell(Vector2i(23, 4), 0, Vector2i(10, 1))
-		wl.set_cell(Vector2i(36, 4), 0, Vector2i(10, 1))
-		wl.set_cell(Vector2i(37, 4), 0, Vector2i(10, 1))
-		wl.set_cell(Vector2i(30, 4), 0, Vector2i(11, 1))
-		# Consoles de despacho no comando (x=28..31, y=7)
-		wl.set_cell(Vector2i(21, 6), 0, Vector2i(2, 2))
-		wl.set_cell(Vector2i(22, 6), 0, Vector2i(2, 2))
-		wl.set_cell(Vector2i(29, 6), 0, Vector2i(3, 2))
-		wl.set_cell(Vector2i(30, 6), 0, Vector2i(3, 2))
-		wl.set_cell(Vector2i(37, 6), 0, Vector2i(2, 2))
-		wl.set_cell(Vector2i(38, 6), 0, Vector2i(2, 2))
+		wl.clear()
+		V2TileCatalog.fill_rect(wl, Rect2i(18, 4, 24, 1), t_cat["wall_station_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(18, 5, 24, 1), t_cat["wall_wood_mid"])
+		for sx in range(19, 41):
+			wl.set_cell(Vector2i(sx, 6), 0, t_cat["shadow_top"])
 
 		# Parede divisória Comando <-> Recepção (y=19..20, arco aberto em x=28..31)
-		RetroLevelHelpers.paint_rect(wl, 19, 19, 9, 1, Vector2i(7, 1))
-		RetroLevelHelpers.paint_rect(wl, 19, 20, 9, 1, Vector2i(8, 1))
-		RetroLevelHelpers.paint_rect(wl, 32, 19, 9, 1, Vector2i(7, 1))
-		RetroLevelHelpers.paint_rect(wl, 32, 20, 9, 1, Vector2i(8, 1))
-		wl.set_cell(Vector2i(26, 19), 0, Vector2i(14, 1))
-		wl.set_cell(Vector2i(33, 19), 0, Vector2i(14, 1))
+		V2TileCatalog.fill_rect(wl, Rect2i(19, 19, 9, 1), t_cat["wall_station_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(19, 20, 9, 1), t_cat["wall_wood_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(32, 19, 9, 1), t_cat["wall_station_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(32, 20, 9, 1), t_cat["wall_wood_mid"])
 
-		# Ala Oeste (x=5 parede oeste, y=5..6 norte, y=33 sul)
-		RetroLevelHelpers.paint_rect(wl, 5, 5, 13, 1, Vector2i(3, 1))
-		RetroLevelHelpers.paint_rect(wl, 5, 6, 13, 1, Vector2i(4, 1))
-		wl.set_cell(Vector2i(11, 5), 0, Vector2i(11, 1))
-		wl.set_cell(Vector2i(9, 7), 0, Vector2i(4, 2))   # Cilindros de combate
-		wl.set_cell(Vector2i(10, 7), 0, Vector2i(4, 2))  # Cilindros de combate
-		wl.set_cell(Vector2i(11, 7), 0, Vector2i(4, 2))
-		RetroLevelHelpers.paint_rect(wl, 5, 5, 1, 29, Vector2i(1, 1))
-		RetroLevelHelpers.paint_rect(wl, 6, 9, 1, 12, Vector2i(1, 2)) # Fileira de armários oeste
-		RetroLevelHelpers.paint_rect(wl, 5, 33, 13, 1, Vector2i(2, 1))
+		# Ala Oeste - Prontidão (x=5 parede oeste, y=5..6 norte, y=33 sul)
+		V2TileCatalog.fill_rect(wl, Rect2i(5, 5, 13, 1), t_cat["wall_station_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(5, 6, 13, 1), t_cat["wall_wood_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(5, 5, 1, 29), t_cat["wall_station_left"])
+		V2TileCatalog.fill_rect(wl, Rect2i(5, 33, 13, 1), t_cat["wall_trim_gold"])
 
-		# Parede divisória Ala Oeste <-> Centro (x=17..18, corredores abertos y=10..12 e y=25..27)
-		RetroLevelHelpers.paint_rect(wl, 17, 5, 2, 5, Vector2i(1, 1))
-		RetroLevelHelpers.paint_rect(wl, 17, 13, 2, 12, Vector2i(1, 1))
-		RetroLevelHelpers.paint_rect(wl, 17, 28, 2, 7, Vector2i(1, 1))
+		# Parede divisória Ala Oeste <-> Centro (x=17..18)
+		V2TileCatalog.fill_rect(wl, Rect2i(17, 5, 2, 5), t_cat["wall_station_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(17, 13, 2, 12), t_cat["wall_station_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(17, 28, 2, 7), t_cat["wall_station_mid"])
 
 		# Ala Leste - Enfermaria (x=54 leste, y=5..6 norte, y=33 sul)
-		RetroLevelHelpers.paint_rect(wl, 42, 5, 13, 1, Vector2i(9, 1))
-		RetroLevelHelpers.paint_rect(wl, 42, 6, 13, 1, Vector2i(8, 1))
-		wl.set_cell(Vector2i(47, 5), 0, Vector2i(10, 1))
-		wl.set_cell(Vector2i(48, 5), 0, Vector2i(10, 1))
-		wl.set_cell(Vector2i(44, 7), 0, Vector2i(2, 2)) # Arquivo médico norte
-		wl.set_cell(Vector2i(45, 7), 0, Vector2i(2, 2))
-		RetroLevelHelpers.paint_rect(wl, 54, 5, 1, 29, Vector2i(1, 1))
-		RetroLevelHelpers.paint_rect(wl, 42, 33, 13, 1, Vector2i(2, 1))
+		V2TileCatalog.fill_rect(wl, Rect2i(42, 5, 13, 1), t_cat["wall_clinic_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(42, 6, 13, 1), t_cat["wall_wood_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(54, 5, 1, 29), t_cat["wall_clinic_right"])
+		V2TileCatalog.fill_rect(wl, Rect2i(42, 33, 13, 1), t_cat["wall_trim_gold"])
 
-		# Parede divisória Centro <-> Ala Leste (x=41..42, corredores y=10..12 e y=25..27)
-		RetroLevelHelpers.paint_rect(wl, 41, 5, 2, 5, Vector2i(1, 1))
-		RetroLevelHelpers.paint_rect(wl, 41, 13, 2, 12, Vector2i(1, 1))
-		RetroLevelHelpers.paint_rect(wl, 41, 28, 2, 7, Vector2i(1, 1))
+		# Parede divisória Centro <-> Ala Leste (x=41..42)
+		V2TileCatalog.fill_rect(wl, Rect2i(41, 5, 2, 5), t_cat["wall_clinic_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(41, 13, 2, 12), t_cat["wall_clinic_mid"])
+		V2TileCatalog.fill_rect(wl, Rect2i(41, 28, 2, 7), t_cat["wall_clinic_mid"])
 
-		# Parede Sul da Recepção (y=35, porta dupla em x=28..31)
-		RetroLevelHelpers.paint_rect(wl, 18, 35, 10, 1, Vector2i(2, 1))
-		RetroLevelHelpers.paint_rect(wl, 32, 35, 10, 1, Vector2i(2, 1))
-		RetroLevelHelpers.paint_rect(wl, 28, 35, 4, 1, Vector2i(12, 1))
-		RetroLevelHelpers.paint_rect(wl, 28, 36, 4, 1, Vector2i(2, 1))
+		# Parede Sul da Recepção (y=35, porta dupla livre em x=28..31)
+		V2TileCatalog.fill_rect(wl, Rect2i(18, 35, 10, 1), t_cat["wall_trim_gold"])
+		V2TileCatalog.fill_rect(wl, Rect2i(32, 35, 10, 1), t_cat["wall_trim_gold"])
+
+	# Camada dedicada para mobiliário multi-tile v2 do Quartel BFP (zero sobreposição)
+	if _furniture_layer == null:
+		_furniture_layer = TileMapLayer.new()
+		_furniture_layer.name = "V2StationFurnitureLayer"
+		_furniture_layer.z_index = 0
+		_furniture_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_furniture_layer.collision_enabled = false
+		add_child(_furniture_layer)
+	if ysort_root != null:
+		ysort_root.z_index = 2
+	_furniture_layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
+	_furniture_layer.clear()
+
+	# Comando Central: Janelas, Lousa BFP, Mesa de Comando Cap. Reyes, Rádio e Estantes
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(22, 4), t_cat["window_day_tl"], Vector2i(2, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(36, 4), t_cat["window_day_tl"], Vector2i(2, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(29, 4), t_cat["chalkboard_bfp"], Vector2i(2, 2))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(20, 6), t_cat["radio_pc_bfp"], Vector2i(1, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(37, 6), t_cat["bookshelf_b"], Vector2i(2, 2))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(27, 7), t_cat["dispatch_desk"], Vector2i(6, 2))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(25, 19), t_cat["bulletin_board"], Vector2i(2, 2))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(33, 19), t_cat["bulletin_board"], Vector2i(2, 2))
+
+	# Recepção: Balcão de Atendimento Leste e Cadeiras de Espera Oeste
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(32, 25), t_cat["dispatch_desk"], Vector2i(6, 2))
+	for cx in range(21, 25):
+		_furniture_layer.set_cell(Vector2i(cx, 26), 0, t_cat["chair_down"])
+
+	# Ala Oeste (Prontidão): Armários, Suprimentos e Mesa de Rádio
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(11, 7), t_cat["supply_crates"], Vector2i(2, 2))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(14, 7), t_cat["supply_crates"], Vector2i(2, 2))
+	for wy in [10, 14, 18, 22]:
+		V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(6, wy), t_cat["wardrobe"], Vector2i(2, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(9, 28), t_cat["table_dining"], Vector2i(3, 3))
+
+	# Ala Leste (Enfermaria): Janela, Arquivo Médico, Mesa Médica e 2 Macas
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(48, 4), t_cat["window_day_tl"], Vector2i(2, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(44, 6), t_cat["bookshelf_a"], Vector2i(2, 2))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(47, 9), t_cat["table_dining"], Vector2i(3, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(50, 14), t_cat["bed_huwag"], Vector2i(3, 4))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(50, 21), t_cat["bed_huwag"], Vector2i(3, 4))
 
 
 func _build_station_props_and_lights() -> void:
-	# Props por ala (normal vs distorcido)
-	_add_dual_prop("bfp_desk", Vector2(480, 146), Vector2(2.2, 1.5), -8)          # Mesa Cap. Reyes
-	_add_dual_prop("bfp_desk", Vector2(560, 426), Vector2(1.4, 1.3), -6)          # Balcão Recepção Leste
-	_add_dual_prop("wooden_signpost", Vector2(368, 434), Vector2(2.1, 1.0), -4)   # Banco Sala de Espera
-	_add_dual_prop("locker_uniform", Vector2(132, 150), Vector2(1.3, 1.3), -6)    # Armário Prontidão
-	_add_dual_prop("locker_uniform", Vector2(158, 150), Vector2(1.3, 1.3), -6)
-	_add_dual_prop("radio_clock", Vector2(168, 476), Vector2(1.2, 1.2), -4)       # Mesa / Rádio dos Bombeiros Oeste
-	_add_dual_prop("pill_table", Vector2(772, 166), Vector2(1.5, 1.4), -6)        # Mesa Médica Enfermaria
-	_add_dual_prop("medical_bed", Vector2(818, 250), Vector2(1.35, 1.35), -8)     # Maca Clínica 1
-	_add_dual_prop("medical_bed", Vector2(818, 350), Vector2(1.35, 1.35), -8)     # Maca Clínica 2
-
-	# Decais exclusivos no estado distorcido
+	# Decais exclusivos no estado distorcido (mobiliário agora vem 100% do atlas interiors_v2)
 	_add_distorted_decal("floor_stain", Vector2(480, 232), Vector2(1.8, 1.5))
 	_add_distorted_decal("floor_stain", Vector2(180, 280), Vector2(1.6, 1.4))
 	_add_distorted_decal("floor_stain", Vector2(760, 290), Vector2(1.7, 1.4))
 	_add_distorted_decal("yume_eye_rune", Vector2(280, 340), Vector2(1.2, 1.2))
 	_add_distorted_decal("yume_eye_rune", Vector2(680, 340), Vector2(1.2, 1.2))
 	_add_distorted_decal("yume_eye_rune", Vector2(480, 310), Vector2(1.4, 1.4))
+	for corridor_eye in [
+		Vector2i(29, 20), Vector2i(17, 11), Vector2i(41, 11),
+		Vector2i(17, 26), Vector2i(41, 26), Vector2i(29, 14)
+	]:
+		_add_distorted_decal("yume_eye_rune", Vector2(corridor_eye.x * 16 + 8, corridor_eye.y * 16 + 8), Vector2(1.0, 1.0))
 
 	# Luzes PointLight2D distribuídas nas 4 alas (fluorescente / tungsten / clínica)
 	var cmd_light := RetroLevelHelpers.create_point_light(Vector2(480, 176), Color(0.86, 0.90, 0.98), 0.85, 3.0)
@@ -362,6 +370,11 @@ func _apply_station_atmosphere() -> void:
 	var higher := _is_higher_dose_active()
 	var ato: int = int(GameState.get_var("Ato", 1))
 
+	var active_base_ts: TileSet = ACT3_TS if act3 else NORMAL_TS
+	floor_normal.tile_set = active_base_ts
+	walls_normal.tile_set = active_base_ts
+	if _furniture_layer != null:
+		_furniture_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
 	floor_normal.visible = not higher
 	walls_normal.visible = not higher
 	floor_distorted.visible = higher
@@ -389,21 +402,31 @@ func _apply_station_atmosphere() -> void:
 		else:
 			npc.set_distorted_state(higher)
 
+	var period: String = GameState.get_day_period() if GameState.has_method("get_day_period") else ("afternoon" if GameState.is_afternoon else "morning")
 	if canvas_mod:
 		if act3:
 			canvas_mod.color = Color(0.62, 0.64, 0.67, 1.0)
 		elif higher:
-			canvas_mod.color = Color(0.34, 0.24, 0.28, 1.0)
+			canvas_mod.color = Color(0.54, 0.49, 0.56, 1.0)
+		elif period == "night":
+			canvas_mod.color = Color(0.50, 0.54, 0.64, 1.0)
+		elif period == "afternoon":
+			canvas_mod.color = Color(0.66, 0.62, 0.68, 1.0)
 		else:
-			canvas_mod.color = Color(0.56, 0.58, 0.66, 1.0)
+			canvas_mod.color = Color(0.74, 0.76, 0.82, 1.0)
 
 	for lt in _lights:
 		if lt == null:
 			continue
 		if higher:
-			lt.color = Color(0.86, 0.16, 0.22)
+			lt.color = Color(0.92, 0.46, 0.52)
 		elif act3:
 			lt.color = Color(0.86, 0.88, 0.90)
+
+	if has_node("/root/AudioManager"):
+		var am = get_node("/root/AudioManager")
+		if am.has_method("sync_adaptive_soundtrack"):
+			am.call("sync_adaptive_soundtrack", "fire_station", false)
 
 
 func _on_npc_interacted(npc_id: String) -> void:

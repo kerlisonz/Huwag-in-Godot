@@ -6,6 +6,7 @@ extends RefCounted
 ## decals ambientais e helpers de construção para TileMapLayer duplo (Normal vs Distorcido).
 
 const WIND_SWAY_SHADER: Shader = preload("res://shaders/wind_sway.gdshader")
+const WATCHING_EYE_SCRIPT := preload("res://scripts/components/watching_eye.gd")
 
 static var _tex_cache: Dictionary = {}
 static var _light_tex_cache: Dictionary = {}
@@ -68,6 +69,8 @@ static func paint_border(layer: TileMapLayer, x0: int, y0: int, w: int, h: int, 
 
 
 static func create_prop_sprite(kind: String, distorted: bool = false) -> Sprite2D:
+	if kind == "yume_eye_rune":
+		return WATCHING_EYE_SCRIPT.new() as Sprite2D
 	var spr := Sprite2D.new()
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	spr.texture = get_prop_texture(kind, distorted)

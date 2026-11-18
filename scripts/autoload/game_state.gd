@@ -11,6 +11,13 @@ signal outfit_changed(outfit_id: String)
 signal level_load_requested(scene_path: String, spawn_tag: String)
 
 signal higher_dose_changed(active: bool)
+signal clock_minute_changed(total_minutes: int, formatted_hhmm: String)
+signal day_period_changed(period_id: String)
+signal sleep_curfew_triggered(current_act: int)
+
+@export var in_game_minutes_per_real_second: float = 2.0
+@export var day_start_minutes: int = 390 # 06:30
+@export var sleep_trigger_minutes: int = 1380 # 23:00
 
 enum PerceptionMode {
 	FILTERED_MORNING = 0,
@@ -58,8 +65,14 @@ var variables: Dictionary = {
 var self_switches: Dictionary = {}
 var inventory: Dictionary = {}
 var is_afternoon: bool = false
+var clock_minutes: int = 390
+var clock_paused: bool = false
+var sleep_transition_active: bool = false
+var _clock_accum: float = 0.0
+var _last_emitted_period: String = "morning"
 var perception_mode: int = PerceptionMode.FILTERED_MORNING
 var dialogue_active: bool = false
+var dialogue_cooldown: float = 0.0
 var spawn_tag: String = "default"
 var current_scene_path: String = "res://scenes/levels/RoomHuwag.tscn"
 var saved_player_pos: Vector2 = Vector2.ZERO
@@ -95,6 +108,117 @@ const SAVE_PATH := "user://huwag_save.json"
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_last_emitted_period = get_day_period(clock_minutes)
+
+
+func _process(delta: float) -> void:
+	if not dialogue_active and dialogue_cooldown > 0.0:
+		dialogue_cooldown = maxf(0.0, dialogue_cooldown - delta)
+	if not _should_advance_clock():
+		return
+	_clock_accum += delta * maxf(0.0, in_game_minutes_per_real_second)
+	if _clock_accum >= 1.0:
+		var step_mins := int(floor(_clock_accum))
+		_clock_accum -= float(step_mins)
+		advance_clock_minutes(step_mins, true)
+
+
+func notify_dialogue_closed(cooldown_sec: float = 0.28) -> void:
+	dialogue_active = false
+	dialogue_cooldown = maxf(dialogue_cooldown, cooldown_sec)
+
+
+func is_interaction_blocked() -> bool:
+	return dialogue_active or sleep_transition_active or dialogue_cooldown > 0.0
+
+
+func _should_advance_clock() -> bool:
+	if clock_paused or dialogue_active or sleep_transition_active:
+		return false
+	if in_game_minutes_per_real_second <= 0.0:
+		return false
+	if current_scene_path.ends_with("vhs_memory_minigame.tscn") or current_scene_path.ends_with("EndingCredits.tscn") or current_scene_path.ends_with("TitleScreen.tscn"):
+		return false
+	var tree := get_tree()
+	if tree == null:
+		return false
+	return tree.get_first_node_in_group("player") != null
+
+
+func get_clock_minutes() -> int:
+	return clock_minutes
+
+
+func get_formatted_time(minutes_val: int = -1) -> String:
+	var m := clock_minutes if minutes_val < 0 else clampi(minutes_val, 0, 1439)
+	var hh := int(m / 60)
+	var mm := int(m % 60)
+	return "%02d:%02d" % [hh, mm]
+
+
+func get_day_period(minutes_val: int = -1) -> String:
+	var m := clock_minutes if minutes_val < 0 else clampi(minutes_val, 0, 1439)
+	if m >= 360 and m < 720:
+		return "morning"
+	elif m >= 720 and m < 1080:
+		return "afternoon"
+	return "night"
+
+
+func is_night_time() -> bool:
+	return get_day_period(clock_minutes) == "night"
+
+
+func get_afternoon_factor() -> float:
+	var p := get_day_period(clock_minutes)
+	if p == "morning":
+		return clampf(float(clock_minutes - 660) / 60.0, 0.0, 1.0) * 0.20
+	elif p == "afternoon":
+		return lerpf(0.25, 0.72, clampf(float(clock_minutes - 720) / 360.0, 0.0, 1.0))
+	return 0.25
+
+
+func get_night_factor() -> float:
+	if clock_minutes >= 1080:
+		return lerpf(0.55, 1.0, clampf(float(clock_minutes - 1080) / 180.0, 0.0, 1.0))
+	elif clock_minutes < 360:
+		return 1.0
+	elif clock_minutes >= 1020:
+		return lerpf(0.0, 0.45, clampf(float(clock_minutes - 1020) / 60.0, 0.0, 1.0))
+	return 0.0
+
+
+func set_clock_minutes(new_minutes: int, emit_curfew: bool = true) -> void:
+	var clamped := clampi(new_minutes, 0, 1439)
+	var prev_period := _last_emitted_period
+	clock_minutes = clamped
+	var new_period := get_day_period(clock_minutes)
+
+	if clock_minutes >= 720 and not is_afternoon:
+		is_afternoon = true
+		if int(variables.get("Ato", 1)) < 3 and not is_unfiltered_act3():
+			set_perception_mode(PerceptionMode.FILTERED_AFTERNOON)
+		time_of_day_changed.emit(true)
+	elif clock_minutes >= 360 and clock_minutes < 720 and is_afternoon:
+		is_afternoon = false
+		if int(variables.get("Ato", 1)) < 3 and not is_unfiltered_act3():
+			set_perception_mode(PerceptionMode.FILTERED_MORNING)
+		time_of_day_changed.emit(false)
+
+	clock_minute_changed.emit(clock_minutes, get_formatted_time(clock_minutes))
+	if new_period != prev_period:
+		_last_emitted_period = new_period
+		day_period_changed.emit(new_period)
+
+	if emit_curfew and clock_minutes >= sleep_trigger_minutes and not sleep_transition_active:
+		sleep_curfew_triggered.emit(int(variables.get("Ato", 1)))
+
+
+func advance_clock_minutes(delta_minutes: int, emit_curfew: bool = true) -> void:
+	if delta_minutes <= 0:
+		return
+	set_clock_minutes(mini(1439, clock_minutes + delta_minutes), emit_curfew)
+
 
 func reset_to_new_game() -> void:
 	for k in switches.keys():
@@ -107,6 +231,11 @@ func reset_to_new_game() -> void:
 	self_switches.clear()
 	inventory.clear()
 	is_afternoon = false
+	clock_minutes = day_start_minutes
+	_clock_accum = 0.0
+	clock_paused = false
+	sleep_transition_active = false
+	_last_emitted_period = "morning"
 	perception_mode = PerceptionMode.FILTERED_MORNING
 	dialogue_active = false
 	spawn_tag = "initial"
@@ -122,6 +251,8 @@ func reset_to_new_game() -> void:
 	stamina_changed.emit(player_stamina, player_max_stamina)
 	perception_changed.emit(perception_mode)
 	time_of_day_changed.emit(false)
+	clock_minute_changed.emit(clock_minutes, get_formatted_time(clock_minutes))
+	day_period_changed.emit("morning")
 	outfit_changed.emit(equipped_outfit)
 
 func get_equipped_outfit_label() -> String:
@@ -216,9 +347,14 @@ func use_soothing_drop() -> bool:
 ## Equivalente ao Common Event "Virar_Tarde" dos documentos (switches 003, 004, 020)
 func trigger_turn_afternoon() -> void:
 	is_afternoon = true
+	if clock_minutes < 960:
+		clock_minutes = 960 # 16:00 (Fim de tarde)
+	_last_emitted_period = get_day_period(clock_minutes)
 	if int(variables.get("Ato", 1)) < 3:
 		set_perception_mode(PerceptionMode.FILTERED_AFTERNOON)
 	time_of_day_changed.emit(true)
+	clock_minute_changed.emit(clock_minutes, get_formatted_time(clock_minutes))
+	day_period_changed.emit(_last_emitted_period)
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_ambience("afternoon_ambience")
 
@@ -273,13 +409,20 @@ func advance_to_act_2() -> void:
 	variable_changed.emit("Ato", 2)
 	variable_changed.emit("Intoxicacao", 1)
 	is_afternoon = false
+	clock_minutes = day_start_minutes
+	_clock_accum = 0.0
+	_last_emitted_period = "morning"
 	player_hp = player_max_hp
+	player_stamina = player_max_stamina
 	hp_changed.emit(player_hp, player_max_hp)
+	stamina_changed.emit(player_stamina, player_max_stamina)
 	set_perception_mode(PerceptionMode.FILTERED_MORNING)
 	higher_dose_changed.emit(false)
 	time_of_day_changed.emit(false)
+	clock_minute_changed.emit(clock_minutes, get_formatted_time(clock_minutes))
+	day_period_changed.emit("morning")
 	autosave(current_scene_path, "initial")
-	notification_requested.emit("Ato II Iniciado — Um novo turno em Agdangan")
+	notification_requested.emit("06:30 — Um novo turno começa em Agdangan")
 
 ## Avança para o Ato 3 (Revelação sem filtro) após concluir o Ato 2 e descansar
 func advance_to_act_3() -> void:
@@ -289,16 +432,21 @@ func advance_to_act_3() -> void:
 	variable_changed.emit("Ato", 3)
 	variable_changed.emit("Intoxicacao", 0)
 	is_afternoon = false
+	clock_minutes = day_start_minutes
+	_clock_accum = 0.0
+	_last_emitted_period = "morning"
 	set_perception_mode(PerceptionMode.UNFILTERED_ACT3)
 	higher_dose_changed.emit(false)
 	time_of_day_changed.emit(false)
+	clock_minute_changed.emit(clock_minutes, get_formatted_time(clock_minutes))
+	day_period_changed.emit("morning")
 	autosave(current_scene_path, "from_act2")
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_ambience("act3_ambience")
 		get_node("/root/AudioManager").play_sfx("vhs_glitch")
-	notification_requested.emit("Ato III — O efeito dos comprimidos passou")
+	notification_requested.emit("06:30 — O efeito dos comprimidos passou")
 
-## Avança ciclicamente entre os Atos (Ato 1 -> Ato 2 -> Ato 3 -> Ato 1) via atalho F10 ou depuração
+## Avança ciclicamente entre os Atos (Ato 1 -> Ato 2 -> Ato 3 -> Ato 1) via atalho de depuração
 func advance_act() -> int:
 	var current_act: int = int(variables.get("Ato", 1))
 	match current_act:
@@ -323,16 +471,21 @@ func advance_act() -> int:
 			set_var("Missoes_concluidas", 0)
 			set_var("Intoxicacao", 0)
 			is_afternoon = false
+			clock_minutes = day_start_minutes
+			_clock_accum = 0.0
+			_last_emitted_period = "morning"
 			player_hp = player_max_hp
 			hp_changed.emit(player_hp, player_max_hp)
 			set_perception_mode(PerceptionMode.FILTERED_MORNING)
 			higher_dose_changed.emit(false)
 			time_of_day_changed.emit(false)
+			clock_minute_changed.emit(clock_minutes, get_formatted_time(clock_minutes))
+			day_period_changed.emit("morning")
 			autosave(current_scene_path, "initial")
 			if has_node("/root/AudioManager"):
 				get_node("/root/AudioManager").play_ambience("day_ambience")
 				get_node("/root/AudioManager").play_bgm("day_theme", 1.0)
-			notification_requested.emit("Ato I Iniciado — Manhã Filtrada")
+			notification_requested.emit("06:30 — Manhã Filtrada em Agdangan")
 			return 1
 
 ## Conclui uma das 3 missões opcionais do Ato 2
@@ -359,9 +512,9 @@ func cycle_perception_preview() -> void:
 	var next_mode: int = (perception_mode + 1) % 3
 	set_perception_mode(next_mode)
 	var labels := [
-		"Ato 1–2: Manhã Filtrada (Efeito dos Comprimidos)",
-		"Ato 1–2: Fim de Tarde (Virar_Tarde)",
-		"Ato 3: Realidade Sem Filtro (Monocromático/Desgastado)"
+		"Manhã Filtrada (Efeito dos Comprimidos)",
+		"Fim de Tarde (Luz Âmbar)",
+		"Realidade Sem Filtro (Monocromático/Desgastado)"
 	]
 	notification_requested.emit(labels[next_mode])
 
@@ -381,6 +534,8 @@ func get_save_summary() -> Dictionary:
 		return {}
 	var data: Dictionary = parsed
 	var ato: int = int(data.get("variables", {}).get("Ato", 1))
+	var saved_mins: int = int(data.get("clock_minutes", 960 if bool(data.get("is_afternoon", false)) else day_start_minutes))
+	var clock_hhmm: String = str(data.get("clock_hhmm", get_formatted_time(saved_mins)))
 	var scene: String = str(data.get("current_scene", "Quarto"))
 	var place := "Quarto de Huwag"
 	if scene.find("Street") != -1:
@@ -395,6 +550,8 @@ func get_save_summary() -> Dictionary:
 		place = "Memória / Pesadelo"
 	return {
 		"ato": ato,
+		"clock_minutes": saved_mins,
+		"clock_hhmm": clock_hhmm,
 		"place": place,
 		"hp": int(data.get("player_hp", 100)),
 		"date": str(data.get("timestamp", "Recente"))
@@ -411,7 +568,7 @@ func autosave(scene_path: String = "", tag: String = "", pos: Vector2 = Vector2.
 
 func save_game() -> bool:
 	var data := {
-		"version": 2,
+		"version": 3,
 		"timestamp": Time.get_datetime_string_from_system(),
 		"current_scene": current_scene_path,
 		"spawn_tag": spawn_tag,
@@ -422,6 +579,8 @@ func save_game() -> bool:
 		"self_switches": self_switches,
 		"inventory": inventory,
 		"is_afternoon": is_afternoon,
+		"clock_minutes": clock_minutes,
+		"clock_hhmm": get_formatted_time(clock_minutes),
 		"perception_mode": perception_mode,
 		"player_hp": player_hp,
 		"water_boss_defeated": water_boss_defeated,
@@ -464,6 +623,10 @@ func load_game() -> bool:
 		inventory = data["inventory"].duplicate()
 
 	is_afternoon = bool(data.get("is_afternoon", false))
+	var loaded_mins: int = int(data.get("clock_minutes", 960 if is_afternoon else day_start_minutes))
+	clock_minutes = clampi(loaded_mins, 0, 1439)
+	_clock_accum = 0.0
+	_last_emitted_period = get_day_period(clock_minutes)
 	player_hp = int(data.get("player_hp", 100))
 	water_boss_defeated = bool(data.get("water_boss_defeated", false))
 	current_scene_path = str(data.get("current_scene", "res://scenes/levels/RoomHuwag.tscn"))
@@ -478,6 +641,8 @@ func load_game() -> bool:
 		variables["Intoxicacao"] = 2 if is_higher_dose() else (1 if int(variables.get("Ato", 1)) == 2 else 0)
 	higher_dose_changed.emit(is_higher_dose())
 	variable_changed.emit("Intoxicacao", variables["Intoxicacao"])
+	clock_minute_changed.emit(clock_minutes, get_formatted_time(clock_minutes))
+	day_period_changed.emit(_last_emitted_period)
 
 	if data.has("settings") and typeof(data["settings"]) == TYPE_DICTIONARY:
 		var s: Dictionary = data["settings"]

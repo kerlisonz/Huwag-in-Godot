@@ -61,15 +61,15 @@ void fragment() {
 			mix(src.b, b_shift, 0.6) * (1.0 - 0.30 * distortion_intensity)
 		);
 
-		// Descoloração + tingimento para tons vermelho-escuro e cinza fúnebre
+		// Descoloração + tingimento rubro controlado preservando nitidez de silhueta e leitura em combate
 		float luma = dot(chroma_col, vec3(0.299, 0.587, 0.114));
-		vec3 grayscale_dark = vec3(luma * (0.82 - hostile_boost * 0.16));
-		vec3 crimson_shadow = grayscale_dark * dark_red_tint.rgb + vec3(luma * 0.35 * (0.35 + hostile_boost * 0.55), 0.0, 0.02);
-		float tint_mix = clamp(distortion_intensity * (0.58 + hostile_boost * 0.34), 0.0, 0.94);
+		vec3 grayscale_dark = vec3(clamp(luma * (0.92 - hostile_boost * 0.08) + 0.05, 0.06, 1.0));
+		vec3 crimson_shadow = grayscale_dark * dark_red_tint.rgb + vec3(luma * 0.28 * (0.30 + hostile_boost * 0.45), 0.04, 0.05);
+		float tint_mix = clamp(distortion_intensity * (0.42 + hostile_boost * 0.16), 0.0, 0.58);
 		vec3 final_rgb = mix(chroma_col, crimson_shadow, tint_mix);
 
 		// Scanline horizontal sutil de interferência no sprite distorcido
-		float scan = 1.0 - (mod(slice_id, 2.0) * 0.10 * distortion_intensity);
+		float scan = 1.0 - (mod(slice_id, 2.0) * 0.05 * distortion_intensity);
 		final_rgb *= scan;
 
 		COLOR = vec4(final_rgb, src.a) * COLOR;

@@ -8,6 +8,9 @@ extends Node2D
 signal request_level_change(target_scene: String, spawn_tag: String)
 signal request_dialogue(pages: Array, callback: Callable)
 
+const V2TileCatalog := preload("res://scripts/levels/v2_tile_catalog.gd")
+const VHS_TILESET := preload("res://assets/tilesets/v2/interiors_v2_distorted_tileset.tres")
+
 @onready var player: CharacterBody2D = $YSortEntities/Player
 @onready var vhs_filter: ColorRect = $CanvasLayer/VHSFilter
 @onready var fragments_label: Label = get_node_or_null("CanvasLayer/UI/VBox/FragmentsLabel")
@@ -32,6 +35,7 @@ func _ready() -> void:
 	if exit_door:
 		exit_door.body_entered.connect(_on_exit_door_entered)
 
+	_build_vhs_v2_tiles()
 	_setup_boundaries()
 	_setup_memory_fragments()
 	_update_ui()
@@ -39,8 +43,11 @@ func _ready() -> void:
 	# Trilha de memória analógica com wow & flutter
 	if has_node("/root/AudioManager"):
 		var am = get_node("/root/AudioManager")
-		am.play_bgm("vhs_memory_bgm", 1.0)
-		am.play_ambience("act3_ambience", 1.5)
+		if am.has_method("sync_adaptive_soundtrack"):
+			am.call("sync_adaptive_soundtrack", "vhs_memory_minigame", false)
+		else:
+			am.play_bgm("vhs_memory_bgm", -11.5)
+			am.play_ambience("act3_ambience", -13.5)
 		am.play_sfx("vhs_glitch")
 
 	# Diálogo de entrada no pesadelo
@@ -114,6 +121,21 @@ func _trigger_intro_dialogue() -> void:
 		}
 	]
 	request_dialogue.emit(pages, Callable())
+
+func _build_vhs_v2_tiles() -> void:
+	var t_cat := V2TileCatalog.INTERIOR_TILES
+	var layer := TileMapLayer.new()
+	layer.name = "V2VhsFloorLayer"
+	layer.z_index = -2
+	layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	layer.tile_set = VHS_TILESET
+	add_child(layer)
+	V2TileCatalog.fill_rect(layer, Rect2i(0, 0, 40, 23), t_cat["void"])
+	V2TileCatalog.fill_rect(layer, Rect2i(2, 3, 36, 16), t_cat["wood_floor_dark"])
+	V2TileCatalog.fill_rect(layer, Rect2i(2, 2, 36, 1), t_cat["wall_station_mid"])
+	for dx in [6, 14, 22, 30]:
+		V2TileCatalog.stamp_rect(layer, Vector2i(dx, 4), t_cat["debris_broken"], Vector2i(2, 2))
+
 
 func _setup_boundaries() -> void:
 	var body := StaticBody2D.new()

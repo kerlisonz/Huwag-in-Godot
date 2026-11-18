@@ -4,9 +4,12 @@ signal request_level_change(target_scene: String, spawn_tag: String)
 signal request_dialogue(pages: Array, callback: Callable)
 
 const RetroLevelHelpers := preload("res://scripts/levels/retro_level_helpers.gd")
+const V2TileCatalog := preload("res://scripts/levels/v2_tile_catalog.gd")
+const AtmosphereRig := preload("res://scripts/levels/atmosphere_rig.gd")
 const NPC_SCENE := preload("res://scenes/characters/NpcEntity.tscn")
-const TOWN_NORMAL_TS := preload("res://assets/tilesets/retro/town_fnaf_normal_tileset.tres")
-const TOWN_DISTORTED_TS := preload("res://assets/tilesets/retro/town_fnaf_distorted_tileset.tres")
+const TOWN_NORMAL_TS := preload("res://assets/tilesets/v2/agdangan_town_v2_normal_tileset.tres")
+const TOWN_DISTORTED_TS := preload("res://assets/tilesets/v2/agdangan_town_v2_distorted_tileset.tres")
+const TOWN_ACT3_TS := preload("res://assets/tilesets/v2/agdangan_town_v2_act3_tileset.tres")
 
 # Rua estendida de Agdangan: 180 x 35 tiles de 16px (2880 x 560)
 const MAP_BOUNDS := Rect2i(0, 0, 2880, 560)
@@ -35,6 +38,7 @@ var _beacon_light: PointLight2D = null
 var _wires_drawer: OverheadWiresDrawer = null
 var _street_dust_particles: CPUParticles2D = null
 var _street_smoke_particles: CPUParticles2D = null
+var _town_props_layer: TileMapLayer = null
 var _blink_timer: float = 0.0
 
 
@@ -135,6 +139,8 @@ func _ready() -> void:
 	GameState.time_of_day_changed.connect(func(_v: bool) -> void: _apply_visual_atmosphere())
 	GameState.perception_changed.connect(func(_m: int) -> void: _apply_visual_atmosphere())
 	GameState.switch_changed.connect(func(_k: String, _v: bool) -> void: _apply_visual_atmosphere())
+	if GameState.has_signal("day_period_changed"):
+		GameState.day_period_changed.connect(func(_p: String) -> void: _apply_visual_atmosphere())
 	if GameState.has_signal("higher_dose_changed"):
 		GameState.higher_dose_changed.connect(func(active: bool) -> void: apply_higher_dose_world(active))
 
@@ -178,263 +184,218 @@ func _is_higher_dose_active() -> bool:
 func _is_night() -> bool:
 	if GameState.is_unfiltered_act3():
 		return false
+	if GameState.has_method("is_night_time") and GameState.is_night_time():
+		return true
 	var ato: int = int(GameState.get_var("Ato", 1))
 	return (
-		GameState.is_afternoon
-		or GameState.perception_mode == GameState.PerceptionMode.FILTERED_AFTERNOON
-		or (ato == 1 and GameState.get_switch("005_Chefe_liberou_cidade"))
+		(ato == 1 and GameState.get_switch("005_Chefe_liberou_cidade"))
 		or (ato == 2 and GameState.get_switch("019_Ato2_concluido"))
 	)
 
 
 func _build_town_tilemaps() -> void:
+	var t_cat := V2TileCatalog.TOWN_TILES
 	for layer in [ground_normal, walls_normal]:
-		layer.tile_set = TOWN_NORMAL_TS
+		layer.tile_set = TOWN_ACT3_TS if GameState.is_unfiltered_act3() else TOWN_NORMAL_TS
 	for layer in [ground_distorted, walls_distorted]:
 		layer.tile_set = TOWN_DISTORTED_TS
 
 	for gl in [ground_normal, ground_distorted]:
-		# Fundo base escuro + gramado Pokémon GB sombrio com tufos orgânicos em toda a extensão 180x35
-		RetroLevelHelpers.paint_rect(gl, 0, 0, 180, 35, Vector2i(10, 0))
-		for gy in range(4, 34):
-			for gx in range(12, 178):
-				if ((gx * 7 + gy * 13) % 5 == 0) or ((gx * 3 + gy * 11) % 13 == 0):
-					gl.set_cell(Vector2i(gx, gy), 0, Vector2i(11, 0))
+		gl.clear()
+		# Base contínua de gramado provincial filipino 16x16 em TODO o mapa 180x35 (zero buracos!)
+		for gy in range(0, 35):
+			for gx in range(0, 180):
+				var gtile: Vector2i = t_cat["grass_b"] if ((gx * 7 + gy * 13) % 5 == 0) else t_cat["grass_a"]
+				gl.set_cell(Vector2i(gx, gy), 0, gtile)
 
-		# Terraplanagem / acessos de terra em vielas e fundos de galpões antes do pavimento
-		for alley_x in [28, 41, 50, 57, 77, 89, 104, 121, 131, 141, 155, 167]:
-			RetroLevelHelpers.paint_rect(gl, alley_x, 18, 2, 5, Vector2i(9, 0))
-		RetroLevelHelpers.paint_rect(gl, 123, 14, 19, 3, Vector2i(9, 0)) # pátio traseiro da feira leste
+		# Vielas pavimentadas entre lotes e pátio da feira leste
+		for alley_x in [28, 41, 50, 57, 77, 89, 104, 121, 132, 142, 155, 167]:
+			V2TileCatalog.fill_rect(gl, Rect2i(alley_x, 18, 2, 5), t_cat["plaza_slab"])
+		V2TileCatalog.fill_rect(gl, Rect2i(123, 15, 19, 3), t_cat["plaza_slab"])
 
-		# Costa oeste: areia e espuma rasas (x: 0..15)
-		RetroLevelHelpers.paint_rect(gl, 6, 4, 8, 29, Vector2i(12, 0))
-		RetroLevelHelpers.paint_rect(gl, 4, 2, 2, 31, Vector2i(13, 0))
-		# Píer de madeira oeste (x: 4..13, y: 26..28)
-		RetroLevelHelpers.paint_rect(gl, 4, 26, 10, 3, Vector2i(14, 0))
+		# Costa oeste de Agdangan: oceano animado, água rasa, praia de areia contínua e píer (x: 0..13)
+		V2TileCatalog.fill_rect(gl, Rect2i(0, 0, 4, 35), t_cat["sea_water_anim"])
+		V2TileCatalog.fill_rect(gl, Rect2i(4, 0, 2, 35), t_cat["shallow_water_anim"])
+		for sy in range(0, 35):
+			for sx in range(6, 14):
+				var stile: Vector2i = t_cat["sand_b"] if ((sx + sy) % 4 == 0) else t_cat["sand_a"]
+				gl.set_cell(Vector2i(sx, sy), 0, stile)
+		# Píer de madeira contínuo (x: 4..13, y: 26..28)
+		for py in range(26, 29):
+			gl.set_cell(Vector2i(4, py), 0, t_cat["pier_plank_l"])
+			for px in range(5, 13):
+				gl.set_cell(Vector2i(px, py), 0, t_cat["pier_plank"])
+			gl.set_cell(Vector2i(13, py), 0, t_cat["pier_plank_r"])
+		for px in range(4, 14, 3):
+			gl.set_cell(Vector2i(px, 29), 0, t_cat["pier_post"])
 
-		# Calçada Norte contínua (y=23..24, x=24..174) + Pátio do Quartel (x=59..77, y=20..24)
-		RetroLevelHelpers.paint_rect(gl, 24, 23, 150, 1, Vector2i(5, 0))
-		RetroLevelHelpers.paint_rect(gl, 24, 24, 150, 1, Vector2i(6, 0))
-		RetroLevelHelpers.paint_rect(gl, 59, 20, 18, 4, Vector2i(5, 0)) # pátio BFP
-		RetroLevelHelpers.paint_rect(gl, 108, 13, 12, 11, Vector2i(5, 0)) # adro da Igreja
+		# Calçada Norte contínua (y=23..24, x=16..172) + Pátio do Quartel BFP + Adro da Igreja
+		V2TileCatalog.fill_rect(gl, Rect2i(16, 23, 156, 1), t_cat["curb_top"])
+		V2TileCatalog.fill_rect(gl, Rect2i(16, 24, 156, 1), t_cat["curb_bottom"])
+		V2TileCatalog.fill_rect(gl, Rect2i(59, 20, 19, 3), t_cat["plaza_slab"])
+		V2TileCatalog.fill_rect(gl, Rect2i(108, 13, 11, 10), t_cat["plaza_slab"])
 
-		# Vegetação / cascalho invadindo cantos da calçada leste e oeste
-		for encro_x in [24, 25, 91, 101, 123, 132, 143, 156, 168]:
-			gl.set_cell(Vector2i(encro_x, 23), 0, Vector2i(11, 0))
+		# Avenida principal asfaltada contínua (x: 16..172, y: 25..31) + Calçada Sul (y=32)
+		V2TileCatalog.fill_rect(gl, Rect2i(16, 25, 156, 7), t_cat["asphalt"])
+		V2TileCatalog.fill_rect(gl, Rect2i(16, 32, 156, 1), t_cat["curb_top"])
 
-		# Avenida principal asfaltada contínua (x: 16..172, y: 25..31)
-		RetroLevelHelpers.paint_rect(gl, 16, 25, 156, 7, Vector2i(1, 0))
-		# Calçada Sul estreita (y=32) com trechos desgastados e mato invadindo
-		RetroLevelHelpers.paint_rect(gl, 16, 32, 156, 1, Vector2i(5, 0))
-		for sc_x in range(20, 170, 9):
-			gl.set_cell(Vector2i(sc_x, 32), 0, Vector2i(9, 0))
-			if sc_x % 18 == 2:
-				gl.set_cell(Vector2i(sc_x + 1, 32), 0, Vector2i(11, 0))
-
-		# Faixa amarela central tracejada e faixas de pedestres estilo GB/FNAF
+		# Faixa central tracejada, rachaduras no asfalto e faixas de pedestres
 		for rx in range(20, 170, 3):
-			gl.set_cell(Vector2i(rx, 28), 0, Vector2i(2, 0))
-		for cw_x in [36, 73, 112, 146]:
-			RetroLevelHelpers.paint_rect(gl, cw_x, 25, 2, 7, Vector2i(3, 0))
+			gl.set_cell(Vector2i(rx, 28), 0, t_cat["asphalt_dash_h"])
+		for cw_x in [35, 73, 112, 146]:
+			V2TileCatalog.fill_rect(gl, Rect2i(cw_x, 25, 2, 7), t_cat["crosswalk"])
 
-		# Quadra Comunitária de Basquete (x: 31..46, y: 8..15)
-		RetroLevelHelpers.paint_rect(gl, 31, 8, 16, 8, Vector2i(7, 0))
-		RetroLevelHelpers.paint_rect(gl, 31, 12, 16, 1, Vector2i(8, 0))
-		RetroLevelHelpers.paint_rect(gl, 34, 16, 4, 2, Vector2i(5, 0)) # acesso calçada/casa
+		# Quadra Comunitária de Basquete do Barangay (x: 31..46, y: 8..15)
+		V2TileCatalog.fill_rect(gl, Rect2i(31, 8, 16, 8), t_cat["plaza_slab"])
+		V2TileCatalog.fill_rect(gl, Rect2i(31, 12, 16, 1), t_cat["plaza_line_h"])
+		V2TileCatalog.fill_rect(gl, Rect2i(38, 8, 1, 8), t_cat["plaza_line_v"])
+		V2TileCatalog.fill_rect(gl, Rect2i(34, 16, 4, 2), t_cat["plaza_slab"])
 
-		# Estrada de terra leste entrando na floresta (x: 171..179, y: 25..31)
-		RetroLevelHelpers.paint_rect(gl, 171, 25, 9, 7, Vector2i(9, 0))
+		# Estrada de terra leste entrando na floresta de Agdangan (x: 172..179, y: 25..31)
+		V2TileCatalog.fill_rect(gl, Rect2i(172, 25, 8, 7), t_cat["dirt_a"])
+		for dy in range(26, 31):
+			gl.set_cell(Vector2i(175, dy), 0, t_cat["dirt_b"])
 
-		# Poças de chuva, manchas de óleo e desgaste ao longo de toda a rua estendida
+		# Poças de chuva tropical e rachaduras discretas ao longo da avenida
 		for p_pos in [
 			Vector2i(21, 29), Vector2i(29, 26), Vector2i(44, 26), Vector2i(53, 30),
 			Vector2i(64, 29), Vector2i(80, 26), Vector2i(94, 26), Vector2i(104, 29),
 			Vector2i(124, 30), Vector2i(130, 26), Vector2i(141, 27), Vector2i(150, 30),
 			Vector2i(158, 29), Vector2i(165, 26)
 		]:
-			gl.set_cell(p_pos, 0, Vector2i(4, 0))
+			gl.set_cell(p_pos, 0, t_cat["asphalt_puddle"])
 
-		for ash_pos in [
-			Vector2i(24, 27), Vector2i(49, 29), Vector2i(68, 22), Vector2i(87, 30),
-			Vector2i(101, 26), Vector2i(118, 26), Vector2i(136, 24), Vector2i(142, 29),
+		for crk_pos in [
+			Vector2i(24, 27), Vector2i(49, 29), Vector2i(68, 26), Vector2i(87, 30),
+			Vector2i(101, 26), Vector2i(118, 26), Vector2i(136, 27), Vector2i(142, 29),
 			Vector2i(152, 27), Vector2i(163, 30)
 		]:
-			gl.set_cell(ash_pos, 0, Vector2i(15, 0))
+			gl.set_cell(crk_pos, 0, t_cat["asphalt_crack"])
 
-		if gl == ground_distorted:
-			# Pistas visuais de pesadelo na rua no Ato 2 dose maior
-			for dist_pos in [
-				Vector2i(26, 26), Vector2i(35, 25), Vector2i(47, 25), Vector2i(74, 22),
-				Vector2i(84, 28), Vector2i(99, 25), Vector2i(114, 25), Vector2i(132, 26),
-				Vector2i(145, 24), Vector2i(154, 29), Vector2i(160, 28), Vector2i(169, 27)
-			]:
-				gl.set_cell(dist_pos, 0, Vector2i(15, 0))
-
-	# Paredes / Prédios nas camadas normal e distorcida
+	# Prédios de grande porte em tiles 1x1 (Quartel BFP e Igreja de Agdangan) sem sobreposição
 	for wl in [walls_normal, walls_distorted]:
-		# Oceano Oeste impenetrável (x: 0..3)
-		RetroLevelHelpers.paint_rect(wl, 0, 0, 4, 35, Vector2i(0, 1))
-		# Borda Norte vegetal contínua (y: 0..3)
-		RetroLevelHelpers.paint_rect(wl, 4, 0, 176, 4, Vector2i(14, 1))
-		# Borda Sul da cidade (y=33..34, deixa píer livre)
-		RetroLevelHelpers.paint_rect(wl, 14, 33, 166, 2, Vector2i(14, 1))
-
-		# Cabanas da praia oeste (Bahay bamboo)
-		_paint_building(wl, 5, 5, 5, 4, Vector2i(1, 1), Vector2i(4, 1), false, 0)
-		_paint_building(wl, 13, 9, 5, 4, Vector2i(1, 1), Vector2i(4, 1), false, 0)
-		_paint_building(wl, 18, 23, 5, 4, Vector2i(2, 1), Vector2i(4, 1), false, 0)
-		# Cerca costeira com abertura na avenida (x=22)
-		RetroLevelHelpers.paint_rect(wl, 22, 9, 1, 15, Vector2i(12, 1))
-
-		# Casa de Huwag (x: 31..40, y: 17..22, porta em x=35)
-		_paint_building(wl, 31, 17, 10, 6, Vector2i(2, 1), Vector2i(4, 1), true, 35)
-		wl.set_cell(Vector2i(33, 21), 0, Vector2i(6, 1))
-		wl.set_cell(Vector2i(38, 21), 0, Vector2i(6, 1))
-
-		# Sari-Sari Store de Aling Nena (x: 43..50, y: 19..23, Toldo/Grade)
-		_paint_building(wl, 43, 19, 7, 5, Vector2i(1, 1), Vector2i(10, 1), false, 0)
-		# Mural do Barangay (x: 52..56, y: 20..23)
-		_paint_building(wl, 52, 20, 5, 3, Vector2i(2, 1), Vector2i(5, 1), false, 0)
+		wl.clear()
+		var win_t: Vector2i = t_cat["wall_window_lit"] if (wl == walls_distorted or _is_night()) else t_cat["wall_window_dark"]
 
 		# CENTRAL DE BOMBEIROS BFP AGDANGAN (x: 59..77, y: 8..19, porta em x=74)
-		_paint_building(wl, 59, 8, 19, 12, Vector2i(3, 1), Vector2i(7, 1), true, 74)
-		RetroLevelHelpers.paint_rect(wl, 67, 16, 4, 4, Vector2i(8, 1)) # Porta dupla da garagem
+		_paint_building(wl, 59, 8, 19, 12, t_cat["roof_yero_rust"], t_cat["wall_bfp_red"], true, 74)
+		V2TileCatalog.fill_rect(wl, Rect2i(59, 13, 19, 1), t_cat["roof_yero_rust_eave"])
+		V2TileCatalog.fill_rect(wl, Rect2i(67, 16, 4, 4), t_cat["wall_bfp_shutter"])
 		for wx in [61, 63, 72, 76]:
-			wl.set_cell(Vector2i(wx, 15), 0, Vector2i(6, 1))
-			wl.set_cell(Vector2i(wx, 11), 0, Vector2i(6, 1))
+			wl.set_cell(Vector2i(wx, 15), 0, win_t)
+			wl.set_cell(Vector2i(wx, 17), 0, win_t)
 
-		# Karinderya / Lanchonete (x: 79..88, y: 16..22)
-		_paint_building(wl, 79, 16, 10, 7, Vector2i(1, 1), Vector2i(5, 1), false, 0)
-		wl.set_cell(Vector2i(81, 21), 0, Vector2i(6, 1))
-		wl.set_cell(Vector2i(86, 21), 0, Vector2i(6, 1))
+		# Igreja de Agdangan ao norte (x: 108..118, y: 5..12, porta em x=113)
+		_paint_building(wl, 108, 5, 11, 8, t_cat["roof_yero_grey"], t_cat["wall_concrete"], true, 113)
+		V2TileCatalog.fill_rect(wl, Rect2i(108, 8, 11, 1), t_cat["roof_yero_grey_eave"])
+		wl.set_cell(Vector2i(110, 10), 0, win_t)
+		wl.set_cell(Vector2i(116, 10), 0, win_t)
 
-		# Casas residenciais e muro intermediário (x: 91..103, y: 15..23)
-		_paint_building(wl, 92, 15, 9, 7, Vector2i(2, 1), Vector2i(5, 1), false, 0)
-		RetroLevelHelpers.paint_rect(wl, 91, 23, 5, 1, Vector2i(12, 1))
-		RetroLevelHelpers.paint_rect(wl, 98, 23, 6, 1, Vector2i(12, 1))
+		# Cercas de bambu alinhadas entre lotes
+		V2TileCatalog.fill_rect(wl, Rect2i(22, 10, 1, 12), t_cat["fence_bamboo_v"])
+		V2TileCatalog.fill_rect(wl, Rect2i(51, 21, 6, 1), t_cat["fence_bamboo_h"])
+		V2TileCatalog.fill_rect(wl, Rect2i(86, 22, 5, 1), t_cat["fence_bamboo_h"])
+		V2TileCatalog.fill_rect(wl, Rect2i(99, 22, 7, 1), t_cat["fence_bamboo_h"])
 
-		# Igreja de Agdangan ao norte (x: 108..118, y: 5..12)
-		_paint_building(wl, 108, 5, 11, 8, Vector2i(2, 1), Vector2i(11, 1), true, 113)
-		wl.set_cell(Vector2i(110, 11), 0, Vector2i(6, 1))
-		wl.set_cell(Vector2i(116, 11), 0, Vector2i(6, 1))
+	# Camada dedicada para casas, Sari-Sari Store, veículos, postes e vegetação v2 (100% alinhados no grid, zero sobreposição)
+	if _town_props_layer == null:
+		_town_props_layer = TileMapLayer.new()
+		_town_props_layer.name = "V2TownPropsLayer"
+		_town_props_layer.z_index = 0
+		_town_props_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_town_props_layer.collision_enabled = false
+		add_child(_town_props_layer)
+	if ysort_root != null:
+		ysort_root.z_index = 2
+	_town_props_layer.tile_set = TOWN_ACT3_TS if GameState.is_unfiltered_act3() else (TOWN_DISTORTED_TS if _is_higher_dose_active() else TOWN_NORMAL_TS)
+	_town_props_layer.clear()
 
-		# BLOCO ESTENDIDO LESTE: Feira Abandonada & Beco das Residências (x: 123..169)
-		_paint_building(wl, 124, 17, 7, 5, Vector2i(1, 1), Vector2i(10, 1), false, 0) # Barraca Feira 1
-		_paint_building(wl, 134, 17, 7, 5, Vector2i(2, 1), Vector2i(10, 1), false, 0) # Barraca Feira 2
-		_paint_building(wl, 145, 16, 10, 7, Vector2i(2, 1), Vector2i(5, 1), false, 0) # Sobrado fechado
-		wl.set_cell(Vector2i(148, 21), 0, Vector2i(6, 1))
-		wl.set_cell(Vector2i(151, 21), 0, Vector2i(6, 1))
-		_paint_building(wl, 157, 17, 10, 6, Vector2i(3, 1), Vector2i(5, 1), false, 0) # Casa abandonada leste
-		wl.set_cell(Vector2i(160, 21), 0, Vector2i(6, 1))
-		wl.set_cell(Vector2i(163, 21), 0, Vector2i(6, 1))
+	# Barco Banca no píer oeste + Casas costeiras
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(5, 23), t_cat["banca_boat"], Vector2i(4, 2))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(7, 6), t_cat["house_concrete_rust"], Vector2i(6, 5))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(15, 11), t_cat["house_concrete_grey"], Vector2i(6, 5))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(15, 17), t_cat["house_concrete_rust"], Vector2i(6, 5))
 
-		# Vegetação fechando norte/leste da saída para floresta
-		RetroLevelHelpers.paint_rect(wl, 169, 4, 11, 19, Vector2i(14, 1))
-		# Fechamento no extremo leste fora da trilha (y < 25 ou y > 31)
-		RetroLevelHelpers.paint_rect(wl, 179, 4, 1, 21, Vector2i(14, 1))
-		RetroLevelHelpers.paint_rect(wl, 179, 32, 1, 3, Vector2i(14, 1))
+	# Casa de Huwag (x: 33..38, y: 18..22 -> porta alinhada em x=35, y=22 / px=569)
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(33, 18), t_cat["house_concrete_rust"], Vector2i(6, 5))
 
-		if wl == walls_distorted:
-			# Paredes com olhos Yume Nikki observando ao longo das fachadas fechadas
-			for wy in [
-				Vector2i(94, 21), Vector2i(97, 21), Vector2i(127, 20), Vector2i(137, 20),
-				Vector2i(147, 20), Vector2i(159, 20), Vector2i(162, 20), Vector2i(54, 21)
-			]:
-				wl.set_cell(wy, 0, Vector2i(15, 1))
+	# Sari-Sari Store de Aling Nena (x: 44..48, y: 19..22 -> centrada em px=750)
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(44, 19), t_cat["sari_sari_store"], Vector2i(5, 4))
+
+	# Viatura BFP estacionada no pátio do Quartel (x: 67..71, y: 20..22 -> px=1110)
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(67, 20), t_cat["bfp_truck"], Vector2i(5, 3))
+	_town_props_layer.set_cell(Vector2i(64, 22), 0, t_cat["fire_hydrant"])
+
+	# Karinderya (x: 80..84, y: 19..22) + Triciclo de Kuya Ben (x: 82..84, y: 25..26 -> px=1330)
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(80, 19), t_cat["sari_sari_store"], Vector2i(5, 4))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(82, 25), t_cat["tricycle"], Vector2i(3, 2))
+
+	# Casa Residencial Central (x: 92..97, y: 18..22)
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(92, 18), t_cat["house_concrete_grey"], Vector2i(6, 5))
+
+	# Feira do Barangay & Casas do Beco Leste (x: 125..163, y: 18..22)
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(125, 19), t_cat["sari_sari_store"], Vector2i(5, 4))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(134, 19), t_cat["sari_sari_store"], Vector2i(5, 4))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(146, 18), t_cat["house_concrete_grey"], Vector2i(6, 5))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(158, 18), t_cat["house_concrete_rust"], Vector2i(6, 5))
+
+	# Bancos na quadra e no adro da Igreja
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(32, 16), t_cat["plaza_bench"], Vector2i(2, 1))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(109, 16), t_cat["plaza_bench"], Vector2i(2, 1))
+	V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(116, 16), t_cat["plaza_bench"], Vector2i(2, 1))
+
+	# Coqueiros (3x6), Bananeiras (2x3) e Árvores Costeiras (2x3) em posições livres de gramado
+	for palm_pos in [
+		Vector2i(8, 14), Vector2i(24, 15), Vector2i(52, 13), Vector2i(86, 14),
+		Vector2i(102, 14), Vector2i(120, 14), Vector2i(141, 14), Vector2i(165, 14)
+	]:
+		var p_key := "coconut_left" if palm_pos.x % 2 == 0 else "coconut_right"
+		V2TileCatalog.stamp_rect(_town_props_layer, palm_pos, t_cat[p_key], Vector2i(3, 6))
+
+	for ban_pos in [
+		Vector2i(24, 8), Vector2i(48, 9), Vector2i(86, 8), Vector2i(101, 8),
+		Vector2i(121, 8), Vector2i(141, 8), Vector2i(154, 16), Vector2i(166, 20)
+	]:
+		V2TileCatalog.stamp_rect(_town_props_layer, ban_pos, t_cat["banana_plant"], Vector2i(2, 3))
+
+	# Fileira norte e borda leste de árvores costeiras
+	for tx in range(14, 174, 6):
+		if (tx >= 30 and tx <= 47) or (tx >= 58 and tx <= 78) or (tx >= 107 and tx <= 119):
+			continue
+		var t_key := "coastal_tree_a" if tx % 12 == 0 else ("coastal_tree_b" if tx % 12 == 6 else "coastal_tree_c")
+		V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(tx, 1), t_cat[t_key], Vector2i(2, 3))
+
+	for fy in [5, 9, 13, 17, 21]:
+		for fx in [171, 174, 177]:
+			V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(fx, fy), t_cat["coastal_tree_c"], Vector2i(2, 3))
+
+	# Postes de iluminação nos intervalos entre os prédios ao longo da calçada norte (zero sobreposição com fachadas)
+	for lx_tile in [21, 30, 41, 56, 78, 90, 105, 121, 142, 156, 170]:
+		V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(lx_tile, 19), t_cat["lamppost_lit"], Vector2i(1, 5))
+	for dx_tile in [50, 99, 132, 165]:
+		V2TileCatalog.stamp_rect(_town_props_layer, Vector2i(dx_tile, 19), t_cat["lamppost_dark"], Vector2i(1, 5))
 
 
 func _paint_building(wl: TileMapLayer, x0: int, y0: int, w: int, h: int, roof_tile: Vector2i, wall_tile: Vector2i, has_door: bool, door_x: int) -> void:
+	var t_cat := V2TileCatalog.TOWN_TILES
 	var roof_h := maxi(2, h / 2)
-	RetroLevelHelpers.paint_rect(wl, x0, y0, w, roof_h, roof_tile)
-	RetroLevelHelpers.paint_rect(wl, x0, y0 + roof_h, w, h - roof_h, wall_tile)
+	V2TileCatalog.fill_rect(wl, Rect2i(x0, y0, w, roof_h), roof_tile)
+	V2TileCatalog.fill_rect(wl, Rect2i(x0, y0 + roof_h, w, h - roof_h), wall_tile)
 	if has_door:
-		wl.set_cell(Vector2i(door_x, y0 + h - 1), 0, Vector2i(9, 1))
+		wl.set_cell(Vector2i(door_x, y0 + h - 1), 0, t_cat["wall_door"])
+	for sx in range(x0, x0 + w):
+		wl.set_cell(Vector2i(sx, y0 + h), 0, t_cat["shadow_top"])
 
 
 func _build_town_props_and_lights() -> void:
-	# Props fixos e duais Y-sorted (normal vs distorcido)
-	_add_dual_prop("barangay_arch", Vector2(436, 146), Vector2(1.1, 1.1), -8)
-	_add_dual_prop("basketball_hoop", Vector2(512, 175), Vector2(1.0, 1.0), -12)
-	_add_dual_prop("basketball_hoop", Vector2(720, 175), Vector2(1.0, 1.0), -12)
-	_add_dual_prop("bfp_firetruck", Vector2(1110, 336), Vector2(1.15, 1.15), -10)
-	_add_dual_prop("jeepney_parked", Vector2(1335, 412), Vector2(1.15, 1.15), -10)
-	_add_dual_prop("wooden_signpost", Vector2(2830, 396), Vector2(1.2, 1.2), -6)
-
-	# Veículos abandonados fora da pista principal (encostos e terrenos leste/oeste)
-	for tri_pos in [Vector2(410, 356), Vector2(1660, 362), Vector2(2390, 362)]:
-		_add_dual_prop("abandoned_tricycle", tri_pos, Vector2(1.08, 1.08), -8)
-	for car_pos in [Vector2(2010, 504), Vector2(2640, 504)]:
-		_add_dual_prop("abandoned_car_wreck", car_pos, Vector2(1.1, 1.1), -10)
-
-	# Desordem urbana, lixo, caixotes da feira, caixas de força e varais com vento
-	for tp in [
-		Vector2(260, 524), Vector2(485, 364), Vector2(690, 364), Vector2(845, 526),
-		Vector2(920, 366), Vector2(1045, 526), Vector2(1280, 362), Vector2(1435, 524),
-		Vector2(1560, 366), Vector2(1695, 364), Vector2(1940, 524), Vector2(2020, 364),
-		Vector2(2195, 524), Vector2(2315, 524), Vector2(2460, 364), Vector2(2610, 524),
-		Vector2(2740, 522)
-	]:
-		_add_dual_prop("trash_pile", tp, Vector2(1.0, 1.0), -6)
-
-	for cp in [
-		Vector2(670, 356), Vector2(1405, 362), Vector2(1960, 360),
-		Vector2(2080, 356), Vector2(2220, 356), Vector2(2315, 362)
-	]:
-		_add_dual_prop("market_crates", cp, Vector2(1.05, 1.05), -6)
-
-	for up in [
-		Vector2(356, 364), Vector2(918, 364), Vector2(1568, 364),
-		Vector2(1948, 364), Vector2(2328, 364), Vector2(2668, 364)
-	]:
-		_add_dual_prop("utility_box", up, Vector2(1.0, 1.0), -10)
-
-	for clp in [Vector2(440, 260), Vector2(1530, 210), Vector2(2370, 230)]:
-		_add_dual_prop("clothesline_post", clp, Vector2(1.0, 1.0), -12, true, 1.35, 2.1)
-
-	# Árvores e vegetação invasiva com shader de vento preenchendo lotes vazios e cantos
-	for tree_pos in [
-		Vector2(230, 118), Vector2(310, 175), Vector2(400, 112), Vector2(825, 148),
-		Vector2(910, 185), Vector2(1355, 130), Vector2(1475, 145), Vector2(1625, 130),
-		Vector2(1965, 128), Vector2(2120, 142), Vector2(2260, 132), Vector2(2415, 128),
-		Vector2(2595, 140), Vector2(2730, 260),
-		Vector2(480, 542), Vector2(1180, 542), Vector2(1760, 542), Vector2(2490, 542)
-	]:
-		_add_dual_prop("pine_canopy_cluster", tree_pos, Vector2(1.05, 1.05), -24, true, 1.7, 1.5)
-
-	for dead_tree_pos in [
-		Vector2(270, 290), Vector2(885, 250), Vector2(1560, 195),
-		Vector2(2195, 195), Vector2(2525, 200), Vector2(2710, 340)
-	]:
-		_add_dual_prop("dead_gnarled_tree", dead_tree_pos, Vector2(1.0, 1.0), -20, true, 0.9, 1.3)
-
-	for shrub_pos in [
-		Vector2(366, 366), Vector2(498, 366), Vector2(650, 366), Vector2(815, 366),
-		Vector2(946, 364), Vector2(1246, 364), Vector2(1430, 366), Vector2(1616, 364),
-		Vector2(1916, 364), Vector2(2108, 358), Vector2(2282, 358), Vector2(2494, 366),
-		Vector2(2684, 366), Vector2(290, 534), Vector2(630, 536), Vector2(990, 536),
-		Vector2(1390, 536), Vector2(1840, 536), Vector2(2160, 536), Vector2(2560, 536)
-	]:
-		_add_dual_prop("corner_shrub", shrub_pos, Vector2(1.0, 1.0), -10, true, 1.5, 1.9)
-
-	for weed_pos in [
-		Vector2(330, 526), Vector2(525, 526), Vector2(775, 528), Vector2(1140, 526),
-		Vector2(1520, 526), Vector2(1735, 366), Vector2(1890, 366), Vector2(2045, 526),
-		Vector2(2360, 526), Vector2(2695, 526), Vector2(2775, 376)
-	]:
-		_add_dual_prop("overgrown_weeds", weed_pos, Vector2(1.0, 1.0), -6, true, 1.85, 2.2)
-
-	# Decais distorcidos Yume Nikki / manchas pela rua
+	# Decais distorcidos Yume Nikki / manchas pela rua (arquitetura, árvores e veículos agora vêm 100% de V2TownPropsLayer)
 	for dx in [310.0, 569.0, 750.0, 960.0, 1110.0, 1340.0, 1590.0, 1810.0, 2140.0, 2380.0, 2480.0, 2720.0]:
 		_add_distorted_decal("floor_stain", Vector2(dx, 444), Vector2(1.4, 1.1))
 		_add_distorted_decal("yume_eye_rune", Vector2(dx - 30.0, 384), Vector2(1.1, 1.1))
 
-	# Postes ao longo da via (alternando áreas iluminadas e trechos escuros)
+	# Luzes PointLight2D nos postes acesos ao longo da via
 	var lit_lamps_x := [340.0, 560.0, 750.0, 1140.0, 1360.0, 1810.0, 2140.0, 2540.0, 2810.0]
 	for lx in lit_lamps_x:
-		var pole := RetroLevelHelpers.create_prop_sprite("streetlamp_pole", false)
-		pole.position = Vector2(lx, 368)
-		ysort_root.add_child(pole)
-
 		var pl := RetroLevelHelpers.create_point_light(Vector2(lx, 396), Color(0.98, 0.80, 0.46), 0.92, 2.6)
 		lights_layer.add_child(pl)
 		_lamp_lights.append(pl)
@@ -443,11 +404,6 @@ func _build_town_props_and_lights() -> void:
 	var dead_lamps_x := [930.0, 1580.0, 1960.0, 2340.0, 2680.0]
 	for i in range(dead_lamps_x.size()):
 		var dead_x: float = dead_lamps_x[i]
-		var dead_pole := RetroLevelHelpers.create_prop_sprite("streetlamp_pole", true)
-		dead_pole.position = Vector2(dead_x, 368)
-		dead_pole.modulate = Color(0.55, 0.56, 0.62, 1.0)
-		ysort_root.add_child(dead_pole)
-
 		var fl := RetroLevelHelpers.create_point_light(Vector2(dead_x, 386), Color(0.85, 0.72, 0.48), 0.35, 2.0)
 		fl.set_meta("phase", float(i) * 1.93 + 0.4)
 		lights_layer.add_child(fl)
@@ -498,17 +454,17 @@ func _build_overhead_wires() -> void:
 	_wires_drawer = OverheadWiresDrawer.new()
 	_wires_drawer.name = "OverheadWiresLayer"
 	_wires_drawer.z_index = 5
-	_wires_drawer.pole_xs = [340.0, 560.0, 750.0, 930.0, 1140.0, 1360.0, 1580.0, 1810.0, 1960.0, 2140.0, 2340.0, 2540.0, 2680.0, 2810.0]
-	_wires_drawer.dead_xs = [930.0, 1580.0, 1960.0, 2340.0, 2680.0]
+	_wires_drawer.pole_xs = [344.0, 488.0, 664.0, 808.0, 904.0, 1256.0, 1448.0, 1592.0, 1688.0, 1944.0, 2120.0, 2280.0, 2504.0, 2648.0, 2728.0]
+	_wires_drawer.dead_xs = [808.0, 1592.0, 2120.0, 2648.0]
 	_wires_drawer.drop_targets = [
-		{"from": Vector2(560, 330), "to": Vector2(576, 304), "sag": 6.0},
-		{"from": Vector2(750, 329), "to": Vector2(742, 318), "sag": 5.0},
-		{"from": Vector2(1140, 328), "to": Vector2(1120, 224), "sag": 14.0},
-		{"from": Vector2(1360, 329), "to": Vector2(1352, 284), "sag": 9.0},
-		{"from": Vector2(1580, 330), "to": Vector2(1548, 266), "sag": 11.0},
-		{"from": Vector2(2140, 330), "to": Vector2(2044, 290), "sag": 12.0},
-		{"from": Vector2(2340, 330), "to": Vector2(2390, 276), "sag": 10.0},
-		{"from": Vector2(2540, 330), "to": Vector2(2588, 286), "sag": 10.0}
+		{"from": Vector2(488, 314), "to": Vector2(544, 304), "sag": 6.0},
+		{"from": Vector2(664, 314), "to": Vector2(720, 318), "sag": 5.0},
+		{"from": Vector2(904, 314), "to": Vector2(1020, 244), "sag": 12.0},
+		{"from": Vector2(1256, 314), "to": Vector2(1300, 304), "sag": 8.0},
+		{"from": Vector2(1448, 314), "to": Vector2(1504, 304), "sag": 9.0},
+		{"from": Vector2(1944, 314), "to": Vector2(2020, 308), "sag": 10.0},
+		{"from": Vector2(2280, 314), "to": Vector2(2360, 304), "sag": 10.0},
+		{"from": Vector2(2504, 314), "to": Vector2(2560, 304), "sag": 10.0}
 	]
 	add_child(_wires_drawer)
 
@@ -732,6 +688,11 @@ func _apply_visual_atmosphere() -> void:
 	var night := _is_night()
 	var higher := _is_higher_dose_active()
 
+	var active_base_ts: TileSet = TOWN_ACT3_TS if act3 else TOWN_NORMAL_TS
+	ground_normal.tile_set = active_base_ts
+	walls_normal.tile_set = active_base_ts
+	if _town_props_layer != null:
+		_town_props_layer.tile_set = TOWN_ACT3_TS if act3 else (TOWN_DISTORTED_TS if higher else TOWN_NORMAL_TS)
 	ground_normal.visible = not higher
 	walls_normal.visible = not higher
 	ground_distorted.visible = higher
@@ -749,34 +710,37 @@ func _apply_visual_atmosphere() -> void:
 		if npc != null and is_instance_valid(npc):
 			npc.set_distorted_state(higher)
 
+	var period: String = GameState.get_day_period() if GameState.has_method("get_day_period") else ("afternoon" if GameState.is_afternoon else "morning")
 	if canvas_mod:
 		if act3:
 			canvas_mod.color = Color(0.60, 0.62, 0.66, 1.0)
 		elif higher:
-			canvas_mod.color = Color(0.34, 0.24, 0.28, 1.0)
-		elif night:
-			canvas_mod.color = Color(0.36, 0.40, 0.56, 1.0)
+			canvas_mod.color = Color(0.56, 0.52, 0.58, 1.0)
+		elif night or period == "night":
+			canvas_mod.color = Color(0.42, 0.46, 0.60, 1.0)
+		elif period == "afternoon" or GameState.is_afternoon:
+			canvas_mod.color = Color(0.72, 0.66, 0.70, 1.0)
 		else:
-			canvas_mod.color = Color(0.56, 0.59, 0.68, 1.0)
+			canvas_mod.color = Color(0.84, 0.86, 0.90, 1.0)
 
 	for lt in _lamp_lights:
 		if lt == null:
 			continue
 		if higher:
-			lt.color = Color(0.84, 0.16, 0.22)
-			lt.energy = 0.72
+			lt.color = Color(0.92, 0.46, 0.52)
+			lt.energy = 0.88
 		elif act3:
 			lt.color = Color(0.82, 0.85, 0.88)
 			lt.energy = 0.68
 		else:
 			lt.color = Color(0.98, 0.80, 0.46)
-			lt.energy = 0.90 if not night else 1.05
+			lt.energy = 1.08 if (night or period == "night") else (0.55 if period == "afternoon" else 0.14)
 
 	for fl in _flicker_lamps:
 		if fl == null:
 			continue
 		if higher:
-			fl.color = Color(0.90, 0.12, 0.18)
+			fl.color = Color(0.92, 0.42, 0.48)
 		elif act3:
 			fl.color = Color(0.76, 0.78, 0.82)
 		else:
@@ -788,14 +752,14 @@ func _apply_visual_atmosphere() -> void:
 		var base_col: Color = wl_pt.get_meta("base_color", Color(0.95, 0.78, 0.44))
 		var base_e: float = float(wl_pt.get_meta("base_energy", 0.50))
 		if higher:
-			wl_pt.color = Color(0.82, 0.10, 0.16)
-			wl_pt.energy = base_e * 0.65
+			wl_pt.color = Color(0.90, 0.42, 0.50)
+			wl_pt.energy = base_e * 0.85
 		elif act3:
 			wl_pt.color = Color(0.78, 0.80, 0.84)
 			wl_pt.energy = base_e * 0.45
 		else:
 			wl_pt.color = base_col
-			wl_pt.energy = base_e * (1.2 if night else 0.75)
+			wl_pt.energy = base_e * (1.25 if (night or period == "night") else (0.65 if period == "afternoon" else 0.18))
 
 	for spk in _spark_particles:
 		if spk != null:
@@ -824,7 +788,9 @@ func _apply_visual_atmosphere() -> void:
 
 	if has_node("/root/AudioManager"):
 		var am = get_node("/root/AudioManager")
-		if act3:
+		if am.has_method("sync_adaptive_soundtrack"):
+			am.call("sync_adaptive_soundtrack", "street_preview", false)
+		elif act3:
 			am.play_ambience("act3_ambience")
 		elif higher or night:
 			am.play_ambience("night_ambience")

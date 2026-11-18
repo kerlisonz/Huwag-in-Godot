@@ -34,7 +34,10 @@ var _portrait_cache: Dictionary = {}
 var _cursor_timer: float = 0.0
 var _is_corrupted_theme: bool = false
 var _theme_mode: String = "normal"
+var _advance_cooldown: float = 0.0
 
+const ADVANCE_COOLDOWN_SEC := 0.08
+const POST_CLOSE_COOLDOWN_SEC := 0.28
 const CURSOR_BASE_TOP := -12.0
 const PIXEL_FONT := preload("res://assets/fonts/undertale-deltarune-extended-fixed.otf")
 
@@ -82,8 +85,11 @@ func start_dialogue(pages: Array) -> void:
 	_pages = pages.duplicate(true)
 	_page_index = 0
 	active = true
+	_advance_cooldown = ADVANCE_COOLDOWN_SEC
 	if has_node("/root/GameState"):
-		get_node("/root/GameState").dialogue_active = true
+		var gs := get_node("/root/GameState")
+		gs.dialogue_active = true
+		gs.dialogue_cooldown = POST_CLOSE_COOLDOWN_SEC
 	if not is_visible_in_tree():
 		_last_speaker_id = ""
 		_last_expression = ""
@@ -92,6 +98,8 @@ func start_dialogue(pages: Array) -> void:
 
 
 func _process(delta: float) -> void:
+	if _advance_cooldown > 0.0:
+		_advance_cooldown = maxf(0.0, _advance_cooldown - delta)
 	if not active:
 		return
 
@@ -109,16 +117,28 @@ func _process(delta: float) -> void:
 		continue_hint.offset_bottom = CURSOR_BASE_TOP + 6.0 + dy
 
 
+func _input(event: InputEvent) -> void:
+	if not active:
+		return
+	_handle_dialogue_input(event)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not active:
 		return
+	_handle_dialogue_input(event)
+
+
+func _handle_dialogue_input(event: InputEvent) -> void:
+	if not active or get_viewport().is_input_handled():
+		return
 
 	if _current_choices.size() > 0:
-		if event.is_action_pressed("ui_up") or (event is InputEventKey and event.pressed and (event.keycode == KEY_W or event.keycode == KEY_UP)):
+		if event.is_action_pressed("ui_up") or (event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_W or event.keycode == KEY_UP)):
 			_move_choice(-1)
 			get_viewport().set_input_as_handled()
 			return
-		elif event.is_action_pressed("ui_down") or (event is InputEventKey and event.pressed and (event.keycode == KEY_S or event.keycode == KEY_DOWN)):
+		elif event.is_action_pressed("ui_down") or (event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_S or event.keycode == KEY_DOWN)):
 			_move_choice(1)
 			get_viewport().set_input_as_handled()
 			return
@@ -132,6 +152,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if accept:
 		get_viewport().set_input_as_handled()
+		if _advance_cooldown > 0.0:
+			return
+		_advance_cooldown = ADVANCE_COOLDOWN_SEC
 		if _typing:
 			_finish_typing()
 		else:
@@ -333,6 +356,11 @@ func _populate_choices() -> void:
 		)
 		btn_box.gui_input.connect(func(ev: InputEvent):
 			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+				btn_box.accept_event()
+				get_viewport().set_input_as_handled()
+				if _advance_cooldown > 0.0:
+					return
+				_advance_cooldown = ADVANCE_COOLDOWN_SEC
 				_selected_choice = i
 				_advance_page()
 		)
@@ -408,11 +436,16 @@ func close_dialogue() -> void:
 func _close_dialogue() -> void:
 	active = false
 	_is_corrupted_theme = false
+	_advance_cooldown = ADVANCE_COOLDOWN_SEC
 	if choices_panel:
 		choices_panel.visible = false
 	hide()
 	if has_node("/root/GameState"):
-		get_node("/root/GameState").dialogue_active = false
+		var gs := get_node("/root/GameState")
+		if gs.has_method("notify_dialogue_closed"):
+			gs.call("notify_dialogue_closed", POST_CLOSE_COOLDOWN_SEC)
+		else:
+			gs.dialogue_active = false
 
 
 func _apply_theme(mode: String) -> void:

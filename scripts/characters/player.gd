@@ -13,8 +13,8 @@ signal player_died()
 @export var speed: float = 135.0
 @export var run_speed_multiplier: float = 1.42
 @export var attack_damage: int = 25
-@export var attack_radius: float = 44.0
-@export var attack_arc_degrees: float = 120.0
+@export var attack_radius: float = 50.0
+@export var attack_arc_degrees: float = 135.0
 
 @export_group("Outfit & Visuals")
 @export_enum("casual", "bfp", "bombeiro") var outfit: String = "casual":
@@ -39,10 +39,10 @@ signal player_died()
 @export var combo_window: float = 0.65
 @export var combo2_damage_multiplier: float = 1.28
 @export var combo3_damage_multiplier: float = 1.80
-@export var dodge_speed: float = 265.0
-@export var dodge_duration: float = 0.24
-@export var dodge_cooldown_time: float = 0.50
-@export var dodge_invulnerability: float = 0.28
+@export var dodge_speed: float = 275.0
+@export var dodge_duration: float = 0.25
+@export var dodge_cooldown_time: float = 0.46
+@export var dodge_invulnerability: float = 0.36
 
 @export_group("Rotate Towards Mouse")
 @export var rotate_towards_mouse: bool = true
@@ -82,8 +82,8 @@ var _attack_cooldown: float = 0.0
 var _attack_anim_timer: float = 0.0
 var _combo_reset_timer: float = 0.0
 var _active_attack_damage: int = 25
-var _active_attack_radius: float = 44.0
-var _active_attack_arc: float = 120.0
+var _active_attack_radius: float = 50.0
+var _active_attack_arc: float = 135.0
 var _attack_lunge_vel: Vector2 = Vector2.ZERO
 
 var _dodge_timer: float = 0.0
@@ -109,6 +109,7 @@ var _was_water_key_down: bool = false
 var _was_outfit_key_down: bool = false
 var _was_jump_key_down: bool = false
 var _was_dodge_key_down: bool = false
+var _was_interact_key_down: bool = false
 
 # Spritesheets pixel art reconstruídos (huwag_v3, célula 48x48, escala 1:1 nítida)
 const HUWAG_V3_SPRITEFRAMES := {
@@ -180,7 +181,14 @@ func _get_game_state() -> Node:
 
 func _is_dialogue_active() -> bool:
 	var gs := _get_game_state()
-	return gs != null and bool(gs.get("dialogue_active"))
+	return gs != null and (bool(gs.get("dialogue_active")) or bool(gs.get("sleep_transition_active")))
+
+
+func _is_interaction_blocked() -> bool:
+	var gs := _get_game_state()
+	if gs != null and gs.has_method("is_interaction_blocked"):
+		return bool(gs.call("is_interaction_blocked"))
+	return _is_dialogue_active() or _interact_cooldown > 0.0
 
 
 func set_outfit(new_outfit: String, persist_save: bool = false) -> void:
@@ -370,7 +378,7 @@ func apply_hit(damage_or_from: Variant, from_or_damage: Variant = null) -> void:
 		if typeof(from_or_damage) == TYPE_VECTOR2:
 			from_pos = from_or_damage as Vector2
 
-	_hurt_timer = 0.55
+	_hurt_timer = 0.75
 	_hurt_anim_timer = 0.28
 	var push_dir := (global_position - from_pos).normalized()
 	if push_dir.length_squared() < 0.01:
@@ -519,7 +527,12 @@ func perform_dodge(custom_dir: Vector2 = Vector2.ZERO) -> bool:
 		_facing_left = (d.x < 0.0)
 
 	CombatSfx.play(self, "swing_miss", -10.5)
-	_spawn_combat_fx("dodge_ghost", global_position, "", Color(0.66, 0.85, 1.0, 0.55))
+	if VfxLibrary.spawn_burst(self, "impact_dust", global_position + Vector2(0, 6), {
+		"scale": Vector2(0.42, 0.42),
+		"modulate": _get_vfx_tint(Color(0.85, 0.86, 0.92, 0.55)),
+		"z_index": 3,
+	}) == null:
+		_spawn_combat_fx("dodge_ghost", global_position, "", Color(0.66, 0.85, 1.0, 0.55))
 	dodge_performed.emit(global_position, _dodge_dir)
 	_update_character_sprite_state()
 	queue_redraw()
@@ -592,6 +605,15 @@ func perform_melee_attack() -> bool:
 
 	var pitch_db := -9.5 if combo_stage == 1 else (-7.5 if combo_stage == 2 else -5.0)
 	CombatSfx.play(self, "swing_miss", pitch_db)
+	var use_crimson := combo_stage >= 3 and not _is_act3_unfiltered()
+	var slash_name := "axe_slash_crimson" if use_crimson else "axe_slash_amber"
+	var slash_scale := Vector2(1.0, -1.0 if combo_stage == 2 else 1.0)
+	VfxLibrary.spawn_burst(self, slash_name, global_position + Vector2(0, -4), {
+		"rotation": _swing_dir.angle(),
+		"scale": slash_scale,
+		"modulate": _get_vfx_tint(Color.WHITE),
+		"z_index": 6,
+	})
 	melee_attack_performed.emit(global_position, _swing_dir, _active_attack_radius, _active_attack_arc, _active_attack_damage)
 	combo_attack_performed.emit(combo_stage, global_position, _swing_dir, _active_attack_damage)
 	_evaluate_active_melee_hitbox()
@@ -632,7 +654,14 @@ func perform_water_skill() -> bool:
 	if dir.length_squared() < 0.01:
 		dir = Vector2.DOWN
 	CombatSfx.play(self, "water_cast", -5.5)
-	water_skill_performed.emit(global_position, dir, 62.0, 35)
+	VfxLibrary.spawn_burst(self, "water_jet", global_position + dir * 8.0 + Vector2(0, -4), {
+		"rotation": dir.angle(),
+		"duration": 0.28,
+		"scale": Vector2(0.95, 0.95),
+		"modulate": _get_vfx_tint(Color.WHITE),
+		"z_index": 6,
+	})
+	water_skill_performed.emit(global_position, dir, 76.0, 35)
 	_apply_water_to_scene_targets(dir)
 	queue_redraw()
 	return true
@@ -691,7 +720,13 @@ func _evaluate_active_melee_hitbox() -> void:
 			var contact_pos := global_position.lerp(hpos, 0.72)
 			var fx_col := Color("#FFE066") if combo_stage >= 3 else Color("#FFF3B0")
 			var fx_txt := "-%d!" % dmg if combo_stage >= 3 else "-%d" % dmg
-			_spawn_combat_fx("hit", contact_pos, fx_txt, fx_col)
+			var has_spark := VfxLibrary.spawn_burst(self, "hit_spark", contact_pos, {
+				"rotation": _swing_dir.angle(),
+				"scale": Vector2.ONE if combo_stage >= 3 else Vector2(0.82, 0.82),
+				"modulate": _get_vfx_tint(Color.WHITE),
+				"z_index": 7,
+			}) != null
+			_spawn_combat_fx("hit_text" if has_spark else "hit", contact_pos, fx_txt, fx_col)
 			attack_hit_landed.emit(contact_pos, dmg)
 
 
@@ -703,23 +738,49 @@ func _apply_water_to_scene_targets(dir: Vector2) -> void:
 		if not is_instance_valid(node) or not node.is_inside_tree() or node.is_queued_for_deletion():
 			continue
 		if node.has_method("query_water_hit"):
-			var hits: Variant = node.call("query_water_hit", global_position, dir, 64.0, 110.0, 35)
+			var hits: Variant = node.call("query_water_hit", global_position, dir, 76.0, 125.0, 35)
 			if typeof(hits) == TYPE_ARRAY and not (hits as Array).is_empty():
 				any_water_hit = true
 				for h in (hits as Array):
 					if typeof(h) == TYPE_DICTIONARY:
 						var hpos: Vector2 = h.get("pos", global_position + dir * 36.0)
 						var label_txt: String = str(h.get("label", "-35"))
-						_spawn_combat_fx("water_hit", hpos, label_txt, Color("#90E0EF"))
+						_spawn_water_impact_vfx(hpos, label_txt)
 		elif node is Node2D:
 			var target_2d := node as Node2D
-			if is_point_in_attack_cone(global_position, dir, target_2d.global_position, 18.0, 64.0, 110.0):
+			if is_point_in_attack_cone(global_position, dir, target_2d.global_position, 22.0, 76.0, 125.0):
 				if target_2d.has_method("receive_water_hit"):
 					target_2d.call("receive_water_hit", 35, global_position)
 					any_water_hit = true
-					_spawn_combat_fx("water_hit", target_2d.global_position, "-35", Color("#90E0EF"))
+					_spawn_water_impact_vfx(target_2d.global_position, "-35")
 	if not any_water_hit:
-		_spawn_combat_fx("miss", global_position + dir * 42.0, "", Color(0.56, 0.88, 0.96, 0.65))
+		if VfxLibrary.spawn_burst(self, "water_splash", global_position + dir * 56.0, {
+			"scale": Vector2(0.60, 0.60),
+			"modulate": _get_vfx_tint(Color.WHITE),
+			"z_index": 6,
+		}) == null:
+			_spawn_combat_fx("miss", global_position + dir * 42.0, "", Color(0.56, 0.88, 0.96, 0.65))
+
+
+func _spawn_water_impact_vfx(hpos: Vector2, label_txt: String) -> void:
+	var has_splash := VfxLibrary.spawn_burst(self, "water_splash", hpos, {
+		"scale": Vector2(0.72, 0.72),
+		"modulate": _get_vfx_tint(Color.WHITE),
+		"z_index": 7,
+	}) != null
+	_spawn_combat_fx("water_text" if has_splash else "water_hit", hpos, label_txt, Color("#90E0EF"))
+
+
+func _is_act3_unfiltered() -> bool:
+	var gs := _get_game_state()
+	return gs != null and bool(gs.call("is_unfiltered_act3"))
+
+
+func _get_vfx_tint(base_col: Color) -> Color:
+	if _is_act3_unfiltered():
+		var lum := base_col.get_luminance()
+		return Color(lum * 0.84, lum * 0.85, lum * 0.88, base_col.a * 0.90)
+	return base_col
 
 
 func _spawn_combat_fx(kind: String, world_pos: Vector2, text: String, col: Color) -> void:
@@ -799,6 +860,13 @@ func _physics_process(delta: float) -> void:
 			_combat_fx.remove_at(i)
 
 	if _is_dialogue_active():
+		_interact_cooldown = maxf(_interact_cooldown, 0.28)
+		_was_interact_key_down = true
+		_was_attack_key_down = true
+		_was_dodge_key_down = true
+		_was_water_key_down = true
+		_was_outfit_key_down = true
+		_was_jump_key_down = true
 		velocity = Vector2.ZERO
 		is_moving = false
 		is_running = false
@@ -869,36 +937,48 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	_refresh_prompt()
-	if _is_interact_just_pressed() and _interact_cooldown <= 0.0:
-		var target := get_best_interactable()
-		if target != null:
-			_interact_cooldown = 0.25
-			target.trigger_interaction()
-
-	var attack_down := Input.is_key_pressed(KEY_J) or Input.is_key_pressed(KEY_SPACE) or (mouse_controls_combat and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
+	var interact_down := Input.is_action_pressed("interact") or Input.is_key_pressed(KEY_E)
+	var interact_edge := (Input.is_action_just_pressed("interact") or (interact_down and not _was_interact_key_down))
+	var mouse_left_down := mouse_controls_combat and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	var attack_down := Input.is_key_pressed(KEY_J) or Input.is_key_pressed(KEY_SPACE) or mouse_left_down
+	var attack_edge := attack_down and not _was_attack_key_down
 	var dodge_down := Input.is_key_pressed(KEY_Z) or Input.is_key_pressed(KEY_L)
 	var water_down := Input.is_key_pressed(KEY_K) or Input.is_key_pressed(KEY_Q) or (mouse_controls_combat and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
 	var outfit_down := Input.is_key_pressed(KEY_U)
 	var jump_down := Input.is_key_pressed(KEY_V) or Input.is_key_pressed(KEY_ALT)
 
-	if attack_down and not _was_attack_key_down:
-		perform_melee_attack()
-	elif dodge_down and not _was_dodge_key_down:
-		perform_dodge(direction if direction.length_squared() > 0.01 else facing_dir)
-	elif jump_down and not _was_jump_key_down:
-		perform_jump()
-	elif water_down and not _was_water_key_down:
-		perform_water_skill()
-	elif outfit_down and not _was_outfit_key_down:
-		var gs_o := _get_game_state()
-		if gs_o != null:
-			gs_o.call("toggle_outfit")
-	elif _is_heal_just_pressed() and _interact_cooldown <= 0.0:
-		var gs_h := _get_game_state()
-		if gs_h != null and bool(gs_h.call("use_soothing_drop")):
-			_interact_cooldown = 0.3
+	var interaction_consumed := false
+	if not _is_interaction_blocked() and _interact_cooldown <= 0.0:
+		var target := get_best_interactable()
+		if target != null:
+			var clicked_target := mouse_left_down and not _was_attack_key_down and _is_mouse_aiming_active() and _get_active_mouse_pos().distance_to(target.global_position) <= 32.0
+			if interact_edge or clicked_target:
+				_interact_cooldown = 0.28
+				_was_interact_key_down = true
+				_was_attack_key_down = true
+				interaction_consumed = true
+				target.trigger_interaction()
 
-	_was_attack_key_down = attack_down
+	if not interaction_consumed and not _is_dialogue_active():
+		if attack_edge and not _is_interaction_blocked():
+			perform_melee_attack()
+		elif dodge_down and not _was_dodge_key_down:
+			perform_dodge(direction if direction.length_squared() > 0.01 else facing_dir)
+		elif jump_down and not _was_jump_key_down:
+			perform_jump()
+		elif water_down and not _was_water_key_down:
+			perform_water_skill()
+		elif outfit_down and not _was_outfit_key_down:
+			var gs_o := _get_game_state()
+			if gs_o != null:
+				gs_o.call("toggle_outfit")
+		elif _is_heal_just_pressed() and _interact_cooldown <= 0.0:
+			var gs_h := _get_game_state()
+			if gs_h != null and bool(gs_h.call("use_soothing_drop")):
+				_interact_cooldown = 0.3
+
+	_was_interact_key_down = interact_down or interaction_consumed
+	_was_attack_key_down = attack_down or interaction_consumed
 	_was_dodge_key_down = dodge_down
 	_was_water_key_down = water_down
 	_was_outfit_key_down = outfit_down
@@ -1100,9 +1180,9 @@ func _draw() -> void:
 		var shadow_scale := clampf(1.0 - (_jump_height / 28.0), 0.55, 1.0)
 		draw_Rect_ellipse(Vector2(0, 8.5), Vector2(7.5, 3.0) * shadow_scale, Color(0.03, 0.03, 0.07, 0.40))
 
-	if _attack_anim_timer > 0.0:
+	if _attack_anim_timer > 0.0 and VfxLibrary.get_frames("axe_slash_amber") == null:
 		_draw_melee_arc()
-	if _water_anim_timer > 0.0:
+	if _water_anim_timer > 0.0 and VfxLibrary.get_frames("water_jet") == null:
 		_draw_water_stream()
 
 	_draw_combat_feedback_fx()
@@ -1183,14 +1263,15 @@ func _draw_combat_feedback_fx() -> void:
 		var col: Color = fx["color"]
 		var alpha := clampf(1.0 - t, 0.0, 1.0)
 
-		if kind == "hit" or kind == "water_hit":
-			var burst_r := lerpf(4.0, 15.0, t)
-			draw_arc(local_pos, burst_r, 0.0, TAU, 16, Color(col.r, col.g, col.b, alpha * 0.85), 1.8)
-			for i in range(4):
-				var a := float(i) * PI * 0.5 + PI * 0.25
-				var p_in := local_pos + Vector2(cos(a), sin(a)) * (burst_r * 0.45)
-				var p_out := local_pos + Vector2(cos(a), sin(a)) * (burst_r * 1.15)
-				draw_line(p_in, p_out, Color(1.0, 1.0, 1.0, alpha), 1.6)
+		if kind == "hit" or kind == "water_hit" or kind == "hit_text" or kind == "water_text":
+			if kind == "hit" or kind == "water_hit":
+				var burst_r := lerpf(4.0, 15.0, t)
+				draw_arc(local_pos, burst_r, 0.0, TAU, 16, Color(col.r, col.g, col.b, alpha * 0.85), 1.8)
+				for i in range(4):
+					var a := float(i) * PI * 0.5 + PI * 0.25
+					var p_in := local_pos + Vector2(cos(a), sin(a)) * (burst_r * 0.45)
+					var p_out := local_pos + Vector2(cos(a), sin(a)) * (burst_r * 1.15)
+					draw_line(p_in, p_out, Color(1.0, 1.0, 1.0, alpha), 1.6)
 			var txt: String = str(fx["text"])
 			if not txt.is_empty() and font_to_use != null:
 				var text_pos := local_pos + Vector2(-10.0, -8.0 - t * 14.0)

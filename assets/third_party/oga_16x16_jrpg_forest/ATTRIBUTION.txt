@@ -1,0 +1,6 @@
+Origin: OpenGameArt.org — 16x16 JRPG tilesets / enlarged collection (submitted by bart)
+URL: https://opengameart.org/content/oga-16x16-jrpg-sprites-tiles
+Related URL: https://opengameart.org/content/16x16-jrpg-tilesets-enlarged-2x
+License: CC-BY 3.0 (Creative Commons Attribution 3.0 Unported)
+Files kept for Huwag (16x16 grid):
+- dark_forest.png (256x608, 16x16 grid, transparent RGBA)
