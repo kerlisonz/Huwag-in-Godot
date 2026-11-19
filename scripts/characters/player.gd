@@ -332,7 +332,7 @@ func _add_rect_animation(sf: SpriteFrames, anim_name: String, tex: Texture2D, ro
 func _style_prompt_label() -> void:
 	if prompt_label == null:
 		return
-	prompt_label.add_theme_stylebox_override("normal", HuwagUiTheme.make_omori_box_style(Color(0.0, 0.0, 0.0, 0.96), Color.WHITE, 6, 3))
+	prompt_label.add_theme_stylebox_override("normal", HuwagUiTheme.make_omori_box_style(Color(0.0, 0.0, 0.0, 1.0), Color.WHITE, 10, 5, 2))
 	var ui_font := HuwagUiTheme.get_ui_font()
 	if ui_font != null:
 		prompt_label.add_theme_font_override("font", ui_font)
@@ -621,8 +621,9 @@ func perform_melee_attack() -> bool:
 
 	_play_attack_or_combo_animation()
 
-	var pitch_db := -9.5 if combo_stage == 1 else (-7.5 if combo_stage == 2 else -5.0)
-	CombatSfx.play(self, "swing_miss", pitch_db)
+	var swing_sfx := "axe_swing_1" if combo_stage == 1 else ("axe_swing_2" if combo_stage == 2 else "axe_swing_3")
+	var swing_db := -2.0 if combo_stage == 1 else (-1.0 if combo_stage == 2 else 0.0)
+	CombatSfx.play(self, swing_sfx, swing_db)
 	var use_crimson := combo_stage >= 3 and not _is_act3_unfiltered()
 	var slash_name := "axe_slash_crimson" if use_crimson else "axe_slash_amber"
 	var slash_scale := Vector2(1.0, -1.0 if combo_stage == 2 else 1.0)
@@ -730,7 +731,8 @@ func _evaluate_active_melee_hitbox() -> void:
 
 	if not newly_hit.is_empty():
 		if not _swing_landed_hit:
-			CombatSfx.play(self, "melee_hit", -3.5 if combo_stage < 3 else -1.5)
+			var hit_sfx := "melee_hit_heavy" if combo_stage >= 3 else "melee_hit"
+			CombatSfx.play(self, hit_sfx, -1.0 if combo_stage < 3 else 0.5)
 		_swing_landed_hit = true
 		for h in newly_hit:
 			var hpos: Vector2 = h.get("pos", global_position + _swing_dir * 28.0)

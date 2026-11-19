@@ -253,9 +253,12 @@ func _show_current_page() -> void:
 		var show_name := (not display_name.is_empty()) and (not is_monologue)
 		nameplate_panel.visible = show_name
 		if show_name:
-			nameplate_panel.reset_size()
-			var target_w := maxf(76.0, speaker_label.get_minimum_size().x + 24.0)
-			nameplate_panel.offset_right = nameplate_panel.offset_left + target_w
+			var left_x: float = frame_panel.offset_left if frame_panel != null else -296.0
+			var target_w := maxf(68.0, speaker_label.get_minimum_size().x + 30.0)
+			nameplate_panel.offset_left = left_x
+			nameplate_panel.offset_right = left_x + target_w
+			nameplate_panel.offset_bottom = (frame_panel.offset_top - 4.0) if frame_panel != null else -114.0
+			nameplate_panel.offset_top = nameplate_panel.offset_bottom - 32.0
 
 	var pal := HuwagUiTheme.get_palette(target_mode)
 	if speaker_label:
@@ -376,15 +379,26 @@ func _populate_choices() -> void:
 		_choice_cursors.append(cursor_icon)
 
 	_selected_choice = 0
-	var bottom_y := -146.0 if (nameplate_panel != null and nameplate_panel.visible) else -116.0
+	var bottom_y := -150.0 if (nameplate_panel != null and nameplate_panel.visible) else -114.0
 	choices_panel.offset_bottom = bottom_y
-	choices_panel.offset_top = bottom_y - float(maxi(1, _current_choices.size()) * 26 + 16)
+	choices_panel.offset_top = bottom_y - float(maxi(1, _current_choices.size()) * 24 + 22)
 	_refresh_choices_visual()
 	choices_panel.visible = true
 
 
 func _refresh_choices_visual() -> void:
 	var pal := HuwagUiTheme.get_palette(_theme_mode)
+	var sb_sel := StyleBoxFlat.new()
+	sb_sel.bg_color = pal["choice_sel_bg"]
+	sb_sel.content_margin_left = 6.0
+	sb_sel.content_margin_right = 8.0
+	sb_sel.content_margin_top = 3.0
+	sb_sel.content_margin_bottom = 3.0
+	var sb_idle := StyleBoxEmpty.new()
+	sb_idle.content_margin_left = 6.0
+	sb_idle.content_margin_right = 8.0
+	sb_idle.content_margin_top = 3.0
+	sb_idle.content_margin_bottom = 3.0
 	for i in range(_choice_labels.size()):
 		var lbl := _choice_labels[i]
 		var box := _choice_boxes[i]
@@ -394,10 +408,10 @@ func _refresh_choices_visual() -> void:
 		cur.visible = is_sel
 		cur.modulate = Color.WHITE if is_sel else Color(1, 1, 1, 0)
 		if is_sel:
-			box.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["choice_sel_border"], 6, 3))
+			box.add_theme_stylebox_override("panel", sb_sel)
 			lbl.add_theme_color_override("font_color", pal["text"])
 		else:
-			box.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["choice_bg"], Color(pal["border"].r, pal["border"].g, pal["border"].b, 0.35), 6, 3))
+			box.add_theme_stylebox_override("panel", sb_idle)
 			lbl.add_theme_color_override("font_color", pal["text_muted"])
 
 
@@ -457,13 +471,13 @@ func _apply_theme(mode: String) -> void:
 	var pal := HuwagUiTheme.get_palette(mode)
 
 	if frame_panel:
-		frame_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 8, 6))
+		frame_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 8, 6, 3))
 	if nameplate_panel:
-		nameplate_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 0, 0))
+		nameplate_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 4, 3, 3))
 	if portrait_frame:
-		portrait_frame.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg_inner"], pal["border"], 4, 4))
+		portrait_frame.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg_inner"], pal["border"], 5, 5, 3))
 	if choices_panel:
-		choices_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 2, 2))
+		choices_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 6, 5, 3))
 
 	var ui_font := HuwagUiTheme.get_ui_font()
 	if ui_font:

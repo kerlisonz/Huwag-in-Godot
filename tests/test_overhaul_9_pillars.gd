@@ -58,7 +58,19 @@ func _run_all() -> void:
 	var custom_font_path: String = str(ProjectSettings.get_setting("gui/theme/custom_font", ""))
 	_assert_ok(custom_font_path == "res://assets/fonts/omori_dialogue_font.tres",
 		"Projeto usa globalmente omori_dialogue_font.tres (atual=%s)" % custom_font_path)
-	print("[PASS] Pilar 6: 6 faixas MP3 + créditos musicais + fonte Omori global validados.")
+	var ui_font: Font = load(custom_font_path) as Font
+	_assert_ok(ui_font != null, "omori_dialogue_font.tres carregada com sucesso")
+	var ptbr_sample := "ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç·•—–ºª°×►↑↓"
+	for ci in range(ptbr_sample.length()):
+		var ch_code := ptbr_sample.unicode_at(ci)
+		_assert_ok(ui_font.has_char(ch_code),
+			"Fonte UI deve conter glifo vetorial nativo para '%s' (U+%04X)" % [ptbr_sample[ci], ch_code])
+	_assert_ok(ui_font.get_height(16) <= 20.0,
+		"Altura de linha em 16px não pode inflar por fallback (atual=%.2f)" % ui_font.get_height(16))
+	var title_font: Font = HuwagUiTheme.get_title_font()
+	_assert_ok(title_font != null and title_font.has_char("Ç".unicode_at(0)) and title_font.has_char("Õ".unicode_at(0)),
+		"Fonte de título OMORI_GAME_PTBR deve suportar acentuação PT-BR")
+	print("[PASS] Pilar 6: 6 faixas MP3 + créditos musicais + fonte Omori vetorial PT-BR validados.")
 
 	# ------------------------------------------------------------------
 	# PILAR 4: Menu Principal Limpo (CoverArt, sem VHS OSD, 6 botões)
@@ -76,6 +88,13 @@ func _run_all() -> void:
 	var btn_names := ["BtnNewGame", "BtnContinue", "BtnLoadGame", "BtnOptions", "BtnMusicCredits", "BtnExit"]
 	for bn in btn_names:
 		_assert_ok(title_ui.get_node_or_null("MenuContainer/MenuVBox/" + bn) != null, "Botão do menu presente: " + bn)
+	var menu_cont := title_ui.get_node_or_null("MenuContainer") as Control
+	var save_lbl := title_ui.get_node_or_null("SaveSummaryLabel") as Control
+	_assert_ok(menu_cont != null and save_lbl != null and (menu_cont.position.y + menu_cont.size.y) <= save_lbl.position.y,
+		"MenuContainer (bottom=%.1f) não pode sobrepor SaveSummaryLabel (top=%.1f)" % [
+			menu_cont.position.y + menu_cont.size.y if menu_cont else -1.0,
+			save_lbl.position.y if save_lbl else -1.0,
+		])
 	title_ui.call("_on_credits_pressed")
 	await process_frame
 	var credits_list := title_ui.get_node_or_null("CreditsModal/Card/Margin/VBox/CreditsList") as VBoxContainer

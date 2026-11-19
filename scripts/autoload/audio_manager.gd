@@ -96,7 +96,7 @@ func _ready() -> void:
 func _setup_audio_buses() -> void:
 	_ensure_filtered_bus("Music", 14000.0, 0.34, -1.5)
 	_ensure_filtered_bus("Ambience", 1800.0, 0.30, -2.0)
-	_ensure_filtered_bus("SFX", 3600.0, 0.32, -1.0)
+	_ensure_filtered_bus("SFX", 5400.0, 0.32, 0.0)
 
 
 func set_volumes(master: float, music: float, sfx: float) -> void:
@@ -106,7 +106,7 @@ func set_volumes(master: float, music: float, sfx: float) -> void:
 	_apply_bus_volume("Master", master_volume, 0.0)
 	_apply_bus_volume("Music", music_volume, -1.5)
 	_apply_bus_volume("Ambience", music_volume, -2.5)
-	_apply_bus_volume("SFX", sfx_volume, -1.0)
+	_apply_bus_volume("SFX", sfx_volume, 0.0)
 
 
 func _apply_bus_volume(bus_name: String, norm_val: float, base_db: float) -> void:
@@ -731,37 +731,49 @@ func _synth_act3_shatter() -> AudioStreamWAV:
 
 
 func _synth_melee_hit() -> AudioStreamWAV:
-	var count := int(0.14 * MIX_RATE)
+	var count := int(0.16 * MIX_RATE)
 	var arr := PackedFloat32Array()
 	arr.resize(count)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4111
 	var phase := 0.0
+	var bite_phase := 0.0
 	var lp := 0.0
 	for i in range(count):
 		var t := float(i) / float(count)
 		var env := pow(1.0 - t, 1.9)
-		phase += TAU * lerpf(155.0, 52.0, t) / float(MIX_RATE)
+		phase += TAU * lerpf(205.0, 48.0, pow(t, 0.5)) / float(MIX_RATE)
+		bite_phase += TAU * lerpf(960.0, 340.0, pow(t, 0.6)) / float(MIX_RATE)
 		var n := rng.randf_range(-1.0, 1.0)
-		lp += 0.16 * (n - lp)
-		arr[i] = (sin(phase) * 0.72 + lp * 0.28) * 0.36 * env
+		lp += 0.34 * (n - lp)
+		var crack := lp * exp(-t * 28.0)
+		var blade := sin(bite_phase) * exp(-t * 16.0) * 0.32
+		arr[i] = clampf(tanh((sin(phase) * 0.80 * env + crack * 0.70 + blade) * 1.35), -0.95, 0.95)
 	return _make_wav(arr, false)
 
 
 func _synth_swing_whoosh() -> AudioStreamWAV:
-	var count := int(0.13 * MIX_RATE)
+	var count := int(0.18 * MIX_RATE)
 	var arr := PackedFloat32Array()
 	arr.resize(count)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1337
-	var lp := 0.0
+	var lp_hi := 0.0
+	var lp_lo := 0.0
 	var phase := 0.0
 	for i in range(count):
 		var t := float(i) / float(count)
-		var env := sin(t * PI) * (1.0 - 0.3 * t)
-		phase += TAU * lerpf(210.0, 92.0, t) / float(MIX_RATE)
-		lp += 0.12 * (rng.randf_range(-1.0, 1.0) - lp)
-		arr[i] = (lp * 0.58 + sin(phase) * 0.42) * 0.26 * env
+		var attack := clampf(t / 0.22, 0.0, 1.0)
+		var release := pow(1.0 - maxf(0.0, (t - 0.22) / 0.78), 1.45)
+		var env := pow(attack, 0.75) * release
+		var n := rng.randf_range(-1.0, 1.0)
+		var fc_hi := lerpf(2100.0, 440.0, pow(t, 0.65))
+		var a_hi := clampf(TAU * fc_hi / (TAU * fc_hi + float(MIX_RATE)), 0.02, 0.85)
+		var a_lo := clampf(TAU * (fc_hi * 0.34) / (TAU * (fc_hi * 0.34) + float(MIX_RATE)), 0.01, 0.70)
+		lp_hi += a_hi * (n - lp_hi)
+		lp_lo += a_lo * (n - lp_lo)
+		phase += TAU * lerpf(280.0, 92.0, pow(t, 0.58)) / float(MIX_RATE)
+		arr[i] = clampf(tanh(((lp_hi - lp_lo) * 1.5 + sin(phase) * 0.48) * env * 1.2), -0.95, 0.95)
 	return _make_wav(arr, false)
 
 

@@ -21,6 +21,15 @@ size = Vector2(32, 128)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_exit_right"]
 size = Vector2(32, 128)
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_edge_stop"]
+size = Vector2(16, 768)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_entrance_south_l"]
+size = Vector2(316, 20)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_entrance_south_r"]
+size = Vector2(64, 20)
+
 [node name="ForestTrail" type="Node2D" unique_id=1760635601]
 y_sort_enabled = true
 script = ExtResource("1_trail_script")
@@ -77,6 +86,22 @@ shape = SubResource("RectangleShape2D_wall_v")
 [node name="EastWallBottom" type="CollisionShape2D" parent="TrailBoundaries" unique_id=1878973420]
 position = Vector2(2544, 600)
 shape = SubResource("RectangleShape2D_wall_v")
+
+[node name="WestEdgeBarrier" type="CollisionShape2D" parent="TrailBoundaries" unique_id=1942001001]
+position = Vector2(-8, 384)
+shape = SubResource("RectangleShape2D_edge_stop")
+
+[node name="EastEdgeBarrier" type="CollisionShape2D" parent="TrailBoundaries" unique_id=1942001002]
+position = Vector2(2568, 384)
+shape = SubResource("RectangleShape2D_edge_stop")
+
+[node name="EntranceSouthBarrierLeft" type="CollisionShape2D" parent="TrailBoundaries" unique_id=1942001003]
+position = Vector2(158, 454)
+shape = SubResource("RectangleShape2D_entrance_south_l")
+
+[node name="EntranceSouthBarrierRight" type="CollisionShape2D" parent="TrailBoundaries" unique_id=1942001004]
+position = Vector2(372, 454)
+shape = SubResource("RectangleShape2D_entrance_south_r")
 
 [node name="Interactables" type="Node2D" parent="." unique_id=1234077642]
 
@@ -4310,7 +4335,7 @@ scale_amount_max = 4.0
 color = Color(1, 0.52, 0.14, 0.78)
 
 [node name="ExitToCityArea" type="Area2D" parent="." unique_id=841105204]
-position = Vector2(14, 384)
+position = Vector2(18, 384)
 collision_layer = 0
 collision_mask = 2
 

@@ -66,7 +66,7 @@ Ilustrações autorais em alta resolução (`512 × 512` px, RGBA com transparê
   - Criados com base no modelo anatômico de `male_hero_free` adaptado para 4 direções top-down (`S, W, E, N`), preservando o machado de bombeiro, alcance de 44 px e colisão nos pés.
 
 ### 2.3 Áudio Procedural de Combate (`res://scripts/audio/combat_sfx.gd`)
-- Sintetizador nativo GDScript (`CombatSfx`) em memória (PCM 16-bit WAV, `22050 Hz`): `swing_miss`, `melee_hit`, `water_cast`, `player_hurt`. Zero dependências externas.
+- Sintetizador nativo GDScript (`CombatSfx`) em memória (PCM 16-bit WAV, `22050 Hz`): `axe_swing_1`, `axe_swing_2`, `axe_swing_3`, `swing_miss`, `melee_hit`, `melee_hit_heavy`, `water_cast`, `player_hurt`. Zero dependências externas.
 
 ### 2.4 Cenário e Adereços Remodelados do Quarto de Huwag (`res://assets/environments/room_huwag/`)
 Assets autorais gerados e corrigidos para o Quarto de Huwag na resolução nativa `640 × 360` px com amostragem Nearest Neighbor (`texture_filter = 1`), baseados na referência visual canônica filipina (Bahay Kubo) aprovada pelo usuário:
@@ -334,10 +334,11 @@ Reconstrução estética, narrativa e estrutural dos 4 cenários principais segu
   - *Giant Wyrm* (`res://assets/audio/bgm/giant_wyrm.mp3`) — Music by Kevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution 4.0 License.
   - *Tempting Secrets* (`res://assets/audio/bgm/tempting_secrets.mp3`) — Music by Kevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution 4.0 License.
 - **Tipografia da Interface (`assets/fonts/`):**
-  - `OMORI_GAME.ttf`, `OMORI_GAME2.ttf`, `omori_ptbr_accents.tres` e `omori_dialogue_font.tres` configurados globalmente em `project.godot` (`gui/theme/custom_font`) para todo o jogo, garantindo acentuação completa em PT-BR e estética *Omori*.
+  - `OMORI_GAME.ttf` e `OMORI_GAME2.ttf` preservados como fontes-base; `OMORI_GAME_PTBR.ttf` e `OMORI_GAME2_PTBR.ttf` sintetizados de forma determinística via `scripts/tools/build_omori_ptbr_fonts.py` (extensão vetorial TrueType nativa na tabela `glyf` com acentuação completa PT-BR `ÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑáàâãäéèêëíìîïóòôõöúùûüçñ` e símbolos tipográficos/UI `·•—…°ºª×÷«»►◄▲▼●■↑↓←→`, substituindo o antigo fallback bitmap `omori_ptbr_accents.tres` e removendo o fallback `undertale-deltarune-extended-fixed.otf` que duplicava a altura de linha).
+  - `omori_dialogue_font.tres` (`FontVariation` apontando diretamente para `OMORI_GAME2_PTBR.ttf`) configurado globalmente em `project.godot` (`gui/theme/custom_font`) para todo o jogo, garantindo nitidez vetorial em qualquer resolução (`640×360`, `1280×720`, `1920×1080`, etc.) e métricas verticais originais.
 - **Interface *Omori*, Capa Limpa, Pause `ESC` vs `[F1]` e Save/Load Multi-Slot:**
   - `scenes/menu/TitleScreen.tscn` + `scripts/menu/title_screen.gd` + `res://assets/ui/title_cover.png`: Tela inicial limpa sem poluição OSD VHS, com névoa animada, vaga-lumes, luzes e modal de Créditos Musicais.
-  - `scenes/ui/DialogueBox.tscn` + `scripts/ui/dialogue_box.gd` + `scripts/ui/huwag_ui_theme.gd`: Caixa `#000000` com borda branca rabiscada à mão, nameplate superior esquerdo, retrato flutuante superior direito sem fundo e cursor mãozinha animado.
+  - `scenes/ui/DialogueBox.tscn` + `scripts/ui/dialogue_box.gd` + `scripts/ui/huwag_ui_theme.gd`: Caixas e menus em estilo *Omori* clássico (`#000000` sólido, contorno externo preto `1 px` + borda branca sólida nítida + recuo interno preto `1 px`, cantos retos `90°`, nameplate superior esquerdo alinhado à esquerda, retrato quadrado superior direito alinhado à direita com `4 px` de respiro e cursor mãozinha animado).
   - `scenes/ui/pause_menu.tscn` + `scripts/ui/pause_menu.gd` + `scenes/ui/save_load_panel.tscn` + `scripts/ui/save_load_panel.gd` + `scripts/autoload/game_state.gd`: Desacoplamento `[ESC]` (pausa da `SceneTree` com Continuar, Salvar, Carregar, Opções, Menu Principal) vs `[F1]` (`ControlsModal`) e 3 slots persistidos em `user://saves/` com JSON + thumbnail PNG `320×180`.
 - **Retratos 96×96 RGBA Transparentes, Machado no Protagonista, Humanoides & Modo Corrompido Surreal:**
   - `scripts/tools/process_portraits_alpha.gd` -> 48 retratos `96×96` RGBA com fundo 100% transparente (`alpha == 0.0`, sem halo chroma e sem carmesim nas variantes distorcidas) em `res://assets/characters/portraits/`.

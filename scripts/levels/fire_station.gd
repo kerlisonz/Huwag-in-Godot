@@ -508,7 +508,7 @@ func _spawn_firefighter_npcs() -> void:
 		Vector2(752, 216), "left", []
 	)
 
-	# 5. Senhora Luningning / Espera (visível principalmente no Ato 2 na Recepção)
+	# 5. Senhora Luningning / Espera (presente na Recepção nos Atos 1 e 2)
 	_spawn_npc(
 		"Velhinha_Espera", "Senhora Luningning",
 		"res://assets/sprites/npcs/senhora_luningning/senhora_luningning_normal_spriteframes.tres",
@@ -594,13 +594,23 @@ func _apply_station_atmosphere() -> void:
 		if npc == null or not is_instance_valid(npc):
 			continue
 		if id == "Velhinha_Espera":
-			var show_luningning := (ato == 2 and not GameState.get_switch("018_Gatinho_devolvido"))
+			var show_luningning := (not act3 and ato <= 2)
+			npc.set_distorted_state(higher)
 			npc.visible = show_luningning
 			npc.set_physics_process(show_luningning)
-			var ia := npc.get_node_or_null("InteractArea")
+			npc.collision_layer = 1 if show_luningning else 0
+			npc.collision_mask = 1 if show_luningning else 0
+			var body_col := npc.get_node_or_null("CollisionShape2D") as CollisionShape2D
+			if body_col:
+				body_col.set_deferred("disabled", not show_luningning)
+			var ia := npc.get_node_or_null("InteractArea") as Area2D
 			if ia:
 				ia.visible = show_luningning
-			npc.set_distorted_state(higher)
+				ia.set_deferred("monitoring", show_luningning)
+				ia.set_deferred("monitorable", show_luningning)
+				var ia_col := ia.get_node_or_null("CollisionShape2D") as CollisionShape2D
+				if ia_col:
+					ia_col.set_deferred("disabled", not show_luningning)
 		else:
 			npc.set_distorted_state(higher)
 
@@ -772,7 +782,10 @@ func _trigger_interaction_id(id: String) -> void:
 
 		"Velhinha_Espera":
 			if ato < 2:
-				request_dialogue.emit([{"speaker": "Huwag", "text": "O banco da recepção está vazio e frio."}], Callable())
+				request_dialogue.emit([{
+					"speaker": "Senhora Luningning",
+					"text": "Bom dia, Huwag. Passei no quartel para avisar o Capitão Reyes sobre o cheiro de fumaça vindo da mata leste. Cuide-se bem hoje, anak — você parece cansado."
+				}], Callable())
 			elif ato == 2:
 				if GameState.get_switch("018_Gatinho_devolvido"):
 					request_dialogue.emit([{"speaker": "Senhora Luningning", "text": "Salamat po, Huwag! Meu gatinho está seguro graças a você."}], Callable())

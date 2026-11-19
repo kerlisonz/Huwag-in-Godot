@@ -634,11 +634,11 @@ func _apply_hud_style(mode: int) -> void:
 	_ui_mode = _resolve_hud_theme_mode(mode)
 	var pal: Dictionary = HuwagUiTheme.get_palette(_ui_mode)
 
-	var left_sb := HuwagUiTheme.make_box_style(pal["bg_soft"], pal["border"], 1)
+	var left_sb := HuwagUiTheme.make_box_style(pal["bg_soft"], pal["border"], 2)
 	if hud_top_left:
 		hud_top_left.add_theme_stylebox_override("panel", left_sb)
 
-	var right_sb := HuwagUiTheme.make_box_style(pal["bg_soft"], pal["border"], 1)
+	var right_sb := HuwagUiTheme.make_box_style(pal["bg_soft"], pal["border"], 2)
 	if hud_top_right:
 		hud_top_right.add_theme_stylebox_override("panel", right_sb)
 
@@ -646,13 +646,13 @@ func _apply_hud_style(mode: int) -> void:
 		stamina_bg.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["bg_inner"], pal["border"], 1))
 
 	if status_label:
-		var toast_sb := HuwagUiTheme.make_box_style(pal["bg"], pal["border"], 1, 7, 3)
+		var toast_sb := HuwagUiTheme.make_box_style(pal["bg"], pal["border"], 2, 10, 5)
 		status_label.add_theme_stylebox_override("normal", toast_sb)
 		status_label.add_theme_color_override("font_color", pal["accent"])
 		status_label.add_theme_color_override("font_shadow_color", pal["text_shadow"])
 
 	if controls_card:
-		controls_card.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["bg"], pal["trim"], 1))
+		controls_card.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["bg"], pal["trim"], 3, 5, 5))
 	if controls_title:
 		controls_title.add_theme_color_override("font_color", pal["accent"])
 		controls_title.add_theme_color_override("font_shadow_color", pal["text_shadow"])
@@ -740,14 +740,9 @@ func _update_hud() -> void:
 	_update_stamina_hud()
 
 	if skills_label:
-		var tags: PackedStringArray = []
-		if GameState.get_switch("016_Magia_de_agua_obtida"):
-			tags.append("H2O")
 		var heal_count: int = GameState.get_item_count("gota_calmante")
-		if heal_count > 0:
-			tags.append("Cura×%d" % heal_count)
-		skills_label.visible = not tags.is_empty()
-		skills_label.text = " · ".join(tags)
+		skills_label.visible = heal_count > 0
+		skills_label.text = "Cura×%d" % heal_count if heal_count > 0 else ""
 
 	if act_place_label:
 		var place_name := "Quarto de Huwag"

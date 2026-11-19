@@ -214,7 +214,7 @@ func _apply_theme(ui_mode: String) -> void:
 		backdrop.color = Color(0.02, 0.02, 0.04, 0.86)
 
 	if card != null:
-		card.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(card_bg, border_col, 14, 12))
+		card.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(card_bg, border_col, 14, 12, 3))
 	if top_tag != null:
 		top_tag.add_theme_color_override("font_color", pal["text_muted"])
 		top_tag.add_theme_color_override("font_shadow_color", pal["text_shadow"])

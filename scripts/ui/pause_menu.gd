@@ -323,14 +323,25 @@ func _refresh_context() -> void:
 
 func _refresh_selection() -> void:
 	var pal := HuwagUiTheme.get_palette(_get_theme_mode())
+	var sb_sel := StyleBoxFlat.new()
+	sb_sel.bg_color = pal["choice_sel_bg"]
+	sb_sel.content_margin_left = 6.0
+	sb_sel.content_margin_right = 8.0
+	sb_sel.content_margin_top = 4.0
+	sb_sel.content_margin_bottom = 4.0
+	var sb_idle := StyleBoxEmpty.new()
+	sb_idle.content_margin_left = 6.0
+	sb_idle.content_margin_right = 8.0
+	sb_idle.content_margin_top = 4.0
+	sb_idle.content_margin_bottom = 4.0
 	for i in range(_item_panels.size()):
 		var is_sel := (i == _selected_idx)
 		_item_cursors[i].visible = is_sel
 		if is_sel:
-			_item_panels[i].add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["border"], 6, 3))
+			_item_panels[i].add_theme_stylebox_override("panel", sb_sel)
 			_item_labels[i].add_theme_color_override("font_color", pal["text"])
 		else:
-			_item_panels[i].add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], Color(pal["border"].r, pal["border"].g, pal["border"].b, 0.25), 6, 3))
+			_item_panels[i].add_theme_stylebox_override("panel", sb_idle)
 			_item_labels[i].add_theme_color_override("font_color", pal["text_muted"])
 
 
@@ -348,16 +359,16 @@ func _apply_theme() -> void:
 	var pal := HuwagUiTheme.get_palette(_get_theme_mode())
 	for pnl in [main_card, options_panel, confirm_panel]:
 		if pnl:
-			pnl.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 2, 2))
+			pnl.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 5, 5, 3))
 	if title_label:
 		title_label.add_theme_color_override("font_color", pal["text"])
 	if context_label:
 		context_label.add_theme_color_override("font_color", pal["text_muted"])
 	for btn in [btn_options_back, btn_confirm_yes, btn_confirm_no]:
 		if btn:
-			btn.add_theme_stylebox_override("normal", HuwagUiTheme.make_omori_box_style(pal["choice_bg"], pal["border"], 8, 3))
-			btn.add_theme_stylebox_override("hover", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["border"], 8, 3))
-			btn.add_theme_stylebox_override("focus", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["border"], 8, 3))
+			btn.add_theme_stylebox_override("normal", HuwagUiTheme.make_omori_box_style(pal["choice_bg"], pal["border"], 8, 4, 2))
+			btn.add_theme_stylebox_override("hover", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["border"], 8, 4, 2))
+			btn.add_theme_stylebox_override("focus", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["border"], 8, 4, 2))
 			btn.add_theme_color_override("font_color", pal["text"])
 
 

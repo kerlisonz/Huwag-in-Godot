@@ -15,7 +15,7 @@ extends Control
 @onready var btn_exit: Button = $MenuContainer/MenuVBox/BtnExit
 @onready var hand_cursor: TextureRect = $HandCursor
 @onready var save_summary_label: Label = $SaveSummaryLabel
-@onready var footer_label: Label = $FooterLabel
+@onready var footer_label: Label = get_node_or_null("FooterLabel") as Label
 @onready var save_load_panel: SaveLoadPanel = $SaveLoadPanel
 
 @onready var options_modal: ColorRect = $OptionsModal
@@ -63,7 +63,7 @@ func _ready() -> void:
 	for i in range(_buttons.size()):
 		var btn := _buttons[i]
 		_base_texts.append(btn.text)
-		btn.text = "    " + _base_texts[i]
+		btn.text = "      " + _base_texts[i]
 		for st in ["normal", "hover", "pressed", "focus", "disabled"]:
 			btn.add_theme_stylebox_override(st, empty_style)
 		btn.mouse_entered.connect(_on_button_mouse_entered.bind(i))
@@ -208,16 +208,16 @@ func _sync_hand_cursor_position() -> void:
 func _apply_omori_styles() -> void:
 	var pal := HuwagUiTheme.get_palette("normal")
 	if menu_container:
-		menu_container.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(Color(0, 0, 0, 0.92), pal["border"], 10, 8))
+		menu_container.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 12, 10, 3))
 	if options_card:
-		options_card.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 2, 2))
+		options_card.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 5, 5, 3))
 	if credits_card:
-		credits_card.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 2, 2))
+		credits_card.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 5, 5, 3))
 	for btn in [btn_close_options, btn_close_credits]:
 		if btn:
-			btn.add_theme_stylebox_override("normal", HuwagUiTheme.make_omori_box_style(pal["choice_bg"], pal["border"], 10, 4))
-			btn.add_theme_stylebox_override("hover", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["border"], 10, 4))
-			btn.add_theme_stylebox_override("focus", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["border"], 10, 4))
+			btn.add_theme_stylebox_override("normal", HuwagUiTheme.make_omori_box_style(pal["choice_bg"], pal["border"], 10, 4, 2))
+			btn.add_theme_stylebox_override("hover", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["border"], 10, 4, 2))
+			btn.add_theme_stylebox_override("focus", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["border"], 10, 4, 2))
 			btn.add_theme_color_override("font_color", pal["text"])
 
 
@@ -248,7 +248,7 @@ func _populate_credits_list() -> void:
 		extra.add_theme_font_override("font", ui_font)
 	extra.add_theme_font_size_override("font_size", 12)
 	extra.add_theme_color_override("font_color", Color(0.72, 0.76, 0.84, 1))
-	extra.text = "Tipografia UI: OMORI_GAME / OMORI_GAME2 com extensão PT-BR e pixel art original."
+	extra.text = "Tipografia UI: OMORI_GAME / OMORI_GAME2 com extensão vetorial PT-BR e pixel art original."
 	credits_list.add_child(extra)
 
 
