@@ -475,7 +475,7 @@ func _apply_theme(mode: String) -> void:
 	if nameplate_panel:
 		nameplate_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 4, 3, 3))
 	if portrait_frame:
-		portrait_frame.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg_inner"], pal["border"], 5, 5, 3))
+		portrait_frame.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg_inner"], pal["border"], 3, 3, 3))
 	if choices_panel:
 		choices_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 6, 5, 3))
 

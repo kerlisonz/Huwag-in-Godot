@@ -1,95 +1,89 @@
 extends SceneTree
 
-const BRAIN_DIR := "C:/Users/SnyX/.gemini/antigravity/brain/57f4ed94-3583-41fc-bbbe-9e9a2d546794"
-const OUT_DIR := "res://assets/characters/portraits"
-const LEGACY_SPRITE_PORTRAITS_DIR := "res://assets/sprites/portraits"
-const SCRATCH_SHEET := "C:/Users/SnyX/.gemini/antigravity/brain/57f4ed94-3583-41fc-bbbe-9e9a2d546794/scratch/portraits_contact_sheet.png"
+## Auditoria, Padronização e Regeneração 16-bit de Retratos (Portraits) — Huwag (Godot 4)
+## Base obrigatória: Visual Padrão 16-bit de Huwag (huwag_casual_neutral.png)
+## - 96x96 px exatos em 100% dos arquivos
+## - Contorno 1px escuro nítido, zero anti-aliasing borrado, zero fundo sólido (PNG Alpha == 0.0 fora da silhueta)
+## - 15 NPCs/Entidades Normais + 15 Variantes em Modo Corrompido (pele pálida/acinzentada cadavérica,
+##   olheiras profundas, veias/rachaduras escuras na pele, expressão vazia/perturbadora e olhos opacos/dilatados)
+## - 18 Variantes de Huwag (Casual & BFP: 8 expressões alinhadas + Modo Corrompido cadavérico)
+
 const TARGET_SIZE := 96
+const PRIMARY_DIR := "res://assets/characters/portraits/"
+const SPRITES_PORTRAIT_DIR := "res://assets/sprites/portraits/"
+const BACKUP_DIR := "C:/Users/kennedy/.gemini/antigravity/brain/723210f5-bfa7-47fb-b4be-e278499af4f2/scratch/backup_portraits/"
+const SCRATCH_DIR := "C:/Users/kennedy/.gemini/antigravity/brain/723210f5-bfa7-47fb-b4be-e278499af4f2/scratch/"
 
 
 func _init() -> void:
-	print("=== Processando 48 Retratos RGBA 96x96 (Fundo 100% Transparente) ===")
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(LEGACY_SPRITE_PORTRAITS_DIR))
+	print("=== [Portraits 16-Bit] Iniciando Auditoria e Regeneracao Completa (96x96 RGBA Alpha) ===")
 
-	var normal_busts: Dictionary = {}
+	# 1. Carregar e limpar o Retrato Mestre 16-bit de Huwag (huwag_casual_neutral.png)
+	var huwag_base := _load_source_png("huwag_casual_neutral.png")
+	_clean_huwag_master_silhouette(huwag_base)
+	var huwag_bfp_base := _build_huwag_bfp_from_casual(huwag_base)
 
-	# 1. Extrair os 10 bustos gerados por IA com Chroma-Key + Despill + BFS
-	var ai_sources: Array[Dictionary] = [
-		{"id": "cap_reyes", "file": "capitao_reyes_bust_1795071096104.jpg", "key": "magenta", "max_h": 92},
-		{"id": "enfermeira_maria", "file": "enfermeira_maria_portrait_v2_1795071224334.jpg", "key": "magenta", "max_h": 92},
-		{"id": "bombeiro_ato", "file": "bombeiro_ato_portrait_1795071307154.jpg", "key": "magenta", "max_h": 92},
-		{"id": "bombeiro_santos", "file": "bombeiro_santos_portrait_1795071388843.jpg", "key": "magenta", "max_h": 92},
-		{"id": "aling_nena", "file": "aling_nena_portrait_1795071781516.jpg", "key": "magenta", "max_h": 92},
-		{"id": "kuya_ben", "file": "kuya_ben_portrait_1795071924183.jpg", "key": "magenta", "max_h": 92},
-		{"id": "feirante", "file": "mang_tomas_portrait_1795071999637.jpg", "key": "magenta", "max_h": 92},
-		{"id": "mang_carding", "file": "mang_carding_portrait_1795072112074.jpg", "key": "magenta", "max_h": 92},
-		{"id": "criatura_lagoa", "file": "portrait_lagoon_raw_1795070656992.jpg", "key": "magenta", "max_h": 92},
-		{"id": "santelmo", "file": "santelmon_portrait_green_1795070995682.jpg", "key": "green", "max_h": 92},
-	]
+	var exprs := ["neutral", "worried", "tired", "surprised", "angry", "scared", "uneasy_smile", "unfiltered", "distorted"]
+	var huwag_casual_map: Dictionary = {}
+	var huwag_bfp_map: Dictionary = {}
+	for e: String in exprs:
+		huwag_casual_map[e] = _make_huwag_expression(huwag_base, e)
+		huwag_bfp_map[e] = _make_huwag_expression(huwag_bfp_base, e)
 
-	for entry in ai_sources:
-		var cid: String = str(entry["id"])
-		var raw_path := "%s/%s" % [BRAIN_DIR, str(entry["file"])]
-		var im := _extract_chromakey_bust(raw_path, str(entry["key"]), int(entry["max_h"]))
-		normal_busts[cid] = im
-		_save_png("%s/fnaf_%s.png" % [OUT_DIR, cid], im)
+	# 2. Carregar e padronizar os 10 retratos 16-bit de NPCs/Chefes existentes
+	var normal_npcs: Dictionary = {}
+	normal_npcs["cap_reyes"] = _clean_border_outline(_load_source_png("fnaf_cap_reyes.png"))
+	normal_npcs["bombeiro_ato"] = _polish_bombeiro_ato(_load_source_png("fnaf_bombeiro_ato.png"))
+	normal_npcs["bombeiro_santos"] = _clean_border_outline(_load_source_png("fnaf_bombeiro_santos.png"))
+	normal_npcs["enfermeira_maria"] = _clean_border_outline(_load_source_png("fnaf_enfermeira_maria.png"))
+	normal_npcs["aling_nena"] = _polish_aling_nena(_load_source_png("fnaf_aling_nena.png"))
+	normal_npcs["kuya_ben"] = _polish_kuya_ben(_load_source_png("fnaf_kuya_ben.png"))
+	normal_npcs["feirante"] = _clean_border_outline(_load_source_png("fnaf_feirante.png"))
+	normal_npcs["mang_carding"] = _clean_border_outline(_load_source_png("fnaf_mang_carding.png"))
+	normal_npcs["criatura_lagoa"] = _clean_border_outline(_load_source_png("fnaf_criatura_lagoa.png"))
+	normal_npcs["santelmo"] = _polish_santelmo(_load_source_png("fnaf_santelmo.png"))
 
-	# 2. Compor os 5 retratos complementares em estilo pixel-art coerente 96x96
-	var custom_map: Dictionary = {
-		"luningning": _compose_luningning_96(),
-		"lola_rosa": _compose_lola_rosa_96(),
-		"toby": _compose_toby_96(),
-		"vulto_bosque": _compose_vulto_bosque_96(),
-		"vhs_radio": _compose_vhs_radio_96(),
-	}
-	for cid in custom_map.keys():
-		var custom_im: Image = custom_map[cid]
-		normal_busts[cid] = custom_im
-		_save_png("%s/fnaf_%s.png" % [OUT_DIR, cid], custom_im)
+	# 3. Construir os 5 retratos 16-bit que estavam em estilo primitivo (Luningning, Lola Rosa, Toby, Vulto, Radio VHF)
+	normal_npcs["luningning"] = _build_16bit_luningning()
+	normal_npcs["lola_rosa"] = _build_16bit_lola_rosa()
+	normal_npcs["toby"] = _build_16bit_toby()
+	normal_npcs["vulto_bosque"] = _build_16bit_vulto_bosque()
+	normal_npcs["vhs_radio"] = _build_16bit_vhs_radio()
 
-	# 3. Gerar todas as 15 variantes distorcidas surreais (índigo/cinza abissal, ZERO vermelho)
-	var all_npc_ids: Array[String] = [
-		"cap_reyes", "bombeiro_ato", "bombeiro_santos", "enfermeira_maria",
-		"luningning", "aling_nena", "kuya_ben", "feirante", "mang_carding",
-		"lola_rosa", "toby", "criatura_lagoa", "vulto_bosque", "santelmo", "vhs_radio"
-	]
-	var distorted_busts: Dictionary = {}
-	for cid in all_npc_ids:
-		var base_im: Image = normal_busts[cid]
-		var dist_im := _make_surreal_distorted(base_im, cid == "vhs_radio", cid == "vulto_bosque" or cid == "santelmo")
-		distorted_busts[cid] = dist_im
-		_save_png("%s/fnaf_distorted_%s.png" % [OUT_DIR, cid], dist_im)
+	# 4. Construir todas as 15 variantes em Modo Corrompido 16-bit (fnaf_distorted_*)
+	var distorted_npcs: Dictionary = {}
+	for k: String in normal_npcs.keys():
+		distorted_npcs[k] = _build_16bit_corrupted_npc(normal_npcs[k], k)
 
-	# 4. Extrair Huwag Casual do JPEG base removendo 100% o cenário do quarto + derivar Huwag BFP + 9 expressões cada
-	var huwag_raw_path := "%s/.user_uploaded/media_1795068812230_f6309f5f.jpg" % BRAIN_DIR
-	var huwag_casual_neutral := _extract_huwag_bust(huwag_raw_path)
-	var huwag_lm := _find_huwag_face_landmarks(huwag_casual_neutral)
-	print("  [Huwag] Landmarks detectados: ", huwag_lm)
-	var huwag_bfp_neutral := _recolor_huwag_to_bfp(huwag_casual_neutral)
+	# 5. Salvar todos os arquivos na pasta principal res://assets/characters/portraits/
+	var saved_count := 0
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(PRIMARY_DIR))
 
-	var huwag_exprs: Array[String] = [
-		"neutral", "worried", "tired", "surprised", "angry", "scared", "uneasy_smile", "unfiltered", "distorted"
-	]
-	var huwag_casual_set: Dictionary = {}
-	var huwag_bfp_set: Dictionary = {}
-	for expr in huwag_exprs:
-		var c_im := _apply_huwag_expression(huwag_casual_neutral, expr)
-		var b_im := _apply_huwag_expression(huwag_bfp_neutral, expr)
-		huwag_casual_set[expr] = c_im
-		huwag_bfp_set[expr] = b_im
-		_save_png("%s/huwag_casual_%s.png" % [OUT_DIR, expr], c_im)
-		_save_png("%s/huwag_bfp_%s.png" % [OUT_DIR, expr], b_im)
+	for e: String in exprs:
+		_save_png(huwag_casual_map[e], PRIMARY_DIR + "huwag_casual_%s.png" % e)
+		_save_png(huwag_bfp_map[e], PRIMARY_DIR + "huwag_bfp_%s.png" % e)
+		saved_count += 2
 
-	# 5. Espelhar arquivos legados para que não reste nenhum retrato opaco antigo no disco
-	var legacy_dist_aliases: Array[String] = [
-		"aling_nena", "feirante", "kuya_ben", "lola_rosa", "luningning", "mang_carding", "toby"
-	]
-	for lid in legacy_dist_aliases:
-		_save_png("%s/distorted_fnaf_%s.png" % [OUT_DIR, lid], distorted_busts[lid])
-	_save_png("%s/fnaf_distorted_bombeiro.png" % OUT_DIR, distorted_busts["bombeiro_santos"])
+	for k: String in normal_npcs.keys():
+		_save_png(normal_npcs[k], PRIMARY_DIR + "fnaf_%s.png" % k)
+		_save_png(distorted_npcs[k], PRIMARY_DIR + "fnaf_distorted_%s.png" % k)
+		saved_count += 2
 
-	var sprite_mirror_ids: Dictionary = {
+	# Aliases legados para compatibilidade total em res://assets/characters/portraits/
+	_save_png(distorted_npcs["bombeiro_santos"], PRIMARY_DIR + "fnaf_distorted_bombeiro.png")
+	var legacy_dist := ["aling_nena", "feirante", "kuya_ben", "lola_rosa", "luningning", "mang_carding", "toby"]
+	for lk: String in legacy_dist:
+		_save_png(distorted_npcs[lk], PRIMARY_DIR + "distorted_fnaf_%s.png" % lk)
+	_save_png(normal_npcs["criatura_lagoa"], PRIMARY_DIR + "placeholder_creature.png")
+	_save_png(normal_npcs["kuya_ben"], PRIMARY_DIR + "placeholder_npc_barangay.png")
+
+	# 5b. Sincronizar espelhos em res://assets/sprites/portraits/ (<id>_normal.png / <id>_distorted.png)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SPRITES_PORTRAIT_DIR))
+	_save_png(huwag_casual_map["neutral"], SPRITES_PORTRAIT_DIR + "huwag_casual_normal.png")
+	_save_png(huwag_casual_map["distorted"], SPRITES_PORTRAIT_DIR + "huwag_casual_distorted.png")
+	_save_png(huwag_bfp_map["neutral"], SPRITES_PORTRAIT_DIR + "huwag_bfp_normal.png")
+	_save_png(huwag_bfp_map["distorted"], SPRITES_PORTRAIT_DIR + "huwag_bfp_distorted.png")
+	var sprites_dir_map := {
 		"aling_nena": "aling_nena",
 		"bombeiro_ato": "bombeiro_ato",
 		"bombeiro_santos": "bombeiro_santos",
@@ -106,956 +100,1635 @@ func _init() -> void:
 		"vhs_radio": "vhs_radio",
 		"vulto_bosque": "vulto_bosque",
 	}
-	for dst_id in sprite_mirror_ids.keys():
-		var src_id: String = str(sprite_mirror_ids[dst_id])
-		_save_png("%s/%s_normal.png" % [LEGACY_SPRITE_PORTRAITS_DIR, dst_id], normal_busts[src_id])
-		_save_png("%s/%s_distorted.png" % [LEGACY_SPRITE_PORTRAITS_DIR, dst_id], distorted_busts[src_id])
-	_save_png("%s/huwag_casual_normal.png" % LEGACY_SPRITE_PORTRAITS_DIR, huwag_casual_set["neutral"])
-	_save_png("%s/huwag_casual_distorted.png" % LEGACY_SPRITE_PORTRAITS_DIR, huwag_casual_set["distorted"])
-	_save_png("%s/huwag_bfp_normal.png" % LEGACY_SPRITE_PORTRAITS_DIR, huwag_bfp_set["neutral"])
-	_save_png("%s/huwag_bfp_distorted.png" % LEGACY_SPRITE_PORTRAITS_DIR, huwag_bfp_set["distorted"])
+	for sp_name: String in sprites_dir_map.keys():
+		var src_k: String = sprites_dir_map[sp_name]
+		_save_png(normal_npcs[src_k], SPRITES_PORTRAIT_DIR + "%s_normal.png" % sp_name)
+		_save_png(distorted_npcs[src_k], SPRITES_PORTRAIT_DIR + "%s_distorted.png" % sp_name)
+		saved_count += 2
 
-	# 6. Gerar prancha de contato visual (xadrez transparência + preto Omori #000000)
-	_build_contact_sheet(normal_busts, distorted_busts, huwag_casual_set, huwag_bfp_set)
-	print("=== Concluido! Todos os 48 retratos RGBA 96x96 + legados gerados com sucesso. ===")
-	quit()
+	# 6. Sincronizar também os retratos individuais em res://assets/characters/<npc>/portrait.png
+	var char_folder_map := {
+		"aling_nena": "aling_nena",
+		"aquatic_creature": "criatura_lagoa",
+		"bombeiro_ato": "bombeiro_ato",
+		"bombeiro_santos": "bombeiro_santos",
+		"cap_reyes": "cap_reyes",
+		"enfermeira_maria": "enfermeira_maria",
+		"kuya_ben": "kuya_ben",
+		"lola_rosa": "lola_rosa",
+		"mang_carding": "mang_carding",
+		"mang_tomas": "feirante",
+		"senhora_luningning": "luningning",
+		"toby": "toby",
+		"vulto_bosque": "vulto_bosque",
+	}
+	for folder: String in char_folder_map.keys():
+		var key: String = char_folder_map[folder]
+		var p_norm := "res://assets/characters/%s/portrait.png" % folder
+		var p_dist := "res://assets/characters/%s/distorted_portrait.png" % folder
+		if FileAccess.file_exists(ProjectSettings.globalize_path(p_norm)):
+			_save_png(normal_npcs[key], p_norm)
+		if FileAccess.file_exists(ProjectSettings.globalize_path(p_dist)):
+			_save_png(distorted_npcs[key], p_dist)
 
+	if DirAccess.dir_exists_absolute(SCRATCH_DIR):
+		_save_preview_huwag(huwag_casual_map, huwag_bfp_map, SCRATCH_DIR + "preview_new_huwag.png")
+		_save_preview_npcs(normal_npcs, SCRATCH_DIR + "preview_new_normal_npcs.png")
+		_save_preview_npcs(distorted_npcs, SCRATCH_DIR + "preview_new_distorted_npcs.png")
+		_save_preview_5_rebuilt_3x(normal_npcs, distorted_npcs, SCRATCH_DIR + "preview_5_rebuilt_3x.png")
 
-func _save_png(res_path: String, im: Image) -> void:
-	var err := im.save_png(ProjectSettings.globalize_path(res_path))
-	if err != OK:
-		push_error("Falha ao salvar %s (err=%d)" % [res_path, err])
-
-
-func _load_source_sampled(abs_path: String, sample_size: int) -> Image:
-	var src := Image.new()
-	var err := src.load(abs_path)
-	if err != OK:
-		push_error("Falha ao abrir retrato fonte: %s" % abs_path)
-		return Image.create(sample_size, sample_size, false, Image.FORMAT_RGBA8)
-	src.convert(Image.FORMAT_RGBA8)
-	var sw := src.get_width()
-	var sh := src.get_height()
-	var out := Image.create(sample_size, sample_size, false, Image.FORMAT_RGBA8)
-	# Amostragem no centro do bloco lógico (3x3 mediano suave na parte interna do bloco) reduz ruído JPEG sem borrar silhueta
-	for y in range(sample_size):
-		var cy := clampi(int(floor((float(y) + 0.5) * float(sh) / float(sample_size))), 1, maxi(1, sh - 2))
-		for x in range(sample_size):
-			var cx := clampi(int(floor((float(x) + 0.5) * float(sw) / float(sample_size))), 1, maxi(1, sw - 2))
-			var center := src.get_pixel(cx, cy)
-			# Média leve somente de pixels muito similares ao centro dentro do mesmo bloco para limpar artefatos DCT
-			var sum := center
-			var cnt := 1.0
-			for dy in [-1, 1]:
-				for dx in [-1, 1]:
-					var nc := src.get_pixel(cx + dx, cy + dy)
-					if absf(nc.r - center.r) + absf(nc.g - center.g) + absf(nc.b - center.b) < 0.20:
-						sum += nc
-						cnt += 1.0
-			var final_c := sum / cnt
-			final_c.a = 1.0
-			out.set_pixel(x, y, final_c)
-	return out
+	print("=== [Portraits 16-Bit] Concluido com sucesso! (%d arquivos principais gravados) ===" % saved_count)
+	quit(0)
 
 
-func _is_key_color(c: Color, key_mode: String, strict: bool) -> bool:
-	if key_mode == "magenta":
-		if strict:
-			return c.r > 0.62 and c.b > 0.60 and c.g < minf(c.r, c.b) * 0.50
-		return c.r > 0.44 and c.b > 0.42 and c.g < minf(c.r, c.b) * 0.72 and (c.r + c.b - c.g * 2.0) > 0.30
-	else:
-		if strict:
-			return c.g > 0.62 and c.g > maxf(c.r, c.b) * 1.45
-		return c.g > 0.42 and c.g > maxf(c.r, c.b) * 1.18 and (c.g - maxf(c.r, c.b)) > 0.14
+func _load_source_png(fname: String) -> Image:
+	var backup_path := BACKUP_DIR + fname
+	if FileAccess.file_exists(backup_path):
+		var b_img := Image.load_from_file(backup_path)
+		if b_img != null:
+			b_img.convert(Image.FORMAT_RGBA8)
+			return b_img
+	var proj_path := ProjectSettings.globalize_path("res://assets/characters/portraits/" + fname)
+	var img := Image.load_from_file(proj_path)
+	img.convert(Image.FORMAT_RGBA8)
+	return img
 
 
-func _extract_chromakey_bust(abs_path: String, key_mode: String, max_h: int) -> Image:
-	# Trabalhar numa grade de 128x128 preserva pixels finos de 1px do JPEG, remove chroma e encaixa crisp em 96x96
-	var S := 128
-	var work := _load_source_sampled(abs_path, S)
-	var bg := PackedByteArray()
-	bg.resize(S * S)
-	bg.fill(0)
-
-	# Passo 1: Flood-fill externo tolerante partindo das 4 bordas
-	var queue: Array[Vector2i] = []
-	for i in range(S):
-		var edge_pts: Array[Vector2i] = [Vector2i(i, 0), Vector2i(i, S - 1), Vector2i(0, i), Vector2i(S - 1, i)]
-		for pt in edge_pts:
-			var idx := pt.y * S + pt.x
-			if bg[idx] == 0 and _is_key_color(work.get_pixel(pt.x, pt.y), key_mode, false):
-				bg[idx] = 1
-				queue.append(pt)
-
-	var head := 0
-	var dirs: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
-	while head < queue.size():
-		var cur := queue[head]
-		head += 1
-		for d in dirs:
-			var nx := cur.x + d.x
-			var ny := cur.y + d.y
-			if nx < 0 or nx >= S or ny < 0 or ny >= S:
-				continue
-			var nidx := ny * S + nx
-			if bg[nidx] != 0:
-				continue
-			if _is_key_color(work.get_pixel(nx, ny), key_mode, false):
-				bg[nidx] = 1
-				queue.append(Vector2i(nx, ny))
-
-	# Passo 2: Limpar bolhas internas de chroma puro (ex: mechas de cabelo da Guardiã / Maria / Aling Nena)
-	for y in range(S):
-		for x in range(S):
-			var idx := y * S + x
-			if bg[idx] == 0 and _is_key_color(work.get_pixel(x, y), key_mode, true):
-				bg[idx] = 1
-
-	# Passo 3: Comer 1px de halo residual colado ao fundo transparente + despill
-	for _pass in range(2):
-		var to_clear: Array[int] = []
-		for y in range(S):
-			for x in range(S):
-				var idx := y * S + x
-				if bg[idx] == 1:
-					continue
-				var touches_bg := false
-				for d in dirs:
-					var nx := x + d.x
-					var ny := y + d.y
-					if nx >= 0 and nx < S and ny >= 0 and ny < S and bg[ny * S + nx] == 1:
-						touches_bg = true
-						break
-				if touches_bg:
-					var c := work.get_pixel(x, y)
-					var luma := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
-					if _is_key_color(c, key_mode, false):
-						to_clear.append(idx)
-					elif key_mode == "magenta" and c.r > c.g + 0.16 and c.b > c.g + 0.16 and luma > 0.24:
-						to_clear.append(idx)
-					elif key_mode == "green" and c.g > maxf(c.r, c.b) * 1.12 and luma > 0.22:
-						to_clear.append(idx)
-		for idx_c in to_clear:
-			bg[idx_c] = 1
-
-	# Passo 4: Despill dos pixels restantes colados à borda (mata halo colorido sem apagar o contorno escuro)
-	for y in range(S):
-		for x in range(S):
-			var idx := y * S + x
-			if bg[idx] == 1:
-				work.set_pixel(x, y, Color(0, 0, 0, 0))
-				continue
-			var touches_bg := false
-			for d in dirs:
-				var nx := x + d.x
-				var ny := y + d.y
-				if nx >= 0 and nx < S and ny >= 0 and ny < S and bg[ny * S + nx] == 1:
-					touches_bg = true
-					break
-			if touches_bg:
-				var c := work.get_pixel(x, y)
-				if key_mode == "magenta":
-					var mx := minf(c.r, c.b)
-					if mx > c.g * 1.20:
-						var avg_g := c.g
-						c.r = lerpf(c.r, avg_g, 0.72)
-						c.b = lerpf(c.b, avg_g, 0.72)
-						work.set_pixel(x, y, c)
-				else:
-					if c.g > maxf(c.r, c.b) * 1.05:
-						c.g = lerpf(c.g, maxf(c.r, c.b), 0.75)
-						work.set_pixel(x, y, c)
-
-	return _fit_bottom_centered_96(work, max_h)
+func _save_png(img: Image, res_path: String) -> void:
+	var abs_p := ProjectSettings.globalize_path(res_path)
+	img.save_png(abs_p)
 
 
-func _fit_bottom_centered_96(src: Image, max_h: int) -> Image:
-	var w := src.get_width()
-	var h := src.get_height()
-	var min_x := w
-	var max_x := -1
-	var min_y := h
-	var max_y := -1
-	for y in range(h):
-		for x in range(w):
-			if src.get_pixel(x, y).a > 0.5:
-				min_x = mini(min_x, x)
-				max_x = maxi(max_x, x)
-				min_y = mini(min_y, y)
-				max_y = maxi(max_y, y)
-	if max_x < min_x or max_y < min_y:
-		return Image.create(TARGET_SIZE, TARGET_SIZE, false, Image.FORMAT_RGBA8)
+# ==============================================================================
+# 1. HUWAG MASTER CLEANUP, BFP UNIFORM & PIXEL-PERFECT EXPRESSIONS
+# ==============================================================================
 
-	var cw := max_x - min_x + 1
-	var ch := max_y - min_y + 1
-	var crop := src.get_region(Rect2i(min_x, min_y, cw, ch))
-	var scale := minf(float(TARGET_SIZE) / float(cw), float(max_h) / float(ch))
-	var dw := clampi(int(roundf(float(cw) * scale)), 1, TARGET_SIZE)
-	var dh := clampi(int(roundf(float(ch) * scale)), 1, TARGET_SIZE)
-	crop.resize(dw, dh, Image.INTERPOLATE_NEAREST)
+func _clean_huwag_master_silhouette(img: Image) -> void:
+	var ink := Color("#030000")
+	for y in range(54, 65):
+		for x in range(83, 96):
+			img.set_pixel(x, y, Color(0, 0, 0, 0))
+	for x in [21, 22]:
+		img.set_pixel(x, 46, Color(0, 0, 0, 0))
 
-	var out := Image.create(TARGET_SIZE, TARGET_SIZE, false, Image.FORMAT_RGBA8)
-	var ox := (TARGET_SIZE - dw) / 2
-	var oy := TARGET_SIZE - dh
-	for y in range(dh):
-		for x in range(dw):
-			var c := crop.get_pixel(x, y)
-			if c.a >= 0.55:
-				c.a = 1.0
-				out.set_pixel(ox + x, oy + y, c)
-	return out
+	for y in range(68, 96):
+		var t := float(y - 68) / 27.0
+		var min_x := int(round(lerpf(14.0, 11.0, clampf(t * 1.4, 0.0, 1.0))))
+		var max_x := int(round(lerpf(79.0, 86.0, clampf(t * 1.4, 0.0, 1.0))))
+		for x in range(0, min_x):
+			img.set_pixel(x, y, Color(0, 0, 0, 0))
+		for x in range(max_x + 1, 96):
+			img.set_pixel(x, y, Color(0, 0, 0, 0))
+		for x in range(min_x, 48):
+			if img.get_pixel(x, y).a > 0.5:
+				img.set_pixel(x, y, ink)
+				break
+		for x in range(max_x, 48, -1):
+			if img.get_pixel(x, y).a > 0.5:
+				img.set_pixel(x, y, ink)
+				break
+
+	_keep_largest_alpha_island(img, 48, 48)
 
 
-func _extract_huwag_bust(abs_path: String) -> Image:
-	var S := 128
-	var work := _load_source_sampled(abs_path, S)
-	var bg := PackedByteArray()
-	bg.resize(S * S)
-	bg.fill(0)
-
-	# Limpar diretamente cantos externos e parede/porta usando cor + fronteira de contorno preto do busto
-	var queue: Array[Vector2i] = []
-	for i in range(S):
-		var edge_pts: Array[Vector2i] = [Vector2i(i, 0), Vector2i(0, i), Vector2i(S - 1, i)]
-		for pt in edge_pts:
-			if pt.y >= 108:
-				continue
-			var idx := pt.y * S + pt.x
-			if bg[idx] == 0 and _is_huwag_bg_candidate(work.get_pixel(pt.x, pt.y), pt.x, pt.y, S):
-				bg[idx] = 1
-				queue.append(pt)
-
-	var head := 0
-	var dirs: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
-	while head < queue.size():
-		var cur := queue[head]
-		head += 1
-		for d in dirs:
-			var nx := cur.x + d.x
-			var ny := cur.y + d.y
-			if nx < 0 or nx >= S or ny < 0 or ny >= S:
-				continue
-			var nidx := ny * S + nx
-			if bg[nidx] != 0:
-				continue
-			var c := work.get_pixel(nx, ny)
-			# Parar apenas no contorno preto sólido, cabelo loiro quente ou pele/pescoço na faixa central
-			if _is_huwag_bg_candidate(c, nx, ny, S):
-				bg[nidx] = 1
-				queue.append(Vector2i(nx, ny))
-
-	# Remover quaisquer ilhas isoladas externas (quadro da parede, interruptor, maçaneta) preservando apenas o maior componente conectado centrado no busto (64, 72)
-	var fg_comp := PackedByteArray()
-	fg_comp.resize(S * S)
-	fg_comp.fill(0)
-	var seed_pt := Vector2i(64, 72)
-	var cq: Array[Vector2i] = [seed_pt]
-	fg_comp[seed_pt.y * S + seed_pt.x] = 1
-	var ch_head := 0
-	while ch_head < cq.size():
-		var cp := cq[ch_head]
-		ch_head += 1
-		for d in dirs:
-			var nx := cp.x + d.x
-			var ny := cp.y + d.y
-			if nx < 0 or nx >= S or ny < 0 or ny >= S:
-				continue
-			var nidx := ny * S + nx
-			if bg[nidx] == 0 and fg_comp[nidx] == 0:
-				fg_comp[nidx] = 1
-				cq.append(Vector2i(nx, ny))
-
-	# Também eliminar pixels remanescentes com tom típico de parede azulada ou madeira da porta acima dos ombros
-	for y in range(S):
-		for x in range(S):
-			var idx := y * S + x
-			if fg_comp[idx] == 0:
-				work.set_pixel(x, y, Color(0, 0, 0, 0))
-			else:
-				var c := work.get_pixel(x, y)
-				if y < 62 and (x < 18 or x > 109):
-					var is_blond := c.r > 0.48 and c.g > 0.34 and c.b < c.r * 0.72
-					var is_black := maxf(maxf(c.r, c.g), c.b) < 0.14
-					if not is_blond and not is_black:
-						work.set_pixel(x, y, Color(0, 0, 0, 0))
-				elif x > 98 and y < 94 and c.r > c.b + 0.025 and c.r < 0.52 and c.g < 0.40:
-					# Madeira da porta / batente à direita nunca faz parte da jaqueta grafite neutra do Huwag
-					work.set_pixel(x, y, Color(0, 0, 0, 0))
-
-	# Limpar 1px de resíduo azul-cinza da parede adjacente ao transparente fora do cabelo loiro e jaqueta
-	for y in range(S):
-		for x in range(S):
-			if work.get_pixel(x, y).a < 0.5:
-				continue
-			var c := work.get_pixel(x, y)
-			var is_wall_blue := c.b > c.r + 0.035 and c.b > 0.20 and c.r < 0.34 and y < 74
-			var is_door_brown := (x > 96 and y < 88 and c.r > c.b + 0.055 and c.r < 0.46 and c.g < 0.34)
-			if is_wall_blue or is_door_brown:
-				for d in dirs:
-					var nx := x + d.x
-					var ny := y + d.y
-					if nx >= 0 and nx < S and ny >= 0 and ny < S and work.get_pixel(nx, ny).a < 0.5:
-						work.set_pixel(x, y, Color(0, 0, 0, 0))
-						break
-
-	return _fit_bottom_centered_96(work, 92)
-
-
-func _is_huwag_bg_candidate(c: Color, x: int, y: int, s: int) -> bool:
-	var maxc := maxf(maxf(c.r, c.g), c.b)
-	# Contorno preto puro da silhueta bloqueia o flood-fill para nunca invadir o personagem
-	if maxc < 0.115:
-		return false
-	# Cabelo loiro dourado quente bloqueia o flood-fill
-	if c.r > 0.44 and c.g > 0.30 and c.b < c.g * 0.76:
-		return false
-	# Pele bronzeada bloqueia o flood-fill na região do rosto/pescoço
-	if x > int(s * 0.24) and x < int(s * 0.76) and y > int(s * 0.25) and y < int(s * 0.85):
-		if c.r > 0.34 and c.r > c.b + 0.12 and c.g < c.r * 0.88:
-			return false
-	# Na faixa baixa dos ombros/jaqueta (y >= 74), apenas a parede azulada ou madeira marrom externa da porta à direita vazam
-	if y >= int(s * 0.58):
-		var is_wall_blue := c.b > c.r + 0.03 and c.r < 0.36
-		var is_side_door := x > int(s * 0.80) and c.r > c.b + 0.055 and c.r < 0.46 and c.g < 0.35
-		return is_wall_blue or is_side_door
-	# Acima dos ombros, parede cinza-azulada, quadro e porta são removíveis exceto cabelo loiro/contorno preto
-	if x < int(s * 0.20) or x > int(s * 0.80):
-		return true
-	var luma := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
-	if luma > 0.12 and (c.b >= c.r - 0.04 or c.r < 0.44):
-		return true
-	return false
-
-
-func _recolor_huwag_to_bfp(casual: Image) -> Image:
-	var out := casual.duplicate() as Image
-	for y in range(54, TARGET_SIZE):
-		for x in range(TARGET_SIZE):
+func _build_huwag_bfp_from_casual(casual_base: Image) -> Image:
+	var out := casual_base.duplicate() as Image
+	var ink := Color("#030000")
+	for y in range(58, 96):
+		for x in range(96):
 			var c := out.get_pixel(x, y)
 			if c.a < 0.5:
 				continue
-			# Preservar contorno preto, pele (pescoço central), e zíper / camiseta interna próxima do centro
-			var maxc := maxf(maxf(c.r, c.g), c.b)
-			var is_skin := c.r > 0.35 and c.r > c.b + 0.10 and absf(float(x) - 48.0) < 20.0
-			if is_skin or maxc < 0.09:
+			if _is_skin_color(c, x, y, "huwag"):
 				continue
-			# Recolorir área dos ombros e jaqueta externa (excluindo triângulo central escuro da camisa)
-			var dx := absf(float(x) - 48.0)
-			var is_inner_shirt := dx < (float(y - 54) * 0.34)
-			var luma := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
-			if is_inner_shirt:
+			var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+			if lum < 0.05:
+				out.set_pixel(x, y, ink)
 				continue
-			# Faixas refletivas BFP horizontais no peito/ombros
-			if y in [78, 79, 80, 81]:
-				out.set_pixel(x, y, Color("#E87822") if luma > 0.12 else Color("#9C4814"))
-			elif y in [82, 83]:
-				out.set_pixel(x, y, Color("#F6D658") if luma > 0.12 else Color("#B5962B"))
-			else:
-				# Azul marinho BFP coerente com luminosidade da jaqueta original
-				var t := clampf((luma - 0.08) / 0.26, 0.0, 1.0)
-				var navy := Color("#0D192E").lerp(Color("#294775"), t)
-				out.set_pixel(x, y, navy)
-	return out
-
-
-func _find_huwag_face_landmarks(im: Image) -> Dictionary:
-	# Detectar exatamente y dos olhos buscando esclera branca neutra flanqueada por pupila escura (y=38..52)
-	var eye_y := 44
-	var best_eye_score := -1
-	var left_ex := 38
-	var right_ex := 58
-	for y in range(38, 53):
-		var sclera_cnt := 0
-		var l_sum := 0
-		var l_n := 0
-		var r_sum := 0
-		var r_n := 0
-		for x in range(31, 65):
-			var c := im.get_pixel(x, y)
-			if c.a < 0.5:
-				continue
-			var mx := maxf(maxf(c.r, c.g), c.b)
-			var mn := minf(minf(c.r, c.g), c.b)
-			if mx > 0.58 and (mx - mn) < 0.14:
-				sclera_cnt += 1
-				if x < 48:
-					l_sum += x
-					l_n += 1
+			var in_lapel_v := (x >= 37 and x <= 57 and y >= 78) and (c.b > c.r + 0.02 or lum > 0.15)
+			var on_jacket_shoulder := (y >= 88 and y <= 91) and (x <= 27 or x >= 68)
+			if on_jacket_shoulder:
+				var row_rel := y - 88
+				var base_ref := Color("#E86E1C") if (row_rel == 0 or row_rel == 3) else Color("#F2D238")
+				var shade_k := clampf(0.82 + lum * 0.75, 0.75, 1.10)
+				out.set_pixel(x, y, Color(
+					clampf(base_ref.r * shade_k, 0.0, 1.0),
+					clampf(base_ref.g * shade_k, 0.0, 1.0),
+					clampf(base_ref.b * shade_k, 0.0, 1.0),
+					1.0
+				))
+			elif in_lapel_v:
+				if lum < 0.14:
+					out.set_pixel(x, y, Color("#111722"))
+				elif lum < 0.24:
+					out.set_pixel(x, y, Color("#1D2636"))
 				else:
-					r_sum += x
-					r_n += 1
-		if sclera_cnt > best_eye_score:
-			best_eye_score = sclera_cnt
-			eye_y = y
-			if l_n > 0:
-				left_ex = int(roundf(float(l_sum) / float(l_n)))
-			if r_n > 0:
-				right_ex = int(roundf(float(r_sum) / float(r_n)))
-
-	# Detectar y da boca: risco horizontal mais escuro entre eye_y+14 e 68 centrada em 48
-	var mouth_y := clampi(eye_y + 17, 54, 67)
-	var best_m_score := -1
-	for y in range(eye_y + 13, mini(69, eye_y + 23)):
-		var dark_cnt := 0
-		for x in range(42, 54):
-			var c := im.get_pixel(x, y)
-			if c.a > 0.5 and (c.r + c.g + c.b) < 0.45:
-				dark_cnt += 1
-		if dark_cnt > best_m_score:
-			best_m_score = dark_cnt
-			mouth_y = y
-
-	return {"eye_y": eye_y, "mouth_y": mouth_y, "left_ex": left_ex, "right_ex": right_ex}
-
-
-func _apply_huwag_expression(base: Image, expr: String) -> Image:
-	if expr == "neutral":
-		return base.duplicate() as Image
-	if expr == "unfiltered":
-		return _make_grayscale_unfiltered(base)
-	if expr == "distorted":
-		return _make_surreal_distorted(base, false, false)
-
-	var im := base.duplicate() as Image
-	var lm := _find_huwag_face_landmarks(im)
-	var ey: int = int(lm["eye_y"])
-	var my: int = int(lm["mouth_y"])
-	var lx: int = int(lm["left_ex"])
-	var rx: int = int(lm["right_ex"])
-	var mx := int((lx + rx) / 2)
-
-	var skin_md := Color("#A8744B")
-	var skin_sh := Color("#7D5033")
-	var outline := Color("#0B090A")
-	var eye_w := Color("#ECE5DC")
-	var pupil := Color("#16100E")
-
-	match expr:
-		"worried":
-			for dx in range(6):
-				_set_px_if_opaque(im, lx - 3 + dx, ey - 3 - int(dx / 2), outline)
-				_set_px_if_opaque(im, rx + 3 - dx, ey - 3 - int(dx / 2), outline)
-			_set_px_if_opaque(im, mx - 5, my + 1, outline)
-			_set_px_if_opaque(im, mx - 4, my + 1, outline)
-			_set_px_if_opaque(im, mx + 4, my + 1, outline)
-			_set_px_if_opaque(im, mx + 5, my + 1, outline)
-		"tired":
-			for ex in [lx, rx]:
-				for dx in range(-4, 5):
-					_set_px_if_opaque(im, ex + dx, ey - 1, outline)
-					_set_px_if_opaque(im, ex + dx, ey + 2, skin_sh)
-					_set_px_if_opaque(im, ex + dx, ey + 3, skin_sh)
-			for dx in range(-4, 5):
-				_set_px_if_opaque(im, mx + dx, my + 1, skin_sh)
-		"surprised":
-			for ex in [lx, rx]:
-				for dx in range(-3, 4):
-					_set_px_if_opaque(im, ex + dx, ey - 5, outline)
-					_set_px_if_opaque(im, ex + dx, ey - 1, eye_w)
-					_set_px_if_opaque(im, ex + dx, ey, eye_w)
-					_set_px_if_opaque(im, ex + dx, ey + 1, eye_w)
-				for py in range(ey - 1, ey + 2):
-					for px in range(ex - 1, ex + 2):
-						_set_px_if_opaque(im, px, py, pupil)
-			for dx in range(-2, 3):
-				for dy in range(0, 3):
-					var is_ring := (absi(dx) == 2 or dy in [0, 2])
-					_set_px_if_opaque(im, mx + dx, my + dy, outline if is_ring else Color("#281412"))
-		"angry":
-			for dx in range(6):
-				_set_px_if_opaque(im, lx - 3 + dx, ey - 5 + int(dx / 2), outline)
-				_set_px_if_opaque(im, rx + 3 - dx, ey - 5 + int(dx / 2), outline)
-			for dx in range(-4, 5):
-				_set_px_if_opaque(im, mx + dx, my, outline)
-			_set_px_if_opaque(im, mx - 4, my + 1, outline)
-			_set_px_if_opaque(im, mx + 4, my + 1, outline)
-		"scared":
-			for ex in [lx, rx]:
-				for dx in range(-4, 5):
-					_set_px_if_opaque(im, ex + dx, ey - 5, outline)
-					for py in range(ey - 1, ey + 2):
-						_set_px_if_opaque(im, ex + dx, py, eye_w)
-				for py in range(ey, ey + 2):
-					_set_px_if_opaque(im, ex, py, pupil)
-			for dx in range(-4, 5):
-				_set_px_if_opaque(im, mx + dx, my + (1 if (dx % 2) == 0 else 0), outline)
-			_set_px_if_opaque(im, rx + 10, ey - 3, Color("#68BCE8"))
-			_set_px_if_opaque(im, rx + 10, ey - 2, Color("#BEE8FA"))
-			_set_px_if_opaque(im, rx + 11, ey - 2, Color("#68BCE8"))
-		"uneasy_smile":
-			for dx in range(5):
-				_set_px_if_opaque(im, lx - 2 + dx, ey - 4 - int(dx / 3), outline)
-				_set_px_if_opaque(im, rx + 2 - dx, ey - 4 - int(dx / 3), outline)
-			for dx in range(-4, 5):
-				_set_px_if_opaque(im, mx + dx, my, skin_md)
-				_set_px_if_opaque(im, mx + dx, my + 1, outline)
-			_set_px_if_opaque(im, mx - 5, my, outline)
-			_set_px_if_opaque(im, mx + 5, my, outline)
-	return im
-
-
-func _set_px_if_opaque(im: Image, x: int, y: int, col: Color) -> void:
-	if x < 0 or x >= im.get_width() or y < 0 or y >= im.get_height():
-		return
-	if im.get_pixel(x, y).a > 0.5:
-		var c := col
-		c.a = 1.0
-		im.set_pixel(x, y, c)
-
-
-func _make_grayscale_unfiltered(src: Image) -> Image:
-	var out := Image.create(TARGET_SIZE, TARGET_SIZE, false, Image.FORMAT_RGBA8)
-	for y in range(TARGET_SIZE):
-		for x in range(TARGET_SIZE):
-			var c := src.get_pixel(x, y)
-			if c.a < 0.5:
-				continue
-			var l := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
-			# Preto/cinza clínico frio de Ato III (zero vermelho)
-			out.set_pixel(x, y, Color(l * 0.94, l * 0.96, l * 1.00, 1.0))
+					out.set_pixel(x, y, Color("#2B384E"))
+			else:
+				if lum < 0.13:
+					out.set_pixel(x, y, Color("#0D1524"))
+				elif lum < 0.22:
+					out.set_pixel(x, y, Color("#182640"))
+				elif lum < 0.32:
+					out.set_pixel(x, y, Color("#25395C"))
+				else:
+					out.set_pixel(x, y, Color("#375280"))
 	return out
 
 
-func _make_surreal_distorted(src: Image, is_radio: bool, _is_entity: bool) -> Image:
-	var out := Image.create(TARGET_SIZE, TARGET_SIZE, false, Image.FORMAT_RGBA8)
-	# Grade abissal índigo-violeta cadavérica (ZERO vermelho sangue) + cisalhamento sutil de 1px
-	for y in range(TARGET_SIZE):
-		var shift := 0
-		if y in [44, 45, 74, 75]:
-			shift = 1
-		elif y == 62:
-			shift = -1
-		for x in range(TARGET_SIZE):
-			var sx := clampi(x - shift, 0, TARGET_SIZE - 1)
-			var c := src.get_pixel(sx, y)
+func _erase_huwag_mouth(img: Image) -> void:
+	var skin_base := Color("#A17653")
+	var skin_sh := Color("#72513F")
+	for y in range(55, 61):
+		for x in range(41, 57):
+			var c := skin_base
+			if x >= 54 or (y >= 60 and x >= 51):
+				c = skin_sh
+			img.set_pixel(x, y, c)
+
+
+func _make_huwag_expression(base: Image, expr: String) -> Image:
+	var out := base.duplicate() as Image
+	if expr == "neutral":
+		return out
+	if expr == "distorted":
+		return _build_16bit_corrupted_huwag(out)
+
+	var skin_base := Color("#A17653")
+	var skin_sh := Color("#72513F")
+	var skin_deep := Color("#52342A")
+	var ink := Color("#030000")
+	var sclera := Color("#DED6C4")
+
+	if expr == "worried":
+		_erase_huwag_mouth(out)
+		for x in range(40, 44):
+			out.set_pixel(x, 33, ink)
+			out.set_pixel(x, 36, skin_base)
+		for x in range(51, 55):
+			out.set_pixel(x, 32, ink)
+			out.set_pixel(x, 35, skin_base)
+		for x in range(34, 42):
+			out.set_pixel(x, 43, skin_deep)
+		for x in range(53, 61):
+			out.set_pixel(x, 42, skin_deep)
+		for x in range(45, 52):
+			out.set_pixel(x, 57, ink if (x >= 47 and x <= 50) else skin_deep)
+		out.set_pixel(44, 58, skin_deep)
+		out.set_pixel(52, 58, skin_deep)
+		for x in range(47, 51):
+			out.set_pixel(x, 59, skin_sh)
+
+	elif expr == "tired":
+		_erase_huwag_mouth(out)
+		for x in range(34, 42):
+			out.set_pixel(x, 40, skin_sh)
+			out.set_pixel(x, 41, ink)
+			out.set_pixel(x, 43, skin_deep)
+			out.set_pixel(x, 44, skin_sh)
+		for x in range(53, 61):
+			out.set_pixel(x, 39, skin_sh)
+			out.set_pixel(x, 40, ink)
+			out.set_pixel(x, 42, skin_deep)
+			out.set_pixel(x, 43, skin_sh)
+		for x in range(45, 53):
+			out.set_pixel(x, 58, ink if (x >= 47 and x <= 50) else skin_deep)
+		for x in range(47, 51):
+			out.set_pixel(x, 60, skin_sh)
+
+	elif expr == "surprised":
+		_erase_huwag_mouth(out)
+		for x in range(34, 43):
+			out.set_pixel(x, 33, ink)
+			out.set_pixel(x, 36, skin_base)
+		for x in range(52, 61):
+			out.set_pixel(x, 32, ink)
+			out.set_pixel(x, 35, skin_base)
+		for x in range(34, 42):
+			out.set_pixel(x, 39, ink)
+		for y in [40, 41]:
+			out.set_pixel(34, y, sclera)
+			out.set_pixel(35, y, sclera)
+			out.set_pixel(36, y, skin_deep)
+			out.set_pixel(37, y, ink)
+			out.set_pixel(38, y, ink)
+			out.set_pixel(39, y, skin_deep)
+			out.set_pixel(40, y, sclera)
+			out.set_pixel(41, y, sclera)
+		out.set_pixel(37, 40, Color("#F2ECE0"))
+		for x in range(53, 61):
+			out.set_pixel(x, 38, ink)
+		for y in [39, 40]:
+			out.set_pixel(53, y, sclera)
+			out.set_pixel(54, y, sclera)
+			out.set_pixel(55, y, skin_deep)
+			out.set_pixel(56, y, ink)
+			out.set_pixel(57, y, ink)
+			out.set_pixel(58, y, skin_deep)
+			out.set_pixel(59, y, sclera)
+			out.set_pixel(60, y, sclera)
+		out.set_pixel(56, 39, Color("#F2ECE0"))
+		for x in range(47, 51):
+			out.set_pixel(x, 56, skin_deep)
+			out.set_pixel(x, 57, ink)
+			out.set_pixel(x, 58, ink)
+			out.set_pixel(x, 59, skin_deep)
+		out.set_pixel(46, 57, skin_deep)
+		out.set_pixel(46, 58, skin_deep)
+		out.set_pixel(51, 57, skin_deep)
+		out.set_pixel(51, 58, skin_deep)
+
+	elif expr == "angry":
+		_erase_huwag_mouth(out)
+		for x in range(40, 44):
+			out.set_pixel(x, 36, ink)
+			out.set_pixel(x, 37, ink)
+		for x in range(50, 54):
+			out.set_pixel(x, 35, ink)
+			out.set_pixel(x, 36, ink)
+		out.set_pixel(46, 36, skin_deep)
+		out.set_pixel(47, 37, skin_deep)
+		for x in range(44, 53):
+			out.set_pixel(x, 57, ink)
+		out.set_pixel(43, 58, ink)
+		out.set_pixel(53, 58, ink)
+		for x in range(46, 51):
+			out.set_pixel(x, 59, skin_deep)
+
+	elif expr == "scared":
+		_erase_huwag_mouth(out)
+		for x in range(40, 44):
+			out.set_pixel(x, 33, ink)
+			out.set_pixel(x, 36, skin_base)
+		for x in range(51, 55):
+			out.set_pixel(x, 32, ink)
+			out.set_pixel(x, 35, skin_base)
+		for x in range(34, 42):
+			out.set_pixel(x, 39, ink)
+			out.set_pixel(x, 43, skin_deep)
+		for y in [40, 41]:
+			for x in range(34, 42):
+				out.set_pixel(x, y, sclera)
+			out.set_pixel(37, y, ink)
+			out.set_pixel(38, y, ink)
+		out.set_pixel(36, 41, skin_deep)
+		for x in range(53, 61):
+			out.set_pixel(x, 38, ink)
+			out.set_pixel(x, 42, skin_deep)
+		for y in [39, 40]:
+			for x in range(53, 61):
+				out.set_pixel(x, y, sclera)
+			out.set_pixel(56, y, ink)
+			out.set_pixel(57, y, ink)
+		out.set_pixel(55, 40, skin_deep)
+		for x in range(45, 53):
+			out.set_pixel(x, 56, skin_deep)
+			out.set_pixel(x, 57, Color("#CFC4B4") if (x >= 46 and x <= 51) else ink)
+			out.set_pixel(x, 58, ink)
+		out.set_pixel(44, 58, skin_deep)
+		out.set_pixel(53, 58, skin_deep)
+		for x in range(46, 52):
+			out.set_pixel(x, 59, skin_deep)
+
+	elif expr == "uneasy_smile":
+		for x in range(40, 44):
+			out.set_pixel(x, 33, ink)
+		for x in range(51, 55):
+			out.set_pixel(x, 32, ink)
+		for x in range(34, 42):
+			out.set_pixel(x, 43, skin_deep)
+		for x in range(53, 61):
+			out.set_pixel(x, 42, skin_deep)
+		out.set_pixel(41, 56, skin_deep)
+		out.set_pixel(41, 57, skin_sh)
+
+	elif expr == "unfiltered":
+		_erase_huwag_mouth(out)
+		for x in range(44, 53):
+			out.set_pixel(x, 57, ink if (x >= 46 and x <= 51) else skin_deep)
+		for x in range(46, 51):
+			out.set_pixel(x, 59, skin_deep)
+		for x in range(34, 42):
+			out.set_pixel(x, 43, skin_deep)
+		for x in range(53, 61):
+			out.set_pixel(x, 42, skin_deep)
+		for y in range(96):
+			for x in range(96):
+				var c := out.get_pixel(x, y)
+				if c.a < 0.5:
+					continue
+				var g := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+				g = clampf((g - 0.5) * 1.16 + 0.46, 0.0, 1.0)
+				out.set_pixel(x, y, Color(g * 0.93, g * 0.95, minf(1.0, g * 1.02), 1.0))
+
+	return out
+
+
+# ==============================================================================
+# 2. POLISHING THE 10 EXISTING 16-BIT PORTRAITS TO MATCH MAP SPRITES
+# ==============================================================================
+
+func _clean_border_outline(img: Image) -> Image:
+	var out := img.duplicate() as Image
+	var ink := Color("#050408")
+	for y in range(96):
+		if out.get_pixel(0, y).a > 0.5:
+			out.set_pixel(0, y, Color(0, 0, 0, 0))
+			if out.get_pixel(1, y).a > 0.5:
+				out.set_pixel(1, y, ink)
+		if out.get_pixel(95, y).a > 0.5:
+			out.set_pixel(95, y, Color(0, 0, 0, 0))
+			if out.get_pixel(94, y).a > 0.5:
+				out.set_pixel(94, y, ink)
+		if out.get_pixel(94, y).a > 0.5 and out.get_pixel(95, y).a < 0.5:
+			var c94 := out.get_pixel(94, y)
+			if (c94.r + c94.g + c94.b) > 0.35:
+				out.set_pixel(94, y, ink)
+	return out
+
+
+func _polish_bombeiro_ato(img: Image) -> Image:
+	var out := _clean_border_outline(img)
+	for y in range(79, 85):
+		for x in range(75, 86):
+			var c := out.get_pixel(x, y)
 			if c.a < 0.5:
 				continue
-			var l := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
-			var col: Color
-			if l < 0.10:
-				col = Color(0.03, 0.02, 0.06, 1.0)
-			elif l < 0.28:
-				col = Color("#120E1D").lerp(Color("#2A243D"), (l - 0.10) / 0.18)
-			elif l < 0.58:
-				col = Color("#2A243D").lerp(Color("#696284"), (l - 0.28) / 0.30)
+			var mx := 94 - x
+			var mc := out.get_pixel(mx, y)
+			if mc.a > 0.5 and (mc.r > 0.65 and mc.g > 0.45):
+				out.set_pixel(x, y, mc.darkened(0.08))
+	return out
+
+
+func _polish_aling_nena(img: Image) -> Image:
+	var out := _clean_border_outline(img)
+	for y in range(70, 96):
+		for x in range(96):
+			var c := out.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			var in_neck_skin := (x >= 35 and x <= 59 and y <= 81)
+			if not in_neck_skin and (c.r > c.g + 0.12) and (c.r > 0.45):
+				var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+				var col: Color
+				if lum < 0.34:
+					col = Color("#1F3F4A")
+				elif lum < 0.46:
+					col = Color("#2E5968")
+				elif lum < 0.58:
+					col = Color("#3F7385")
+				else:
+					col = Color("#568F9E")
+				out.set_pixel(x, y, col)
+	return out
+
+
+func _polish_kuya_ben(img: Image) -> Image:
+	var out := _clean_border_outline(img)
+	for y in range(4, 34):
+		for x in range(20, 76):
+			var c := out.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+			if lum > 0.16 and (c.g > c.b + 0.04 or c.b > c.r + 0.05) and (y <= 25 or (x >= 27 and x <= 68 and y <= 28)):
+				var col: Color
+				if lum < 0.28:
+					col = Color("#1D2E4A")
+				elif lum < 0.38:
+					col = Color("#2A4268")
+				elif lum < 0.48:
+					col = Color("#395887")
+				else:
+					col = Color("#4E73A8")
+				out.set_pixel(x, y, col)
+	for y in range(14, 17):
+		for x in range(44, 52):
+			if y == 14 or y == 16 or x == 44 or x == 51:
+				out.set_pixel(x, y, Color("#8A6828"))
 			else:
-				col = Color("#696284").lerp(Color("#C2BED6"), (l - 0.58) / 0.42)
-			# Brilho ocular sutil apenas sobre esclera branca pura na linha dos olhos (nunca em pele quente)
-			if not is_radio and ((x >= 32 and x <= 44) or (x >= 52 and x <= 64)) and y >= 36 and y <= 49:
-				var maxc := maxf(maxf(c.r, c.g), c.b)
-				var minc := minf(minf(c.r, c.g), c.b)
-				var is_pure_sclera := maxc > 0.78 and minc > 0.68 and (maxc - minc) < 0.10
-				if is_pure_sclera:
-					col = Color("#E6E2FA")
-			col.a = 1.0
+				out.set_pixel(x, y, Color("#D4A848"))
+
+	for y in range(67, 96):
+		for x in range(96):
+			var c := out.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			var in_neck := (x >= 35 and x <= 60 and y <= 82) and (c.r > c.g + 0.08) and (c.r > c.b + 0.12)
+			if in_neck:
+				continue
+			var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+			if lum < 0.08:
+				continue
+			var col: Color
+			if lum < 0.20:
+				col = Color("#152033")
+			elif lum < 0.30:
+				col = Color("#20324E")
+			elif lum < 0.42:
+				col = Color("#2E476E")
+			elif lum < 0.54:
+				col = Color("#3E5E8E")
+			else:
+				col = Color("#5478AD")
 			out.set_pixel(x, y, col)
 	return out
 
 
-# ==============================================================================
-# COMPOSIÇÃO PIXEL-GRID 64x64 -> 96x96 TRANSPARENTE PARA OS 5 PERFIS RESTANTES
-# ==============================================================================
-func _new_grid64() -> Image:
-	return Image.create(64, 64, false, Image.FORMAT_RGBA8)
-
-
-func _g_rect(im: Image, x: int, y: int, w: int, h: int, col: Color) -> void:
-	for py in range(maxi(0, y), mini(im.get_height(), y + h)):
-		for px in range(maxi(0, x), mini(im.get_width(), x + w)):
-			im.set_pixel(px, py, col)
-
-
-func _g_ellipse(im: Image, cx: float, cy: float, rx: float, ry: float, col: Color) -> void:
-	for py in range(maxi(0, int(floor(cy - ry))), mini(im.get_height(), int(ceil(cy + ry)) + 1)):
-		for px in range(maxi(0, int(floor(cx - rx))), mini(im.get_width(), int(ceil(cx + rx)) + 1)):
-			var nx := (float(px) - cx) / rx
-			var ny := (float(py) - cy) / ry
-			if nx * nx + ny * ny <= 1.0:
-				im.set_pixel(px, py, col)
-
-
-func _g_outline(im: Image, outline_col: Color) -> Image:
-	var w := im.get_width()
-	var h := im.get_height()
-	var out := im.duplicate() as Image
-	var dirs: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
-	for y in range(h):
-		for x in range(w):
-			if im.get_pixel(x, y).a > 0.5:
+func _polish_santelmo(img: Image) -> Image:
+	var out := _clean_border_outline(img)
+	for y in range(6, 36):
+		for x in range(18, 78):
+			if y >= 24 and x >= 31 and x <= 64:
 				continue
-			for d in dirs:
-				var nx := x + d.x
-				var ny := y + d.y
-				if nx >= 0 and nx < w and ny >= 0 and ny < h and im.get_pixel(nx, ny).a > 0.5:
-					out.set_pixel(x, y, outline_col)
-					break
+			var c := out.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+			var is_cyan_flame := (c.b > c.r + 0.20 and lum > 0.35)
+			if not is_cyan_flame and lum >= 0.14 and lum <= 0.34:
+				if lum > 0.23:
+					out.set_pixel(x, y, Color("#B53E1A") if ((x + y) % 3 != 0) else Color("#E86E24"))
+				elif lum > 0.18:
+					out.set_pixel(x, y, Color("#662010"))
 	return out
 
 
-func _compose_luningning_96() -> Image:
-	var g := _new_grid64()
-	var skin_dk := Color("#6D432B")
-	var skin_sh := Color("#885A3D")
-	var skin_md := Color("#AC7B56")
-	var skin_hi := Color("#C99770")
-	var hair_dk := Color("#3E4450")
-	var hair_md := Color("#667080")
-	var hair_hi := Color("#A6B0C2")
-	var shawl_dk := Color("#38152B")
-	var shawl_md := Color("#5A2444")
-	var shawl_hi := Color("#7D3762")
-	var shawl_trim := Color("#C69A64")
-	var blouse := Color("#DDD4C4")
-	var line := Color("#09070B")
+# ==============================================================================
+# 3. FIVE NEW 16-BIT PORTRAITS (LUNINGNING, LOLA ROSA, TOBY, VULTO, RADIO VHF)
+# ==============================================================================
 
-	# Coque alto grisalho + mechas finas presas
-	_g_ellipse(g, 32, 8, 8.2, 5.5, hair_dk)
-	_g_ellipse(g, 31, 7, 5.6, 3.6, hair_md)
-	_g_rect(g, 28, 6, 4, 1, hair_hi)
-	_g_ellipse(g, 32, 23, 15.2, 13.5, hair_dk)
-	_g_ellipse(g, 32, 22, 13.4, 11.4, hair_md)
-	for hx in [21, 23, 39, 41]:
-		_g_rect(g, hx, 14, 2, 4, hair_hi)
-	# Cachos caídos finos nas têmporas
-	_g_rect(g, 18, 30, 1, 7, hair_dk)
-	_g_rect(g, 45, 30, 1, 7, hair_dk)
+func _build_16bit_luningning() -> Image:
+	var nena := _load_source_png("fnaf_aling_nena.png")
+	var maria := _load_source_png("fnaf_enfermeira_maria.png")
+	var out := Image.create(96, 96, false, Image.FORMAT_RGBA8)
+	out.fill(Color(0, 0, 0, 0))
+	var ink := Color("#06050A")
 
-	# Xale roxo-vinho *alampay* sobre blusa clara com bordado e dobras
-	_g_ellipse(g, 32, 58, 27.5, 14.5, shawl_dk)
-	_g_ellipse(g, 32, 56, 24.5, 12.2, shawl_md)
-	_g_rect(g, 26, 45, 12, 19, blouse)
-	_g_rect(g, 25, 46, 1, 18, line)
-	_g_rect(g, 38, 46, 1, 18, line)
-	_g_rect(g, 19, 46, 6, 18, shawl_hi)
-	_g_rect(g, 39, 46, 6, 18, shawl_hi)
-	_g_rect(g, 24, 47, 1, 17, shawl_trim)
-	_g_rect(g, 39, 47, 1, 17, shawl_trim)
-	# Pescoço sombreado sob queixo
-	_g_rect(g, 27, 38, 10, 10, skin_sh)
-	_g_rect(g, 28, 40, 8, 8, skin_md)
-	_g_rect(g, 28, 39, 8, 2, skin_dk)
+	for y in range(10, 96):
+		for x in range(96):
+			var c := nena.get_pixel(x, y)
+			if x >= 22 and x <= 30 and y >= 20 and y <= 31:
+				var mc := nena.get_pixel(95 - x, y)
+				if mc.a > 0.5:
+					c = mc
+			if c.a < 0.5:
+				continue
+			if y >= 44 and y <= 63 and (x <= 23 or x >= 72):
+				continue
+			out.set_pixel(x, y, c)
 
-	# Orelhas + Rosto com maçãs do rosto, rugas e nariz esculpido
-	_g_ellipse(g, 18, 29, 2.4, 4.0, skin_sh)
-	_g_ellipse(g, 46, 29, 2.4, 4.0, skin_sh)
-	_g_rect(g, 18, 28, 1, 2, skin_dk)
-	_g_rect(g, 45, 28, 1, 2, skin_dk)
-	_g_ellipse(g, 32, 27, 12.2, 12.8, skin_sh)
-	_g_ellipse(g, 32, 26, 11.2, 11.4, skin_md)
-	_g_ellipse(g, 32, 25, 8.2, 7.6, skin_hi)
-	# Franja partida
-	_g_ellipse(g, 24, 17, 6.2, 3.8, hair_dk)
-	_g_ellipse(g, 40, 17, 6.2, 3.8, hair_dk)
-	_g_rect(g, 25, 16, 3, 2, hair_hi)
-	_g_rect(g, 36, 16, 3, 2, hair_hi)
-	# Rugas testa, sobrancelhas graves, olhos e boca
-	_g_rect(g, 26, 20, 12, 1, skin_sh)
-	_g_rect(g, 22, 24, 6, 1, line)
-	_g_rect(g, 36, 24, 6, 1, line)
-	_g_rect(g, 22, 26, 6, 1, line)
-	_g_rect(g, 36, 26, 6, 1, line)
-	_g_rect(g, 23, 27, 5, 2, Color("#EFE8E0"))
-	_g_rect(g, 36, 27, 5, 2, Color("#EFE8E0"))
-	_g_rect(g, 24, 27, 3, 2, Color("#24150E"))
-	_g_rect(g, 37, 27, 3, 2, Color("#24150E"))
-	_g_rect(g, 24, 27, 1, 1, Color.WHITE)
-	_g_rect(g, 37, 27, 1, 1, Color.WHITE)
-	_g_rect(g, 23, 30, 5, 1, skin_dk)
-	_g_rect(g, 36, 30, 5, 1, skin_dk)
-	# Nariz com dorso claro e base sombreada
-	_g_rect(g, 31, 26, 2, 5, skin_hi)
-	_g_rect(g, 30, 31, 4, 1, skin_dk)
-	_g_rect(g, 26, 33, 2, 3, skin_sh)
-	_g_rect(g, 36, 33, 2, 3, skin_sh)
-	_g_rect(g, 28, 35, 8, 1, line)
-	_g_rect(g, 30, 36, 4, 1, skin_dk)
+	for y in range(4, 17):
+		for x in range(35, 61):
+			var mc := maria.get_pixel(x, y)
+			if mc.a > 0.5 and out.get_pixel(x, y).a < 0.5:
+				var lum := mc.r * 0.299 + mc.g * 0.587 + mc.b * 0.114
+				var sc: Color
+				if lum < 0.06:
+					sc = ink
+				elif lum < 0.13:
+					sc = Color("#4E5566")
+				elif lum < 0.20:
+					sc = Color("#7E879B")
+				elif lum < 0.28:
+					sc = Color("#AEB7CA")
+				else:
+					sc = Color("#DCE3F2")
+				out.set_pixel(x, y, sc)
 
-	return _fit_bottom_centered_96(_g_outline(g, line), 92)
+	for y in range(4, 65):
+		for x in range(18, 78):
+			var c := out.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+			if lum < 0.07:
+				continue
+			var is_skin := (c.r > c.b + 0.13) and (y >= 20)
+			if not is_skin:
+				var sc: Color
+				if lum < 0.22:
+					sc = Color("#464C5C")
+				elif lum < 0.34:
+					sc = Color("#747D91")
+				elif lum < 0.46:
+					sc = Color("#A5AEBF")
+				elif lum < 0.58:
+					sc = Color("#CFD6E6")
+				else:
+					sc = Color("#EEF2FA")
+				out.set_pixel(x, y, sc)
 
+	var sk_hi := Color("#D8A67E")
+	var sk_base := Color("#BF8C66")
+	var sk_mid := Color("#9E6C49")
+	var sk_sh := Color("#754B30")
+	var sk_deep := Color("#4E2E1D")
+	for y in range(20, 84):
+		for x in range(24, 72):
+			var c := out.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			if c.r > c.b + 0.13 and c.r > c.g + 0.05 and y < 78:
+				var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+				if lum > 0.62:
+					out.set_pixel(x, y, sk_hi)
+				elif lum > 0.50:
+					out.set_pixel(x, y, sk_base)
+				elif lum > 0.38:
+					out.set_pixel(x, y, sk_mid)
+				elif lum > 0.24:
+					out.set_pixel(x, y, sk_sh)
+	for y in range(53, 61):
+		for x in range(37, 59):
+			var col := sk_base
+			if x <= 39 or x >= 56 or y >= 59:
+				col = sk_mid
+			out.set_pixel(x, y, col)
+	for x in range(44, 52):
+		out.set_pixel(x, 56, sk_deep if (x >= 46 and x <= 49) else sk_sh)
+	out.set_pixel(43, 57, sk_deep)
+	out.set_pixel(44, 57, sk_sh)
+	out.set_pixel(51, 57, sk_sh)
+	out.set_pixel(52, 57, sk_deep)
+	for x in range(46, 50):
+		out.set_pixel(x, 57, sk_hi)
+		out.set_pixel(x, 58, sk_sh)
+	out.set_pixel(39, 53, sk_sh); out.set_pixel(38, 54, sk_sh); out.set_pixel(38, 55, sk_mid)
+	out.set_pixel(56, 53, sk_sh); out.set_pixel(57, 54, sk_sh); out.set_pixel(57, 55, sk_mid)
+	out.set_pixel(40, 34, sk_deep); out.set_pixel(41, 33, sk_deep)
+	out.set_pixel(55, 34, sk_deep); out.set_pixel(54, 33, sk_deep)
 
-func _compose_lola_rosa_96() -> Image:
-	var g := _new_grid64()
-	var skin_dk := Color("#6E442C")
-	var skin_sh := Color("#8B5C3E")
-	var skin_md := Color("#AF7E59")
-	var skin_hi := Color("#CA9871")
-	var scarf_dk := Color("#9E9584")
-	var scarf_md := Color("#DAD2C2")
-	var scarf_hi := Color("#F4EFE6")
-	var hair_silver := Color("#ACB4C0")
-	var hair_dk := Color("#6E7682")
-	var baro_md := Color("#CFC3A3")
-	var baro_dk := Color("#9E9274")
-	var leaf_dk := Color("#2B6232")
-	var leaf_green := Color("#4B8B52")
-	var line := Color("#0B0808")
+	for y in range(68, 96):
+		for x in range(96):
+			var c := out.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			var in_neck := (x >= 36 and x <= 59 and y <= 80) and (c.r > c.b + 0.12)
+			if in_neck:
+				continue
+			var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+			if lum < 0.07:
+				continue
+			var is_shawl_strap := (c.r > 0.62 and c.g > 0.56 and c.b > 0.48)
+			if is_shawl_strap:
+				if lum < 0.68:
+					out.set_pixel(x, y, Color("#8868A6"))
+				elif lum < 0.78:
+					out.set_pixel(x, y, Color("#A888C4"))
+				else:
+					out.set_pixel(x, y, Color("#C9ADE0"))
+			elif x >= 37 and x <= 58 and y >= 82:
+				if lum < 0.36:
+					out.set_pixel(x, y, Color("#A69B92"))
+				elif lum < 0.50:
+					out.set_pixel(x, y, Color("#C9BFB4"))
+				else:
+					out.set_pixel(x, y, Color("#EAE2D8"))
+			else:
+				if lum < 0.34:
+					out.set_pixel(x, y, Color("#2E1A42"))
+				elif lum < 0.46:
+					out.set_pixel(x, y, Color("#462963"))
+				elif lum < 0.58:
+					out.set_pixel(x, y, Color("#603B82"))
+				else:
+					out.set_pixel(x, y, Color("#7B50A1"))
 
-	# Lenço branco/creme com dobras + nó no topo
-	_g_ellipse(g, 32, 23, 16.5, 15.0, scarf_dk)
-	_g_ellipse(g, 32, 21, 14.5, 13.0, scarf_md)
-	_g_ellipse(g, 30, 14, 9.0, 5.2, scarf_hi)
-	_g_rect(g, 20, 14, 3, 2, Color("#A48870"))
-	_g_rect(g, 41, 15, 2, 2, Color("#A48870"))
-
-	# Blusa *baro* texturizada + gola dobrada + ramo de *lagundi*
-	_g_ellipse(g, 32, 57, 26.8, 13.8, baro_dk)
-	_g_ellipse(g, 32, 56, 24.0, 11.8, baro_md)
-	_g_rect(g, 25, 45, 14, 10, scarf_hi)
-	_g_rect(g, 26, 45, 12, 1, line)
-	_g_rect(g, 27, 38, 10, 10, skin_sh)
-	_g_rect(g, 28, 39, 8, 8, skin_md)
-	_g_rect(g, 28, 38, 8, 2, skin_dk)
-	# Fios grisalhos sob lenço
-	_g_rect(g, 19, 20, 4, 8, hair_dk)
-	_g_rect(g, 41, 20, 4, 8, hair_dk)
-	_g_rect(g, 20, 21, 2, 6, hair_silver)
-	_g_rect(g, 42, 21, 2, 6, hair_silver)
-
-	# Rosto gentil esculpido
-	_g_ellipse(g, 32, 28, 12.0, 12.0, skin_sh)
-	_g_ellipse(g, 32, 27, 11.0, 10.8, skin_md)
-	_g_ellipse(g, 32, 26, 8.4, 7.6, skin_hi)
-	# Ramo *lagundi* no colarinho esquerdo
-	_g_rect(g, 21, 47, 5, 4, leaf_dk)
-	_g_rect(g, 22, 47, 3, 3, leaf_green)
-	_g_rect(g, 19, 50, 4, 3, Color("#76BF74"))
-	# Olhos ternos, pálpebras e sorriso
-	_g_rect(g, 23, 24, 5, 1, hair_dk)
-	_g_rect(g, 36, 24, 5, 1, hair_dk)
-	_g_rect(g, 23, 26, 5, 1, line)
-	_g_rect(g, 36, 26, 5, 1, line)
-	_g_rect(g, 24, 27, 4, 2, Color("#F4EFE8"))
-	_g_rect(g, 36, 27, 4, 2, Color("#F4EFE8"))
-	_g_rect(g, 25, 27, 2, 2, Color("#241510"))
-	_g_rect(g, 37, 27, 2, 2, Color("#241510"))
-	_g_rect(g, 25, 27, 1, 1, Color.WHITE)
-	_g_rect(g, 37, 27, 1, 1, Color.WHITE)
-	_g_rect(g, 31, 27, 2, 4, skin_hi)
-	_g_rect(g, 30, 31, 4, 1, skin_dk)
-	_g_rect(g, 28, 35, 8, 1, line)
-	_g_rect(g, 27, 34, 1, 1, line)
-	_g_rect(g, 36, 34, 1, 1, line)
-
-	return _fit_bottom_centered_96(_g_outline(g, line), 90)
+	return _clean_border_outline(out)
 
 
-func _compose_toby_96() -> Image:
-	var g := _new_grid64()
-	var skin_dk := Color("#744729")
-	var skin_sh := Color("#93613D")
-	var skin_md := Color("#BB875C")
-	var skin_hi := Color("#D8A67D")
-	var cap_dk := Color("#9C360C")
-	var cap_md := Color("#E86622")
-	var cap_hi := Color("#FFA04A")
-	var hair_dk := Color("#16141A")
-	var hair_md := Color("#2B2834")
-	var tee_dk := Color("#1E582C")
-	var tee_md := Color("#368E4C")
-	var tee_hi := Color("#50AA64")
-	var strap := Color("#3B4558")
-	var buckle := Color("#BAC4D2")
-	var line := Color("#08070A")
+func _build_16bit_lola_rosa() -> Image:
+	var nena := _load_source_png("fnaf_aling_nena.png")
+	var feirante := _load_source_png("fnaf_feirante.png")
+	var out := Image.create(96, 96, false, Image.FORMAT_RGBA8)
+	out.fill(Color(0, 0, 0, 0))
+	var ink := Color("#060508")
 
-	# Boné esportivo laranja com gomos e aba detalhada
-	_g_ellipse(g, 32, 17, 14.5, 10.2, cap_dk)
-	_g_ellipse(g, 32, 16, 13.0, 9.0, cap_md)
-	_g_ellipse(g, 30, 13, 7.5, 4.0, cap_hi)
-	_g_rect(g, 31, 8, 2, 11, cap_dk)
-	_g_rect(g, 18, 20, 28, 4, cap_dk)
-	_g_rect(g, 19, 20, 25, 2, cap_hi)
+	for y in range(66, 96):
+		for x in range(96):
+			var fc := feirante.get_pixel(x, y)
+			if fc.a < 0.5:
+				continue
+			var lum := fc.r * 0.299 + fc.g * 0.587 + fc.b * 0.114
+			if lum < 0.07:
+				out.set_pixel(x, y, ink)
+				continue
+			var is_skin := (x >= 35 and x <= 60 and y <= 83) and (fc.r > fc.g + 0.08)
+			if is_skin:
+				out.set_pixel(x, y, fc)
+				continue
+			var is_towel := (fc.r > 0.62 and fc.g > 0.62 and fc.b > 0.58)
+			if is_towel:
+				if lum < 0.68:
+					out.set_pixel(x, y, Color("#A8987E"))
+				elif lum < 0.80:
+					out.set_pixel(x, y, Color("#C9BA9E"))
+				else:
+					out.set_pixel(x, y, Color("#E8DEC6"))
+			elif x >= 40 and x <= 55 and y >= 78:
+				if lum < 0.28:
+					out.set_pixel(x, y, Color("#4A2E1D"))
+				elif lum < 0.40:
+					out.set_pixel(x, y, Color("#6B442B"))
+				else:
+					out.set_pixel(x, y, Color("#8C5B3C"))
+			else:
+				if lum < 0.24:
+					out.set_pixel(x, y, Color("#182B16"))
+				elif lum < 0.34:
+					out.set_pixel(x, y, Color("#264223"))
+				elif lum < 0.46:
+					out.set_pixel(x, y, Color("#385E34"))
+				else:
+					out.set_pixel(x, y, Color("#4D7D48"))
 
-	# Camiseta verde juvenil + gola + mochila
-	_g_ellipse(g, 32, 58, 22.0, 11.8, tee_dk)
-	_g_ellipse(g, 32, 57, 19.8, 9.8, tee_md)
-	_g_ellipse(g, 32, 53, 10.5, 5.2, tee_hi)
-	_g_rect(g, 20, 48, 4, 16, strap)
-	_g_rect(g, 40, 48, 4, 16, strap)
-	_g_rect(g, 20, 56, 4, 2, buckle)
-	_g_rect(g, 40, 56, 4, 2, buckle)
-	_g_rect(g, 28, 42, 8, 8, skin_sh)
-	_g_rect(g, 29, 43, 6, 7, skin_md)
-	_g_rect(g, 29, 42, 6, 2, skin_dk)
+	var sk_hi := Color("#C98E62")
+	var sk_base := Color("#AD734A")
+	var sk_mid := Color("#8F5A36")
+	var sk_sh := Color("#6B3F23")
+	var sk_deep := Color("#472614")
+	for y in range(10, 75):
+		for x in range(22, 74):
+			var nc := nena.get_pixel(x, y)
+			if x >= 22 and x <= 30 and y >= 20 and y <= 31:
+				var mc := nena.get_pixel(95 - x, y)
+				if mc.a > 0.5:
+					nc = mc
+			if nc.a < 0.5:
+				continue
+			var lum := nc.r * 0.299 + nc.g * 0.587 + nc.b * 0.114
+			var is_skin := (nc.r > nc.b + 0.13) and (y >= 20)
+			if is_skin:
+				var sc := sk_base
+				if lum > 0.62:
+					sc = sk_hi
+				elif lum > 0.50:
+					sc = sk_base
+				elif lum > 0.38:
+					sc = sk_mid
+				elif lum > 0.24:
+					sc = sk_sh
+				else:
+					sc = sk_deep
+				out.set_pixel(x, y, sc)
+			elif y <= 65:
+				out.set_pixel(x, y, nc)
 
-	# Orelhas + Rosto infantil bochechudo
-	_g_ellipse(g, 20, 32, 2.4, 3.4, skin_sh)
-	_g_ellipse(g, 44, 32, 2.4, 3.4, skin_sh)
-	_g_ellipse(g, 32, 32, 11.4, 10.8, skin_sh)
-	_g_ellipse(g, 32, 31, 10.4, 9.8, skin_md)
-	_g_ellipse(g, 32, 30, 8.2, 7.2, skin_hi)
-	# Mechas pretas espessas sob a aba do boné
-	_g_rect(g, 20, 23, 6, 4, hair_dk)
-	_g_rect(g, 27, 23, 5, 3, hair_md)
-	_g_rect(g, 34, 23, 9, 4, hair_dk)
-	# Olhos grandes expressivos, bochechas rosadas, sorriso alegre
-	_g_rect(g, 23, 27, 5, 1, line)
-	_g_rect(g, 36, 27, 5, 1, line)
-	_g_rect(g, 24, 29, 4, 3, Color("#FAF6F0"))
-	_g_rect(g, 36, 29, 4, 3, Color("#FAF6F0"))
-	_g_rect(g, 25, 29, 3, 3, Color("#1E120C"))
-	_g_rect(g, 36, 29, 3, 3, Color("#1E120C"))
-	_g_rect(g, 25, 29, 1, 1, Color.WHITE)
-	_g_rect(g, 36, 29, 1, 1, Color.WHITE)
-	_g_rect(g, 23, 33, 3, 2, Color("#CC7E66"))
-	_g_rect(g, 38, 33, 3, 2, Color("#CC7E66"))
-	_g_rect(g, 31, 33, 2, 2, skin_sh)
-	_g_rect(g, 28, 37, 8, 1, line)
-	_g_rect(g, 27, 36, 1, 1, line)
-	_g_rect(g, 36, 36, 1, 1, line)
+	for y in range(53, 60):
+		for x in range(37, 59):
+			var col := sk_base
+			if x <= 39 or x >= 56 or y >= 59:
+				col = sk_mid
+			out.set_pixel(x, y, col)
+	for x in range(43, 53):
+		out.set_pixel(x, 56, ink if (x >= 45 and x <= 50) else sk_deep)
+	out.set_pixel(42, 55, sk_deep)
+	out.set_pixel(53, 55, sk_deep)
+	for x in range(45, 51):
+		out.set_pixel(x, 57, sk_hi)
+		out.set_pixel(x, 58, sk_sh)
+	out.set_pixel(37, 51, sk_deep)
 
-	return _fit_bottom_centered_96(_g_outline(g, line), 86)
+	var sc_hi := Color("#F2ECE0")
+	var sc_base := Color("#DDD4C2")
+	var sc_mid := Color("#BEB29C")
+	var sc_sh := Color("#968972")
+	# Smooth top headscarf crown & seal upper silhouette contour cleanly
+	for y in range(10, 14):
+		for x in range(42, 54):
+			if out.get_pixel(x, y).a < 0.5:
+				out.set_pixel(x, y, ink if y == 10 else (sc_hi if x < 48 else sc_base))
 
+	for y in range(8, 34):
+		for x in range(21, 75):
+			var cur := out.get_pixel(x, y)
+			if cur.a < 0.5:
+				continue
+			var lum := cur.r * 0.299 + cur.g * 0.587 + cur.b * 0.114
+			if lum < 0.07:
+				continue
+			var is_skin := (cur.r > cur.b + 0.13) and (y >= 22)
+			var in_scarf_zone := (y <= 23) or (y <= 33 and (x <= 28 or x >= 67))
+			if in_scarf_zone and (not is_skin or y <= 22):
+				var col := sc_base
+				if y == 23 and x >= 27 and x <= 68:
+					col = ink
+				elif y == 22 and x >= 27 and x <= 68:
+					col = sc_sh
+				elif lum < 0.24:
+					col = sc_sh
+				elif lum < 0.36:
+					col = sc_mid
+				elif lum < 0.48:
+					col = sc_base
+				else:
+					col = sc_hi
+				if y == 18 and (x in [36, 37, 47, 48, 58, 59]):
+					col = Color("#C84638")
+				out.set_pixel(x, y, col)
 
-func _compose_vulto_bosque_96() -> Image:
-	var g := _new_grid64()
-	var ash_dk := Color("#101116")
-	var ash_md := Color("#23242E")
-	var ash_hi := Color("#464858")
-	var helm_dk := Color("#1A1C24")
-	var helm_md := Color("#333644")
-	var ember_out := Color("#EA5A10")
-	var ember_hi := Color("#FFC25C")
-	var glow_eye := Color("#FFF4B8")
-	var line := Color("#040407")
+	# Ensure crisp 1px dark outline along upper contour of headscarf
+	for x in range(20, 76):
+		for y in range(8, 24):
+			if out.get_pixel(x, y).a > 0.5:
+				if out.get_pixel(x, y - 1).a < 0.5:
+					out.set_pixel(x, y, ink)
+				break
 
-	# Capacete BFP carbonizado e trincado
-	_g_ellipse(g, 32, 16, 15.2, 11.2, helm_dk)
-	_g_ellipse(g, 31, 14, 12.2, 8.2, helm_md)
-	_g_rect(g, 15, 21, 34, 4, helm_dk)
-	_g_rect(g, 17, 21, 30, 2, ash_hi)
-	_g_rect(g, 34, 7, 2, 12, ember_out)
-	_g_rect(g, 35, 10, 2, 6, ember_hi)
+	# Delicate curved silver braid behind left earlobe resting over left collarbone (y=53..79)
+	for y in range(53, 80):
+		var t := float(y - 53) / 26.0
+		var cx_b := 26.0 + sin(t * PI * 0.65) * 3.5
+		var hw := lerpf(2.2, 1.3, t)
+		var xl := int(round(cx_b - hw))
+		var xr := int(round(cx_b + hw))
+		for x in range(xl, xr + 1):
+			if x == xl or x == xr or y == 79:
+				out.set_pixel(x, y, ink)
+			else:
+				var seg := ((y + x) % 4)
+				if seg == 0:
+					out.set_pixel(x, y, Color("#626A7C"))
+				elif float(x) < cx_b:
+					out.set_pixel(x, y, Color("#EEF2FA") if seg == 1 else Color("#C8D0E0"))
+				else:
+					out.set_pixel(x, y, Color("#9EA6B8") if seg == 1 else Color("#767E91"))
 
-	# Capote rasgado de bombeiro com dobras e faixa queimada
-	_g_ellipse(g, 32, 57, 26.8, 14.0, ash_dk)
-	_g_ellipse(g, 32, 55, 23.2, 12.0, ash_md)
-	_g_rect(g, 18, 46, 28, 18, ash_dk)
-	_g_rect(g, 21, 47, 5, 16, ash_hi)
-	_g_rect(g, 38, 47, 5, 16, ash_hi)
-	_g_rect(g, 13, 54, 38, 4, Color("#6E3B18"))
-	_g_rect(g, 17, 55, 30, 2, ember_out)
-	_g_rect(g, 26, 40, 12, 14, ash_dk)
+	var leaf_pts := [
+		Vector2i(33, 76), Vector2i(34, 76), Vector2i(32, 77), Vector2i(33, 77), Vector2i(34, 77),
+		Vector2i(35, 78), Vector2i(36, 78), Vector2i(33, 79), Vector2i(34, 79), Vector2i(32, 80)
+	]
+	for lp in leaf_pts:
+		out.set_pixel(lp.x, lp.y, Color("#78C268") if (lp.x + lp.y) % 2 == 0 else Color("#3E7834"))
 
-	# Rosto esqueletizado na fuligem + olhos de brasa
-	_g_ellipse(g, 32, 31, 11.6, 11.6, ash_dk)
-	_g_ellipse(g, 32, 29, 9.6, 8.6, ash_md)
-	_g_rect(g, 22, 28, 6, 4, line)
-	_g_rect(g, 36, 28, 6, 4, line)
-	_g_rect(g, 24, 29, 3, 2, ember_out)
-	_g_rect(g, 37, 29, 3, 2, ember_out)
-	_g_rect(g, 25, 29, 1, 1, glow_eye)
-	_g_rect(g, 38, 29, 1, 1, glow_eye)
-	_g_rect(g, 31, 31, 2, 3, line)
-	_g_rect(g, 28, 36, 8, 2, line)
-	_g_rect(g, 13, 14, 3, 7, ash_hi)
-	_g_rect(g, 48, 12, 3, 8, ash_hi)
-
-	return _fit_bottom_centered_96(_g_outline(g, line), 92)
-
-
-func _compose_vhs_radio_96() -> Image:
-	var g := _new_grid64()
-	var body_dk := Color("#171C24")
-	var body_md := Color("#2B3442")
-	var body_hi := Color("#4C5A6E")
-	var screen_dk := Color("#0B2A30")
-	var screen_glow := Color("#4ED8E0")
-	var led_amber := Color("#FFAA30")
-	var knob := Color("#3E4654")
-	var line := Color("#06080C")
-
-	# Antena helicoidal à esquerda
-	_g_rect(g, 19, 4, 4, 22, body_dk)
-	_g_rect(g, 20, 4, 2, 20, body_md)
-	for ry in range(6, 22, 3):
-		_g_rect(g, 19, ry, 4, 1, body_hi)
-	# Botões rotativos no topo
-	_g_rect(g, 32, 16, 6, 6, knob)
-	_g_rect(g, 41, 17, 5, 5, knob)
-
-	# Corpo principal do transceptor VHF BFP
-	_g_rect(g, 16, 21, 32, 41, body_dk)
-	_g_rect(g, 18, 22, 28, 39, body_md)
-	_g_rect(g, 18, 22, 28, 2, body_hi)
-	# Visor LCD cyan iluminado + ondas de frequência
-	_g_rect(g, 21, 26, 22, 11, screen_dk)
-	_g_rect(g, 23, 30, 2, 3, screen_glow)
-	_g_rect(g, 26, 28, 2, 7, screen_glow)
-	_g_rect(g, 29, 29, 2, 5, screen_glow)
-	_g_rect(g, 32, 27, 2, 9, screen_glow)
-	_g_rect(g, 35, 30, 2, 4, screen_glow)
-	_g_rect(g, 38, 31, 3, 2, screen_glow)
-	# LED TX âmbar
-	_g_rect(g, 41, 24, 2, 2, led_amber)
-	# Grade de alto-falante
-	for sy in range(41, 55, 3):
-		_g_rect(g, 21, sy, 22, 2, line)
-	# Etiqueta amarela BFP na base
-	_g_rect(g, 23, 56, 18, 3, Color("#D69E2E"))
-
-	return _fit_bottom_centered_96(_g_outline(g, line), 88)
-
-
-func _build_contact_sheet(
-	normal_busts: Dictionary,
-	distorted_busts: Dictionary,
-	huwag_casual: Dictionary,
-	huwag_bfp: Dictionary
-) -> void:
-	# Prancha comparativa: fila 1-2 = normal sobre xadrez + normal sobre #000000 Omori;
-	# fila 3 = distorted sobre #000000; fila 4 = huwag expressões sobre #000000.
-	var cols := 10
-	var rows := 5
-	var sheet := Image.create(cols * TARGET_SIZE, rows * TARGET_SIZE, false, Image.FORMAT_RGBA8)
-	var keys := normal_busts.keys()
-
-	for r in range(rows):
-		for c in range(cols):
-			var ox := c * TARGET_SIZE
-			var oy := r * TARGET_SIZE
-			var use_checker := (r == 0)
-			for py in range(TARGET_SIZE):
-				for px in range(TARGET_SIZE):
-					var bg_col := Color(0.0, 0.0, 0.0, 1.0)
-					if use_checker:
-						var chk := ((int(px / 8) + int(py / 8)) % 2) == 0
-						bg_col = Color("#464D58") if chk else Color("#303640")
-					sheet.set_pixel(ox + px, oy + py, bg_col)
-
-	# Row 0 & 1: 15 normal NPCs/Entities sobre xadrez e preto (primeiros 10 em r=0, próximos 5 + 5 Huwag BFP/Casual em r=1)
-	for i in range(mini(10, keys.size())):
-		_blit_alpha(sheet, normal_busts[keys[i]], i * TARGET_SIZE, 0)
-	for i in range(10, keys.size()):
-		_blit_alpha(sheet, normal_busts[keys[i]], (i - 10) * TARGET_SIZE, TARGET_SIZE)
-	_blit_alpha(sheet, huwag_casual["neutral"], 5 * TARGET_SIZE, TARGET_SIZE)
-	_blit_alpha(sheet, huwag_bfp["neutral"], 6 * TARGET_SIZE, TARGET_SIZE)
-	_blit_alpha(sheet, huwag_casual["worried"], 7 * TARGET_SIZE, TARGET_SIZE)
-	_blit_alpha(sheet, huwag_casual["angry"], 8 * TARGET_SIZE, TARGET_SIZE)
-	_blit_alpha(sheet, huwag_casual["distorted"], 9 * TARGET_SIZE, TARGET_SIZE)
-
-	# Row 2 & 3: Todas as 15 variantes distorcidas surreais + Huwag expressões restantes
-	for i in range(mini(10, keys.size())):
-		_blit_alpha(sheet, distorted_busts[keys[i]], i * TARGET_SIZE, 2 * TARGET_SIZE)
-	for i in range(10, keys.size()):
-		_blit_alpha(sheet, distorted_busts[keys[i]], (i - 10) * TARGET_SIZE, 3 * TARGET_SIZE)
-	var rem_exprs := ["tired", "surprised", "scared", "uneasy_smile", "unfiltered"]
-	for i in range(rem_exprs.size()):
-		_blit_alpha(sheet, huwag_bfp[rem_exprs[i]], (5 + i) * TARGET_SIZE, 3 * TARGET_SIZE)
-
-	# Row 4: Normal sobre fundo branco #F0F0F0 nos primeiros 10 para denunciar qualquer contorno falho
-	for x in range(cols * TARGET_SIZE):
-		for y in range(4 * TARGET_SIZE, 5 * TARGET_SIZE):
-			sheet.set_pixel(x, y, Color("#EAECEF"))
-	for i in range(mini(10, keys.size())):
-		_blit_alpha(sheet, normal_busts[keys[i]], i * TARGET_SIZE, 4 * TARGET_SIZE)
-
-	sheet.save_png(SCRATCH_SHEET)
-	print("  [ContactSheet] Prancha visual salva em %s" % SCRATCH_SHEET)
+	_keep_largest_alpha_island(out, 48, 48)
+	return _clean_border_outline(out)
 
 
-func _blit_alpha(dst: Image, src: Image, ox: int, oy: int) -> void:
-	for y in range(src.get_height()):
-		for x in range(src.get_width()):
-			var c := src.get_pixel(x, y)
-			if c.a > 0.5:
-				dst.set_pixel(ox + x, oy + y, c)
+func _build_16bit_toby() -> Image:
+	var santos := _load_source_png("fnaf_bombeiro_santos.png")
+	var ben := _load_source_png("fnaf_kuya_ben.png")
+	var out := Image.create(96, 96, false, Image.FORMAT_RGBA8)
+	out.fill(Color(0, 0, 0, 0))
+	var ink := Color("#050408")
+	var sk_hi := Color("#D8A274")
+	var sk_base := Color("#BD8356")
+	var sk_sh := Color("#915C38")
+	var sk_deep := Color("#5E361E")
+
+	# 1. Clean 16-bit neck (y=62..78, x=39..56) drawn first so the chin sits cleanly on top of it
+	for y in range(62, 79):
+		for x in range(39, 57):
+			if x == 39 or x == 56:
+				out.set_pixel(x, y, ink)
+			else:
+				var dx := float(x) - 47.5
+				var chin_sh_y := 67.5 - absf(dx) * 0.22
+				if float(y) <= chin_sh_y:
+					out.set_pixel(x, y, sk_deep if float(y) <= chin_sh_y - 1.2 else sk_sh)
+				elif dx > 3.5:
+					out.set_pixel(x, y, sk_sh)
+				else:
+					out.set_pixel(x, y, sk_base)
+
+	# 2. Youthful crew-neck golden-yellow t-shirt with navy collar ring, chest stripe & olive backpack straps (y=73..95)
+	for y in range(73, 96):
+		var prog := float(y - 73) / 22.0
+		var hw := int(round(lerpf(11.0, 35.0, pow(prog, 0.72))))
+		var xl := 47 - hw
+		var xr := 48 + hw
+		for x in range(xl, xr + 1):
+			# Keep inner neck opening at y <= 78
+			var neck_half := maxi(0, 9 - (y - 72) * 2)
+			if y <= 77 and absi(x - 47) < neck_half:
+				continue
+			if x == xl or x == xr or (y == 73 and absi(x - 47) >= neck_half):
+				out.set_pixel(x, y, ink)
+				continue
+			# Olive-green backpack straps (x=21..26 and x=69..74, y >= 76)
+			var on_strap := (y >= 76) and ((x >= 21 and x <= 26) or (x >= 69 and x <= 74))
+			if on_strap:
+				if x in [21, 26, 69, 74] or y == 76:
+					out.set_pixel(x, y, ink)
+				elif y in [85, 86]:
+					out.set_pixel(x, y, Color("#AEB8C4"))
+				else:
+					out.set_pixel(x, y, Color("#4A7D52") if (x in [22, 23, 70, 71]) else Color("#2E5436"))
+				continue
+			# Navy crew-neck collar ring (2px around neck opening) or horizontal chest stripe (y=87..89)
+			var dist_neck := absi(x - 47) - neck_half
+			var on_collar_ring := (y <= 80 and dist_neck >= 0 and dist_neck <= 3 and absi(x - 47) <= 12)
+			var on_chest_stripe := (y >= 87 and y <= 89)
+			if on_collar_ring or on_chest_stripe:
+				if on_collar_ring and dist_neck == 3:
+					out.set_pixel(x, y, ink)
+				elif y == 87 or y == 89:
+					out.set_pixel(x, y, Color("#141E33"))
+				else:
+					out.set_pixel(x, y, Color("#243659") if x < 48 else Color("#18243D"))
+			else:
+				# 16-bit golden-yellow t-shirt with shoulder highlights and sleeve fold shadows
+				var dx := float(x) - 47.5
+				var col := Color("#DB9F20")
+				if dx < -6.0 and y < 85:
+					col = Color("#F5C238")
+				elif dx > 10.0 or (absi(int(dx)) in [14, 15] and y >= 83):
+					col = Color("#8A5E0B")
+				elif dx > 3.0 or ((x + y) % 5 == 0 and dx > -4.0):
+					col = Color("#B58014")
+				out.set_pixel(x, y, col)
+
+	# 3. Copy Santos's 16-bit youthful face down to his actual chin outline (y=24..64 -> sy=24..66)
+	for y in range(24, 65):
+		var sy := y if y <= 46 else (y + 2)
+		for x in range(22, 74):
+			var sx := int(round(47.5 + (float(x) - 47.5) * 1.04))
+			var sc := santos.get_pixel(sx, sy)
+			if sc.a < 0.5:
+				continue
+			# Exclude Santos's neck & shirt pixels outside the chin oval on rows y=58..64
+			if y >= 58:
+				var max_chin_hw := lerpf(13.0, 5.5, float(y - 58) / 6.0)
+				if absf(float(x) - 47.5) > max_chin_hw:
+					continue
+			out.set_pixel(x, y, sc)
+
+	for y in range(35, 39):
+		for x in range(42, 54):
+			out.set_pixel(x, y, sk_base if y < 38 else sk_sh)
+	for x in range(34, 42):
+		out.set_pixel(x, 34, ink)
+		out.set_pixel(x, 35, ink if x <= 36 else sk_base)
+		out.set_pixel(x, 36, sk_base)
+	for x in range(54, 62):
+		out.set_pixel(x, 34, ink)
+		out.set_pixel(x, 35, ink if x >= 59 else sk_base)
+		out.set_pixel(x, 36, sk_base)
+	for side in [0, 1]:
+		var bx := 33 if side == 0 else 53
+		for x in range(bx + 1, bx + 8):
+			out.set_pixel(x, 38, ink)
+		for y in [39, 40, 41]:
+			out.set_pixel(bx, y, ink)
+			out.set_pixel(bx + 1, y, Color("#EFE8DC"))
+			out.set_pixel(bx + 2, y, Color("#EFE8DC") if y < 41 else sk_sh)
+			out.set_pixel(bx + 3, y, Color("#4A2A18"))
+			out.set_pixel(bx + 4, y, ink)
+			out.set_pixel(bx + 5, y, ink)
+			out.set_pixel(bx + 6, y, Color("#4A2A18"))
+			out.set_pixel(bx + 7, y, Color("#EFE8DC"))
+			out.set_pixel(bx + 8, y, ink)
+		out.set_pixel(bx + 3, 39, Color("#FFFFFF"))
+		out.set_pixel(bx + 4, 39, Color("#FFFFFF"))
+	for y in range(52, 59):
+		for x in range(40, 56):
+			out.set_pixel(x, y, sk_base)
+	for x in range(43, 53):
+		out.set_pixel(x, 55, ink if (x >= 45 and x <= 50) else sk_deep)
+	out.set_pixel(42, 54, sk_deep)
+	out.set_pixel(53, 54, sk_deep)
+	for x in range(46, 50):
+		out.set_pixel(x, 56, sk_hi)
+		out.set_pixel(x, 57, sk_sh)
+
+	for y in range(6, 33):
+		for x in range(18, 78):
+			var bc := ben.get_pixel(x, y + 1)
+			if bc.a < 0.5:
+				continue
+			var lum := bc.r * 0.299 + bc.g * 0.587 + bc.b * 0.114
+			var is_skin := (y >= 22 and x >= 31 and x <= 64 and bc.r > bc.g + 0.08 and bc.r > bc.b + 0.12)
+			if is_skin:
+				continue
+			if lum < 0.08:
+				out.set_pixel(x, y, ink)
+			elif y <= 26 and (bc.g > bc.b + 0.03 or bc.b > bc.r + 0.05) and lum > 0.16:
+				var cc: Color
+				if lum < 0.23:
+					cc = Color("#63160A")
+				elif lum < 0.33:
+					cc = Color("#942412")
+				elif lum < 0.43:
+					cc = Color("#C4381E")
+				elif lum < 0.53:
+					cc = Color("#E65232")
+				else:
+					cc = Color("#FF7654")
+				out.set_pixel(x, y, cc)
+			elif y >= 21:
+				out.set_pixel(x, y, Color("#151822") if lum < 0.15 else Color("#272C3D"))
+
+	return _clean_border_outline(out)
+
+
+func _build_16bit_vulto_bosque() -> Image:
+	var ato := _load_source_png("fnaf_bombeiro_ato.png")
+	var out := Image.create(96, 96, false, Image.FORMAT_RGBA8)
+	out.fill(Color(0, 0, 0, 0))
+	var ink := Color("#030306")
+
+	for y in range(26, 96):
+		for x in range(96):
+			var ac := ato.get_pixel(x, y)
+			if ac.a < 0.5:
+				continue
+			var lum := ac.r * 0.299 + ac.g * 0.587 + ac.b * 0.114
+			if lum < 0.06:
+				out.set_pixel(x, y, ink)
+				continue
+			var in_neck_v := (y <= 84 and x >= 37 and x <= 58) and not (y >= 78 and (x <= 41 or x >= 54) and ac.r > 0.70)
+			var is_refl := (y >= 75) and not in_neck_v and (ac.r > 0.65 and ac.g > 0.35 and ac.b < 0.35)
+			var is_skin := in_neck_v or ((y <= 70 and x >= 24 and x <= 71) and (ac.r > ac.b + 0.12))
+			if is_skin:
+				if y <= 43:
+					out.set_pixel(x, y, Color("#0A0B10") if lum < 0.48 else Color("#141722"))
+				elif lum < 0.34:
+					out.set_pixel(x, y, Color("#0E1017"))
+				elif lum < 0.48:
+					out.set_pixel(x, y, Color("#1A1D29"))
+				elif lum < 0.60:
+					out.set_pixel(x, y, Color("#272B3B"))
+				else:
+					out.set_pixel(x, y, Color("#363B4F"))
+			elif is_refl:
+				if lum > 0.62:
+					out.set_pixel(x, y, Color("#E86A1E"))
+				elif lum < 0.42:
+					out.set_pixel(x, y, Color("#AD3E10"))
+				else:
+					out.set_pixel(x, y, Color("#662008"))
+			else:
+				if lum < 0.14:
+					out.set_pixel(x, y, Color("#0B0C11"))
+				elif lum < 0.22:
+					out.set_pixel(x, y, Color("#151721"))
+				elif lum < 0.32:
+					out.set_pixel(x, y, Color("#222533"))
+				else:
+					out.set_pixel(x, y, Color("#33384A"))
+
+	for side in [0, 1]:
+		var bx := 33 if side == 0 else 54
+		for y in range(38, 42):
+			for x in range(bx, bx + 9):
+				out.set_pixel(x, y, ink)
+		for y in [39, 40]:
+			out.set_pixel(bx + 2, y, Color("#8F240A"))
+			out.set_pixel(bx + 3, y, Color("#E85C14"))
+			out.set_pixel(bx + 4, y, Color("#FFB838"))
+			out.set_pixel(bx + 5, y, Color("#E85C14"))
+			out.set_pixel(bx + 6, y, Color("#8F240A"))
+		out.set_pixel(bx + 4, 39, Color("#FFF4C2"))
+
+	for x in range(43, 53):
+		out.set_pixel(x, 56, ink)
+		out.set_pixel(x, 57, Color("#24120C") if (x % 2 == 0) else ink)
+
+	for y in range(5, 34):
+		var cy := 21.0
+		var rx := 25.0 if y < 25 else 29.0
+		var ry := 16.0
+		for x in range(16, 80):
+			var dx := (float(x) - 47.5) / rx
+			var dy := (float(y) - cy) / ry
+			var d2 := dx * dx + dy * dy
+			var in_dome := (y <= 26 and d2 <= 1.0)
+			var in_visor_brim := (y >= 24 and y <= 30 and absf(float(x) - 47.5) <= 27.5 - float(absi(y - 27)) * 1.8)
+			var in_ear_flaps := (y >= 28 and y <= 42 and ((x >= 19 and x <= 25) or (x >= 70 and x <= 76)))
+			if in_dome or in_visor_brim or in_ear_flaps:
+				var col := Color("#1F222E")
+				if in_visor_brim:
+					if y == 24 or y == 30 or absf(float(x) - 47.5) >= 26.0 - float(absi(y - 27)) * 1.8:
+						col = ink
+					elif y <= 26:
+						col = Color("#34394C")
+					else:
+						col = Color("#11131C")
+				elif in_ear_flaps:
+					if x in [19, 25, 70, 76] or y == 42:
+						col = ink
+					else:
+						col = Color("#161822") if (x in [20, 75]) else Color("#242836")
+				else:
+					if d2 > 0.88:
+						col = ink
+					elif d2 > 0.72 or dx > 0.42:
+						col = Color("#13151E")
+					elif dx < -0.22 and dy < -0.15:
+						col = Color("#3C4256")
+					elif absf(dx) < 0.14:
+						col = Color("#2C3142")
+				out.set_pixel(x, y, col)
+
+	var crack_pts := [
+		Vector2i(50, 9), Vector2i(50, 10), Vector2i(51, 11), Vector2i(51, 12), Vector2i(52, 13),
+		Vector2i(51, 14), Vector2i(51, 15), Vector2i(52, 16), Vector2i(53, 17), Vector2i(52, 18),
+		Vector2i(52, 19), Vector2i(51, 20), Vector2i(51, 21), Vector2i(52, 22), Vector2i(52, 23),
+		Vector2i(51, 24), Vector2i(51, 25), Vector2i(50, 26), Vector2i(50, 27)
+	]
+	for cp in crack_pts:
+		out.set_pixel(cp.x - 1, cp.y, ink)
+		out.set_pixel(cp.x, cp.y, Color("#FF731E") if (cp.y % 3 != 0) else Color("#FFC84D"))
+		out.set_pixel(cp.x + 1, cp.y, Color("#9E2B0C"))
+
+	return _clean_border_outline(out)
+
+
+func _build_16bit_vhs_radio() -> Image:
+	var out := Image.create(96, 96, false, Image.FORMAT_RGBA8)
+	out.fill(Color(0, 0, 0, 0))
+	var ink := Color("#05060A")
+	var c_dk := Color("#131720")
+	var c_sh := Color("#1E2430")
+	var c_md := Color("#2D3646")
+	var c_hi := Color("#435066")
+	var c_spec := Color("#637491")
+
+	for y in range(4, 27):
+		var hw := 3 if y >= 7 else 2
+		var cx := 26
+		for x in range(cx - hw, cx + hw + 1):
+			if x == cx - hw or x == cx + hw or y == 4:
+				out.set_pixel(x, y, ink)
+			elif y >= 24:
+				out.set_pixel(x, y, Color("#A88C4A") if x < cx else Color("#6E5828"))
+			else:
+				var rib := (y % 3 == 0)
+				if x == cx - hw + 1:
+					out.set_pixel(x, y, c_spec if rib else c_hi)
+				elif x == cx:
+					out.set_pixel(x, y, c_hi if rib else c_md)
+				else:
+					out.set_pixel(x, y, c_sh if rib else c_dk)
+
+	for k in [[46, 54, 18], [58, 66, 19]]:
+		var x0: int = k[0]
+		var x1: int = k[1]
+		var y0: int = k[2]
+		for y in range(y0, 27):
+			for x in range(x0, x1 + 1):
+				if x == x0 or x == x1 or y == y0:
+					out.set_pixel(x, y, ink)
+				else:
+					var knurl := (x % 2 == 0)
+					if x <= x0 + 2:
+						out.set_pixel(x, y, c_spec if knurl else c_hi)
+					elif x >= x1 - 2:
+						out.set_pixel(x, y, c_dk)
+					else:
+						out.set_pixel(x, y, c_hi if knurl else c_md)
+	for y in range(22, 27):
+		for x in range(35, 42):
+			if x == 35 or x == 41 or y == 22:
+				out.set_pixel(x, y, ink)
+			else:
+				out.set_pixel(x, y, Color("#F06A24") if y == 23 else Color("#B84312"))
+
+	for y in range(26, 94):
+		var inset := 2 if (y == 26 or y == 93) else (1 if (y == 27 or y == 92) else 0)
+		var xl := 19 + inset
+		var xr := 72 - inset
+		for x in range(xl, xr + 1):
+			if x == xl or x == xr or y == 26 or y == 93:
+				out.set_pixel(x, y, ink)
+			elif y == 27 or x == xl + 1:
+				out.set_pixel(x, y, c_spec if (y < 55 and x < 55) else c_hi)
+			elif y == 92 or x == xr - 1:
+				out.set_pixel(x, y, c_dk)
+			elif x <= xl + 3:
+				out.set_pixel(x, y, c_hi if (y % 4 != 0) else c_sh)
+			elif x >= xr - 3:
+				out.set_pixel(x, y, c_sh if (y % 4 != 0) else c_dk)
+			else:
+				var dither := ((x + y) % 2 == 0)
+				if x < 42 and y < 58:
+					out.set_pixel(x, y, c_md if dither else c_hi)
+				elif x > 55 or y > 78:
+					out.set_pixel(x, y, c_sh if dither else c_md)
+				else:
+					out.set_pixel(x, y, c_md)
+
+	for y in range(36, 55):
+		for x in range(15, 20):
+			if x == 15 or y == 36 or y == 54:
+				out.set_pixel(x, y, ink)
+			elif x == 16:
+				out.set_pixel(x, y, Color("#FF8838") if (y % 3 != 0) else Color("#C44E14"))
+			else:
+				out.set_pixel(x, y, Color("#D95B1C") if (y % 3 != 0) else Color("#8F330B"))
+
+	for y in range(29, 32):
+		for x in range(62, 65):
+			out.set_pixel(x, y, Color("#52FF7E") if (x == 63 and y == 30) else Color("#186E32"))
+
+	for y in range(33, 54):
+		for x in range(25, 67):
+			if x == 25 or x == 66 or y == 33 or y == 53:
+				out.set_pixel(x, y, ink)
+			elif x == 26 or y == 34:
+				out.set_pixel(x, y, Color("#061418"))
+			elif x == 65 or y == 52:
+				out.set_pixel(x, y, Color("#245C66"))
+			else:
+				var scan := (y % 2 == 0)
+				out.set_pixel(x, y, Color("#0C282E") if scan else Color("#11363D"))
+
+	for b in range(4):
+		var bx := 29 + b * 3
+		for by in range(39 - b, 40):
+			out.set_pixel(bx, by, Color("#72F2E0"))
+			out.set_pixel(bx + 1, by, Color("#3AB5A6"))
+	for x in range(29, 63):
+		var amp := 5.5 * sin(float(x - 29) * 0.55) * cos(float(x - 29) * 0.23)
+		var wy := clampi(int(round(45.0 + amp)), 37, 50)
+		for y in range(mini(45, wy), maxi(45, wy) + 1):
+			out.set_pixel(x, y, Color("#B8FFF4") if y == wy else Color("#40C9B8"))
+
+	for y in range(57, 83):
+		for x in range(25, 67):
+			var dx := float(x) - 45.5
+			var dy := float(y) - 70.0
+			var in_cone := (dx * dx + dy * dy <= 120.0)
+			if x == 25 or x == 66 or y == 57 or y == 82:
+				out.set_pixel(x, y, ink)
+			elif (y - 57) % 3 == 1 and x >= 28 and x <= 63:
+				if x in [39, 52]:
+					out.set_pixel(x, y, c_md)
+				else:
+					out.set_pixel(x, y, ink if in_cone else c_dk)
+			elif (y - 57) % 3 == 2 and x >= 28 and x <= 63:
+				out.set_pixel(x, y, c_hi if not in_cone else c_md)
+			else:
+				out.set_pixel(x, y, c_sh if in_cone else c_md)
+
+	for y in range(85, 90):
+		for x in range(31, 61):
+			if x == 31 or x == 60 or y == 85 or y == 89:
+				out.set_pixel(x, y, ink)
+			elif y == 87 and (x in [35, 36, 38, 40, 41, 45, 47, 48, 51, 53, 55, 56]):
+				out.set_pixel(x, y, Color("#2B200E"))
+			else:
+				out.set_pixel(x, y, Color("#E0B244") if y == 86 else Color("#B58928"))
+
+	for y in range(72, 95):
+		var t := float(y - 72) / 22.0
+		var cx_c := int(round(73.0 + sin(t * PI * 3.5) * 2.2 + t * 4.5))
+		for dx in range(-2, 3):
+			var px := cx_c + dx
+			if dx == -2 or dx == 2 or y == 72 or y == 94:
+				out.set_pixel(px, y, ink)
+			elif dx == -1:
+				out.set_pixel(px, y, c_hi)
+			elif dx == 0:
+				out.set_pixel(px, y, c_md)
+			else:
+				out.set_pixel(px, y, c_dk)
+
+	return out
+
+
+# ==============================================================================
+# 4. CORRUPTED MODE 16-BIT TRANSFORMATION (HUWAG + ALL 15 NPCS/ENTITIES)
+# ==============================================================================
+
+func _is_skin_color(c: Color, x: int, y: int, id: String) -> bool:
+	if y < 18 or y > 84 or x < 20 or x > 76:
+		return false
+	var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+	if id == "santelmo":
+		return (y >= 26 and x >= 31 and x <= 64) and (lum > 0.34 and c.b >= c.r - 0.05)
+	if id == "criatura_lagoa":
+		return (c.b > c.r + 0.08 and lum > 0.22)
+	if id == "huwag":
+		if y < 25:
+			return false
+		if c.h >= 0.094 or (c.g - c.b) > 0.235:
+			return false
+		return (c.r > c.b + 0.12) and (c.r > c.g + 0.05)
+	if id == "toby":
+		if y <= 26:
+			return false
+		if y >= 67 and (x < 38 or x > 57 or y > 79):
+			return false
+		if c.h >= 0.096 or (c.g - c.b) > 0.35:
+			return false
+		return (c.r > c.b + 0.12) and (c.r > c.g + 0.04)
+	if id == "cap_reyes" or id == "kuya_ben" or id == "feirante" or id == "lola_rosa":
+		if y <= 23:
+			return false
+	return (c.r > c.b + 0.11) and (c.r > c.g + 0.04) and (c.h >= 0.038 and c.h <= 0.095)
+
+
+func _build_16bit_corrupted_huwag(normal_huwag: Image) -> Image:
+	var out := normal_huwag.duplicate() as Image
+	_erase_huwag_mouth(out)
+	_apply_cadaverous_palette(out, "huwag")
+	var ink := Color("#050508")
+	var sock_dk := Color("#16171E")
+	var sock_md := Color("#2E303B")
+	var sock_hi := Color("#4A4D5C")
+	var sclera_dead := Color("#8C909C")
+	var pinpoint := Color("#C8CDD8")
+
+	for y in range(38, 46):
+		for x in range(32, 44):
+			var d := absf(float(x) - 37.5) / 5.5 + absf(float(y) - 41.5) / 3.5
+			if d <= 1.25 and out.get_pixel(x, y).a > 0.5:
+				out.set_pixel(x, y, sock_dk if d < 0.75 else (sock_md if d < 1.0 else sock_hi))
+		for x in range(51, 63):
+			var d := absf(float(x) - 56.5) / 5.5 + absf(float(y) - 40.5) / 3.5
+			if d <= 1.25 and out.get_pixel(x, y).a > 0.5:
+				out.set_pixel(x, y, sock_dk if d < 0.75 else (sock_md if d < 1.0 else sock_hi))
+
+	for x in range(34, 42):
+		out.set_pixel(x, 39, ink)
+	for y in [40, 41]:
+		out.set_pixel(33, y, ink)
+		out.set_pixel(34, y, sclera_dead)
+		out.set_pixel(35, y, sock_dk)
+		out.set_pixel(36, y, ink)
+		out.set_pixel(37, y, ink)
+		out.set_pixel(38, y, ink)
+		out.set_pixel(39, y, sock_dk)
+		out.set_pixel(40, y, sclera_dead)
+		out.set_pixel(41, y, ink)
+	out.set_pixel(37, 41, pinpoint)
+
+	for x in range(53, 61):
+		out.set_pixel(x, 38, ink)
+	for y in [39, 40]:
+		out.set_pixel(52, y, ink)
+		out.set_pixel(53, y, sclera_dead)
+		out.set_pixel(54, y, sock_dk)
+		out.set_pixel(55, y, ink)
+		out.set_pixel(56, y, ink)
+		out.set_pixel(57, y, ink)
+		out.set_pixel(58, y, sock_dk)
+		out.set_pixel(59, y, sclera_dead)
+		out.set_pixel(60, y, ink)
+	out.set_pixel(56, 40, pinpoint)
+
+	_paint_corrupted_mouth(out, 48, 57, 0)
+
+	_paint_dark_veins(out, [
+		[Vector2i(33, 44), Vector2i(33, 47), Vector2i(32, 50), Vector2i(34, 53), Vector2i(33, 56)],
+		[Vector2i(33, 49), Vector2i(36, 51), Vector2i(37, 54)],
+		[Vector2i(59, 43), Vector2i(60, 46), Vector2i(59, 49), Vector2i(61, 52), Vector2i(60, 56)],
+		[Vector2i(59, 48), Vector2i(56, 51), Vector2i(55, 53)],
+		[Vector2i(42, 65), Vector2i(43, 69), Vector2i(41, 73), Vector2i(42, 78)],
+		[Vector2i(54, 66), Vector2i(53, 71), Vector2i(55, 76), Vector2i(54, 81)],
+	])
+	return out
+
+
+func _build_16bit_corrupted_npc(normal_img: Image, id: String) -> Image:
+	var out := normal_img.duplicate() as Image
+	if id == "vhs_radio":
+		return _build_16bit_corrupted_radio(out)
+
+	_apply_cadaverous_palette(out, id)
+	var ink := Color("#050508")
+	var sock_dk := Color("#16171E")
+	var sock_md := Color("#2E303B")
+	var sock_hi := Color("#4A4D5C")
+	var sclera_dead := Color("#868A96")
+	var pinpoint := Color("#C6CBD6")
+
+	if id == "vulto_bosque":
+		# Vulto do Bosque corrupted: ash-pale spectral face & cracked helmet so silhouette and deep sockets read clearly against #000000
+		for y in range(28, 84):
+			for x in range(24, 72):
+				var c := out.get_pixel(x, y)
+				if c.a < 0.5:
+					continue
+				var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+				var in_neck_skin := (y >= 67 and x >= 37 and x <= 58)
+				var in_face_oval := (y >= 31 and y <= 67 and x >= 29 and x <= 66)
+				if (in_face_oval or in_neck_skin) and lum > 0.055:
+					if lum > 0.17:
+						out.set_pixel(x, y, Color("#8C909E"))
+					elif lum > 0.10:
+						out.set_pixel(x, y, Color("#606472"))
+					else:
+						out.set_pixel(x, y, Color("#3B3E4A"))
+		for y in range(37, 46):
+			for x in range(31, 43):
+				var d := absf(float(x) - 37.0) / 5.5 + absf(float(y) - 41.0) / 3.8
+				if d <= 1.25 and out.get_pixel(x, y).a > 0.5:
+					out.set_pixel(x, y, sock_dk if d < 0.72 else sock_md)
+			for x in range(52, 64):
+				var d := absf(float(x) - 58.0) / 5.5 + absf(float(y) - 41.0) / 3.8
+				if d <= 1.25 and out.get_pixel(x, y).a > 0.5:
+					out.set_pixel(x, y, sock_dk if d < 0.72 else sock_md)
+		for side in [0, 1]:
+			var bx := 33 if side == 0 else 54
+			for y in range(38, 42):
+				for x in range(bx, bx + 9):
+					out.set_pixel(x, y, ink)
+			out.set_pixel(bx + 4, 40, pinpoint)
+			out.set_pixel(bx + 4, 39, sock_hi)
+		_paint_corrupted_mouth(out, 48, 56, 2)
+		_paint_dark_veins(out, [
+			[Vector2i(33, 45), Vector2i(32, 48), Vector2i(34, 52), Vector2i(33, 56)],
+			[Vector2i(61, 45), Vector2i(62, 49), Vector2i(60, 53), Vector2i(61, 56)],
+			[Vector2i(42, 68), Vector2i(43, 72), Vector2i(41, 76)],
+			[Vector2i(53, 68), Vector2i(52, 72), Vector2i(54, 76)],
+		])
+		return out
+
+	var ey_y := 39
+	var el_x := 33
+	var er_x := 53
+	var m_y := 56
+	if id == "santelmo":
+		ey_y = 40
+		m_y = 57
+	elif id == "criatura_lagoa":
+		ey_y = 39
+		m_y = 55
+	elif id == "toby":
+		m_y = 55
+
+	var ref_skin_base := out.get_pixel(36, 48)
+	var ref_skin_sh := out.get_pixel(36, 48).darkened(0.22)
+	if id != "cap_reyes" and id != "feirante":
+		for y in range(m_y - 2, m_y + 4):
+			for x in range(39, 57):
+				var cur := out.get_pixel(x, y)
+				if cur.a > 0.5:
+					out.set_pixel(x, y, ref_skin_base if (x > 41 and x < 54 and y < m_y + 2) else ref_skin_sh)
+
+	for y in range(ey_y - 2, ey_y + 7):
+		for x in range(el_x - 2, el_x + 11):
+			var d := absf(float(x) - float(el_x + 4)) / 6.0 + absf(float(y) - float(ey_y + 2)) / 4.2
+			if d <= 1.25 and out.get_pixel(x, y).a > 0.5:
+				out.set_pixel(x, y, sock_dk if d < 0.72 else (sock_md if d < 0.98 else sock_hi))
+		for x in range(er_x - 2, er_x + 11):
+			var d := absf(float(x) - float(er_x + 4)) / 6.0 + absf(float(y) - float(ey_y + 2)) / 4.2
+			if d <= 1.25 and out.get_pixel(x, y).a > 0.5:
+				out.set_pixel(x, y, sock_dk if d < 0.72 else (sock_md if d < 0.98 else sock_hi))
+
+	for side in [0, 1]:
+		var bx := el_x if side == 0 else er_x
+		for x in range(bx, bx + 9):
+			out.set_pixel(x, ey_y - 1, ink)
+			out.set_pixel(x, ey_y + 2, sock_dk)
+		for y in [ey_y, ey_y + 1]:
+			out.set_pixel(bx, y, ink)
+			out.set_pixel(bx + 1, y, sclera_dead)
+			out.set_pixel(bx + 2, y, sock_dk)
+			out.set_pixel(bx + 3, y, ink)
+			out.set_pixel(bx + 4, y, ink)
+			out.set_pixel(bx + 5, y, ink)
+			out.set_pixel(bx + 6, y, sock_dk)
+			out.set_pixel(bx + 7, y, sclera_dead)
+			out.set_pixel(bx + 8, y, ink)
+		out.set_pixel(bx + 4, ey_y, pinpoint)
+
+	var m_style := absi(id.hash()) % 3
+	if id in ["cap_reyes", "feirante"]:
+		m_style = 1
+	_paint_corrupted_mouth(out, 48, m_y + 1, m_style)
+
+	var v_chains := [
+		[Vector2i(33, ey_y + 4), Vector2i(32, ey_y + 7), Vector2i(34, ey_y + 10), Vector2i(33, ey_y + 14)],
+		[Vector2i(33, ey_y + 8), Vector2i(36, ey_y + 10), Vector2i(37, ey_y + 12)],
+		[Vector2i(61, ey_y + 4), Vector2i(62, ey_y + 7), Vector2i(60, ey_y + 10), Vector2i(61, ey_y + 14)],
+		[Vector2i(60, ey_y + 9), Vector2i(57, ey_y + 11), Vector2i(56, ey_y + 13)],
+		[Vector2i(42, 65), Vector2i(43, 69), Vector2i(41, 73), Vector2i(42, 77)],
+		[Vector2i(53, 66), Vector2i(52, 70), Vector2i(54, 74), Vector2i(53, 78)],
+	]
+	if m_style == 0:
+		v_chains.append([Vector2i(36, 26), Vector2i(37, 29), Vector2i(35, 32)])
+	elif m_style == 2:
+		v_chains.append([Vector2i(58, 26), Vector2i(57, 29), Vector2i(59, 32)])
+	_paint_dark_veins(out, v_chains)
+
+	return out
+
+
+func _paint_corrupted_mouth(img: Image, cx: int, my: int, style: int) -> void:
+	var ink := Color("#050508")
+	var lip_dk := Color("#252730")
+	var lip_sh := Color("#464956")
+	var lip_hi := Color("#6E7280")
+	if style == 1:
+		for x in range(cx - 4, cx + 4):
+			img.set_pixel(x, my, ink if (x >= cx - 2 and x <= cx + 1) else lip_dk)
+			img.set_pixel(x, my - 1, lip_sh)
+		img.set_pixel(cx - 5, my + 1, lip_dk)
+		img.set_pixel(cx - 4, my + 1, lip_sh)
+		img.set_pixel(cx + 3, my + 1, lip_sh)
+		img.set_pixel(cx + 4, my + 1, lip_dk)
+		for x in range(cx - 2, cx + 2):
+			img.set_pixel(x, my + 1, lip_hi)
+			img.set_pixel(x, my + 2, lip_sh)
+	elif style == 2:
+		for x in range(cx - 3, cx + 3):
+			img.set_pixel(x, my - 1, lip_sh)
+			img.set_pixel(x, my, ink)
+			img.set_pixel(x, my + 1, ink if (x >= cx - 2 and x <= cx + 1) else lip_dk)
+			img.set_pixel(x, my + 2, lip_sh)
+		img.set_pixel(cx - 4, my, lip_dk)
+		img.set_pixel(cx - 4, my + 1, lip_sh)
+		img.set_pixel(cx + 3, my, lip_dk)
+		img.set_pixel(cx + 3, my + 1, lip_sh)
+	else:
+		for x in range(cx - 3, cx + 3):
+			img.set_pixel(x, my - 1, lip_sh)
+			img.set_pixel(x, my, ink)
+		for x in range(cx - 2, cx + 2):
+			img.set_pixel(x, my + 1, ink)
+			img.set_pixel(x, my + 2, lip_sh)
+		img.set_pixel(cx - 4, my + 1, lip_dk)
+		img.set_pixel(cx - 3, my + 1, lip_dk)
+		img.set_pixel(cx + 2, my + 1, lip_dk)
+		img.set_pixel(cx + 3, my + 1, lip_dk)
+
+
+func _build_16bit_corrupted_radio(normal_radio: Image) -> Image:
+	var out := normal_radio.duplicate() as Image
+	_apply_cadaverous_palette(out, "vhs_radio")
+	var ink := Color("#040407")
+	for y in range(35, 52):
+		for x in range(27, 65):
+			var scan := (y % 2 == 0)
+			out.set_pixel(x, y, Color("#101218") if scan else Color("#181B24"))
+	for y in range(38, 49):
+		for x in range(34, 57):
+			var dx := (float(x) - 45.5) / 10.0
+			var dy := (float(y) - 43.0) / 4.2
+			var d := dx * dx + dy * dy
+			if d <= 1.0:
+				if d > 0.78:
+					out.set_pixel(x, y, ink)
+				else:
+					var pd := pow((float(x) - 45.5) / 3.8, 2.0) + pow((float(y) - 43.0) / 3.5, 2.0)
+					if pd <= 0.25:
+						out.set_pixel(x, y, Color("#D4D8E2"))
+					elif pd <= 1.0:
+						out.set_pixel(x, y, ink)
+					else:
+						out.set_pixel(x, y, Color("#8E93A0") if dy > -0.3 else Color("#5E626E"))
+	var crack := [
+		Vector2i(28, 36), Vector2i(31, 38), Vector2i(35, 40), Vector2i(39, 43),
+		Vector2i(52, 44), Vector2i(57, 47), Vector2i(61, 50), Vector2i(56, 39), Vector2i(60, 36)
+	]
+	for p in crack:
+		out.set_pixel(p.x, p.y, ink)
+		out.set_pixel(p.x + 1, p.y, Color("#4A4E5C"))
+	return out
+
+
+func _apply_cadaverous_palette(img: Image, id: String) -> void:
+	var ink := Color("#050508")
+	for y in range(96):
+		for x in range(96):
+			var c := img.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			var lum := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+			if lum < 0.07:
+				img.set_pixel(x, y, ink)
+				continue
+
+			if _is_skin_color(c, x, y, id):
+				var cad: Color
+				if lum > 0.60:
+					cad = Color("#CFD3DA")
+				elif lum > 0.48:
+					cad = Color("#AEB2BC")
+				elif lum > 0.37:
+					cad = Color("#878B96")
+				elif lum > 0.25:
+					cad = Color("#5E616C")
+				else:
+					cad = Color("#383A44")
+				img.set_pixel(x, y, cad)
+			else:
+				var gray := Color(lum * 0.92, lum * 0.94, minf(1.0, lum * 0.99), 1.0)
+				var bleak := c.lerp(gray, 0.74).darkened(0.22)
+				bleak.a = 1.0
+				img.set_pixel(x, y, bleak)
+
+
+func _paint_dark_veins(img: Image, chains: Array) -> void:
+	var v_main := Color("#23252E")
+	var v_sub := Color("#434652")
+	for chain in chains:
+		var pts: Array = chain
+		for i in range(pts.size() - 1):
+			var p0: Vector2i = pts[i]
+			var p1: Vector2i = pts[i + 1]
+			var steps := maxi(absi(p1.x - p0.x), absi(p1.y - p0.y))
+			for s in range(steps + 1):
+				var t := float(s) / float(maxi(1, steps))
+				var px := int(round(lerpf(float(p0.x), float(p1.x), t)))
+				var py := int(round(lerpf(float(p0.y), float(p1.y), t)))
+				if px >= 22 and px <= 73 and py >= 20 and py <= 83:
+					var cur := img.get_pixel(px, py)
+					var lum := cur.r * 0.299 + cur.g * 0.587 + cur.b * 0.114
+					if cur.a > 0.5 and lum > 0.30 and absf(cur.r - cur.b) < 0.12:
+						img.set_pixel(px, py, v_main if i == 0 else v_sub)
+
+
+func _keep_largest_alpha_island(img: Image, seed_x: int, seed_y: int) -> void:
+	var w := img.get_width()
+	var h := img.get_height()
+	var visited := PackedByteArray()
+	visited.resize(w * h)
+	var queue: Array[Vector2i] = [Vector2i(seed_x, seed_y)]
+	visited[seed_y * w + seed_x] = 1
+	var head := 0
+	while head < queue.size():
+		var cur := queue[head]
+		head += 1
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+			var nx: int = cur.x + d.x
+			var ny: int = cur.y + d.y
+			if nx >= 0 and nx < w and ny >= 0 and ny < h:
+				var idx: int = ny * w + nx
+				if visited[idx] == 0 and img.get_pixel(nx, ny).a > 0.5:
+					visited[idx] = 1
+					queue.append(Vector2i(nx, ny))
+	for y in range(h):
+		for x in range(w):
+			if img.get_pixel(x, y).a > 0.0 and visited[y * w + x] == 0:
+				img.set_pixel(x, y, Color(0, 0, 0, 0))
+
+
+# ==============================================================================
+# 5. PREVIEW CONTACT SHEETS FOR VISUAL AUDIT
+# ==============================================================================
+
+func _save_preview_huwag(casual: Dictionary, bfp: Dictionary, out_path: String) -> void:
+	var exprs := ["neutral", "worried", "tired", "surprised", "angry", "scared", "uneasy_smile", "unfiltered", "distorted"]
+	var list: Array[Image] = []
+	for e: String in exprs:
+		list.append(casual[e])
+	for e: String in exprs:
+		list.append(bfp[e])
+	_render_pair_grid(list, 6, out_path)
+
+
+func _save_preview_npcs(map: Dictionary, out_path: String) -> void:
+	var order := [
+		"cap_reyes", "bombeiro_ato", "bombeiro_santos", "enfermeira_maria", "aling_nena",
+		"kuya_ben", "feirante", "mang_carding", "luningning", "lola_rosa",
+		"toby", "vulto_bosque", "santelmo", "criatura_lagoa", "vhs_radio"
+	]
+	var list: Array[Image] = []
+	for k: String in order:
+		list.append(map[k])
+	_render_pair_grid(list, 5, out_path)
+
+
+func _save_preview_5_rebuilt_3x(norm: Dictionary, dist: Dictionary, out_path: String) -> void:
+	var keys := ["luningning", "lola_rosa", "toby", "vulto_bosque", "vhs_radio"]
+	var scale := 3
+	var cw := 96 * scale + 8
+	var ch := 96 * scale + 8
+	var sheet := Image.create(5 * cw, 2 * ch, false, Image.FORMAT_RGBA8)
+	sheet.fill(Color("#121318"))
+	for i in range(keys.size()):
+		var k: String = keys[i]
+		for row: int in [0, 1]:
+			var img: Image = norm[k] if row == 0 else dist[k]
+			var ox: int = i * cw + 4
+			var oy: int = row * ch + 4
+			for y in range(96):
+				for x in range(96):
+					var c := img.get_pixel(x, y)
+					var dc := c if c.a > 0.5 else Color(0, 0, 0, 1)
+					for dy in range(scale):
+						for dx in range(scale):
+							sheet.set_pixel(ox + x * scale + dx, oy + y * scale + dy, dc)
+	sheet.save_png(out_path)
+
+
+func _render_pair_grid(list: Array[Image], cols: int, out_path: String) -> void:
+	var rows := int(ceil(float(list.size()) / float(cols)))
+	var cw := 204
+	var ch := 106
+	var sheet := Image.create(cols * cw, rows * ch, false, Image.FORMAT_RGBA8)
+	sheet.fill(Color("#181A20"))
+	for i in range(list.size()):
+		var img := list[i]
+		var ox := (i % cols) * cw + 4
+		var oy := int(i / cols) * ch + 5
+		for y in range(96):
+			for x in range(96):
+				var chk := ((int(x / 8) + int(y / 8)) % 2) == 0
+				var bg := Color("#C832C8") if chk else Color("#641964")
+				var c := img.get_pixel(x, y)
+				sheet.set_pixel(ox + x, oy + y, c if c.a > 0.5 else bg)
+				sheet.set_pixel(ox + 100 + x, oy + y, c if c.a > 0.5 else Color(0, 0, 0, 1))
+		for bx in range(98):
+			sheet.set_pixel(ox + 99 + bx, oy - 1, Color.WHITE)
+			sheet.set_pixel(ox + 99 + bx, oy + 96, Color.WHITE)
+		for by in range(98):
+			sheet.set_pixel(ox + 99, oy - 1 + by, Color.WHITE)
+			sheet.set_pixel(ox + 196, oy - 1 + by, Color.WHITE)
+	sheet.save_png(out_path)

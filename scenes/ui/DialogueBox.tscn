@@ -103,8 +103,8 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = 208.0
-offset_top = -202.0
+offset_left = 194.0
+offset_top = -216.0
 offset_right = 296.0
 offset_bottom = -114.0
 grow_horizontal = 0
@@ -113,7 +113,7 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_omori_base")
 
 [node name="SpeakerPortrait" type="TextureRect" parent="PortraitFrame"]
 texture_filter = 1
-custom_minimum_size = Vector2(78, 78)
+custom_minimum_size = Vector2(96, 96)
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 5
