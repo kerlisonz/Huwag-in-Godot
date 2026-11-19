@@ -1,43 +1,42 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3 uid="uid://cyxkenv5jgadx"]
 
-[ext_resource type="Script" path="res://scripts/levels/street_preview.gd" id="1_street"]
+[ext_resource type="Script" uid="uid://bgbapqxe2kt" path="res://scripts/levels/street_preview.gd" id="1_street"]
 [ext_resource type="PackedScene" path="res://scenes/characters/Player.tscn" id="2_player"]
 
-[node name="StreetPreview" type="Node2D"]
+[node name="StreetPreview" type="Node2D" unique_id=32265360]
 script = ExtResource("1_street")
 
-[node name="CanvasModulate" type="CanvasModulate" parent="."]
-color = Color(0.58, 0.60, 0.68, 1)
+[node name="CanvasModulate" type="CanvasModulate" parent="." unique_id=1977258508]
+color = Color(0.58, 0.6, 0.68, 1)
 
-[node name="TownGroundNormal" type="TileMapLayer" parent="."]
+[node name="TownGroundNormal" type="TileMapLayer" parent="." unique_id=1428780505]
 texture_filter = 1
 
-[node name="TownWallsNormal" type="TileMapLayer" parent="."]
+[node name="TownWallsNormal" type="TileMapLayer" parent="." unique_id=1317787542]
 texture_filter = 1
 
-[node name="TownGroundDistorted" type="TileMapLayer" parent="."]
+[node name="TownGroundDistorted" type="TileMapLayer" parent="." unique_id=1405995220]
 visible = false
 texture_filter = 1
 
-[node name="TownWallsDistorted" type="TileMapLayer" parent="."]
+[node name="TownWallsDistorted" type="TileMapLayer" parent="." unique_id=1881614460]
 visible = false
 texture_filter = 1
 
-[node name="DecalsLayer" type="Node2D" parent="."]
+[node name="DecalsLayer" type="Node2D" parent="." unique_id=1509053163]
 z_index = 1
 
-[node name="CityCollisions" type="StaticBody2D" parent="."]
-collision_layer = 1
+[node name="CityCollisions" type="StaticBody2D" parent="." unique_id=1116736708]
 collision_mask = 0
 
-[node name="Interactables" type="Node2D" parent="."]
+[node name="Interactables" type="Node2D" parent="." unique_id=844840196]
 
-[node name="YSortEntities" type="Node2D" parent="."]
+[node name="YSortEntities" type="Node2D" parent="." unique_id=97089731]
 y_sort_enabled = true
 
-[node name="Player" parent="YSortEntities" instance=ExtResource("2_player")]
+[node name="Player" parent="YSortEntities" unique_id=1773269906 instance=ExtResource("2_player")]
+y_sort_enabled = true
 position = Vector2(569, 395)
-y_sort_enabled = true
 
-[node name="LightsLayer" type="Node2D" parent="."]
+[node name="LightsLayer" type="Node2D" parent="." unique_id=2084385817]
 z_index = 6

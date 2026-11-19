@@ -48,6 +48,23 @@ func _run() -> void:
 	var creek_td := f_src.get_tile_data(creek_coord, 0)
 	_assert_ok(bool(creek_td.get_custom_data("is_water")) == true, "water_deep_anim deve marcar is_water=true")
 	_assert_ok(creek_td.get_collision_polygons_count(0) >= 1, "water_deep_anim precisa colisão de margem/leito")
+	for wf_key in ["waterfall_top", "waterfall_mid"]:
+		var wf_coord: Vector2i = V2TileCatalog.FOREST_TILES[wf_key]
+		_assert_ok(f_src.get_tile_animation_frames_count(wf_coord) == 3, "%s deve ter 3 frames animados" % wf_key)
+		var wf_td := f_src.get_tile_data(wf_coord, 0)
+		_assert_ok(bool(wf_td.get_custom_data("is_water")) == true and wf_td.get_collision_polygons_count(0) >= 1,
+			"%s precisa de is_water=true e colisão" % wf_key)
+	var f_img: Image = f_src.texture.get_image()
+	for frame_i in range(3):
+		var distinct := {}
+		var fx0 := (creek_coord.x + frame_i) * 16
+		for py in range(16):
+			for px in range(16):
+				var c := f_img.get_pixel(fx0 + px, py)
+				distinct["%d,%d,%d" % [int(c.r * 255), int(c.g * 255), int(c.b * 255)]] = true
+		_assert_ok(distinct.size() >= 3, "Frame %d de water_deep_anim não pode ficar liso/vazio (cores=%d)" % [frame_i, distinct.size()])
+	_assert_ok(f_img.get_pixel(3 * 16, 2 * 16).a < 0.05, "Canto externo de pond_tl deve ser transparente para mesclar na grama da floresta")
+	_assert_ok(f_img.get_pixel(19 * 16 + 1, 3 * 16 + 1).a > 0.9, "Ponte vertical deve ter água preenchida sob os vãos das tábuas")
 
 	var ancient_coord: Vector2i = V2TileCatalog.FOREST_TILES["ancient_tree"]
 	_assert_ok(f_src.get_tile_size_in_atlas(ancient_coord) == Vector2i(14, 18), "ancient_tree deve ser 14x18")

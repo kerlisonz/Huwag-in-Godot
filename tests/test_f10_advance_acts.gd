@@ -53,8 +53,8 @@ func _run_tests() -> void:
 	await process_frame
 
 	var act_label: Label = main.get_node_or_null("CanvasLayer/HudTopRight/Margin/HBox/ActPlaceLabel")
-	assert_true(act_label != null, "Label de Ato/Local presente no HUD")
-	assert_true(act_label.text.begins_with("Ato I"), "HUD inicia exibindo Ato I")
+	assert_true(act_label != null, "Label de Horário/Local presente no HUD")
+	assert_true(act_label.text.contains("·") and act_label.text.find("Ato") == -1, "HUD inicia exibindo horário/local sem prefixo 'Ato': %s" % act_label.text)
 
 	# Simula evento de tecla F10 pressionada
 	var f10_event := InputEventKey.new()
@@ -64,14 +64,14 @@ func _run_tests() -> void:
 	await process_frame
 
 	assert_true(int(gs.get_var("Ato", 1)) == 2, "Tecla F10 avançou o jogo para o Ato 2")
-	assert_true(act_label.text.begins_with("Ato II"), "HUD atualizado para exibir Ato II")
+	assert_true(gs.get_switch("006_Dormir_avancou_para_Ato2") == true and act_label.text.contains("·"), "HUD e switch atualizados no Ato 2: %s" % act_label.text)
 
 	# Simula F10 novamente -> Avança para Ato 3
 	main._unhandled_input(f10_event)
 	await process_frame
 
 	assert_true(int(gs.get_var("Ato", 1)) == 3, "Segunda pressão de F10 avançou o jogo para o Ato 3")
-	assert_true(act_label.text.begins_with("Ato III"), "HUD atualizado para exibir Ato III")
+	assert_true(gs.is_unfiltered_act3() and act_label.text.contains("·"), "HUD e modo sem filtro atualizados no Ato 3: %s" % act_label.text)
 
 	main.queue_free()
 	await process_frame

@@ -631,9 +631,9 @@ static func draw_interior_window_tile(img: Image, window_tl: Vector2i, variant: 
 	var glass_b := Color("#F4F8EA")
 	var glass_hi := Color("#FFFFFF")
 	if variant == "distorted":
-		glass_a = Color("#A84B59")
-		glass_b = Color("#CF727D")
-		glass_hi = Color("#F5C4C9")
+		glass_a = Color("#544F74")
+		glass_b = Color("#7E79A4")
+		glass_hi = Color("#CFC8F0")
 	elif variant == "act3":
 		glass_a = Color("#B7BEC6")
 		glass_b = Color("#CFD5DC")

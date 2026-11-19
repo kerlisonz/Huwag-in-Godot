@@ -1,19 +1,36 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/menu/ending_credits.gd" id="1_script"]
-[ext_resource type="FontFile" path="res://assets/fonts/undertale-deltarune-extended-fixed.otf" id="2_font"]
+[ext_resource type="FontVariation" path="res://assets/fonts/omori_dialogue_font.tres" id="2_font"]
 [ext_resource type="Shader" path="res://shaders/perception_filter.gdshader" id="3_shader"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_dawn"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_demo_end"]
 shader = ExtResource("3_shader")
 shader_parameter/afternoon_mix = 0.0
 shader_parameter/night_mix = 0.0
-shader_parameter/unfiltered_mix = 0.35
-shader_parameter/vhs_scanline_alpha = 0.06
-shader_parameter/vhs_noise_intensity = 0.02
-shader_parameter/vhs_chromatic_aberration = 0.15
-shader_parameter/vhs_tracking_jitter = 0.05
-shader_parameter/vhs_crt_vignette = 0.30
+shader_parameter/unfiltered_mix = 0.45
+shader_parameter/corruption_mix = 0.0
+shader_parameter/vhs_scanline_alpha = 0.10
+shader_parameter/vhs_noise_intensity = 0.03
+shader_parameter/vhs_chromatic_aberration = 0.0018
+shader_parameter/vhs_tracking_jitter = 0.0003
+shader_parameter/vhs_tracking_band = 0.03
+shader_parameter/vhs_head_switch = 0.02
+shader_parameter/vhs_dropout = 0.02
+shader_parameter/vhs_tear = 0.0
+shader_parameter/vhs_crt_vignette = 0.36
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+bg_color = Color(0.07, 0.08, 0.11, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.76, 0.68, 0.42, 0.92)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
 
 [node name="EndingCredits" type="Control"]
 layout_mode = 3
@@ -31,19 +48,125 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.06, 0.07, 0.1, 1)
+color = Color(0.04, 0.05, 0.07, 1)
 
-[node name="DawnGlow" type="ColorRect" parent="."]
+[node name="OsdLeft" type="Label" parent="."]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 14.0
+offset_right = 280.0
+offset_bottom = 32.0
+theme_override_colors/font_color = Color(0.82, 0.84, 0.88, 0.78)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "STOP ■  FIM DA FITA  ·  SP"
+
+[node name="OsdRight" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -250.0
+offset_top = 14.0
+offset_right = -18.0
+offset_bottom = 32.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(0.82, 0.84, 0.88, 0.78)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "BFP AGDANGAN · QUEZON"
+horizontal_alignment = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = 22.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.24, 0.18, 0.22, 0.45)
+
+[node name="DemoCard" type="PanelContainer" parent="CenterContainer"]
+custom_minimum_size = Vector2(468, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="Margin" type="MarginContainer" parent="CenterContainer/DemoCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="CenterContainer/DemoCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 7
+alignment = 1
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/DemoCard/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.84, 0.44, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 34
+text = "FIM DA DEMO"
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="CenterContainer/DemoCard/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.94, 0.96, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+text = "Obrigado por jogar Huwag"
+horizontal_alignment = 1
+
+[node name="Rule" type="ColorRect" parent="CenterContainer/DemoCard/Margin/VBox"]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+color = Color(0.76, 0.68, 0.42, 0.55)
+
+[node name="RouteTitleLabel" type="Label" parent="CenterContainer/DemoCard/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.78, 0.52, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "ROTA CONCLUÍDA: PERCEPÇÃO ESTÁVEL"
+horizontal_alignment = 1
+
+[node name="RouteSummaryLabel" type="Label" parent="CenterContainer/DemoCard/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.85, 0.89, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "Você manteve a dose habitual, atendeu os moradores de Agdangan com firmeza e atravessou a fita VHS de olhos abertos."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Spacer" type="Control" parent="CenterContainer/DemoCard/Margin/VBox"]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+
+[node name="BtnMainMenu" type="Button" parent="CenterContainer/DemoCard/Margin/VBox"]
+custom_minimum_size = Vector2(240, 30)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 16
+text = "Voltar ao Menu Principal"
+
+[node name="FooterHint" type="Label" parent="CenterContainer/DemoCard/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.66, 0.72, 0.85)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 13
+text = "Huwag Matitiis — BFP Agdangan · [ENTER / CLIQUE]"
+horizontal_alignment = 1
 
 [node name="ShaderLayer" type="ColorRect" parent="."]
-material = SubResource("ShaderMaterial_dawn")
+material = SubResource("ShaderMaterial_demo_end")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -51,75 +174,3 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-
-[node name="ScrollContainer" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = 360.0
-offset_bottom = 360.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="VBox" type="VBoxContainer" parent="ScrollContainer"]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_left = 60.0
-offset_right = -60.0
-offset_bottom = 400.0
-grow_horizontal = 2
-theme_override_constants/separation = 12
-
-[node name="TitleLabel" type="Label" parent="ScrollContainer/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 1)
-theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 24
-text = "HUWAG"
-horizontal_alignment = 1
-
-[node name="Subtitle" type="Label" parent="ScrollContainer/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.85, 0.82, 0.65, 1)
-theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 8
-text = "A Revelação de Agdangan"
-horizontal_alignment = 1
-
-[node name="Spacer" type="Control" parent="ScrollContainer/VBox"]
-custom_minimum_size = Vector2(0, 16)
-layout_mode = 2
-
-[node name="CreditsLabel" type="Label" parent="ScrollContainer/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
-theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 8
-text = "Huwag Matitiis — Bombeiro da BFP Agdangan, Quezon
-
-Capitão Reyes · Lola Rosa · Aling Nena · Kuya Ben · Mang Carding
-Ato · Santos · Esquadrão Voluntário de Quezon
-
-\"Sobreviver não é esquecer.
-É escolher continuar protegendo a vida a cada novo amanhecer.\"
-
-FIM"
-horizontal_alignment = 1
-
-[node name="PromptLabel" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -28.0
-offset_bottom = -10.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_colors/font_color = Color(0.96, 0.8, 0.36, 0.9)
-theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 8
-text = "Pressione [Espaço] ou [Enter] para retornar ao Menu Inicial"
-horizontal_alignment = 1

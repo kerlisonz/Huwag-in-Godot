@@ -1,25 +1,32 @@
-[gd_scene format=3 uid="uid://c2i7v3siwe8xv"]
+[gd_scene format=3 uid="uid://cs34r4titleomr"]
 
-[ext_resource type="Script" uid="uid://ofkq8d7yrlqe" path="res://scripts/menu/title_screen.gd" id="1_script"]
-[ext_resource type="Texture2D" uid="uid://b8ih0wcuj1upu" path="res://assets/ui/title_cover.png" id="2_cover"]
-[ext_resource type="Shader" uid="uid://d37woo7mt4kxe" path="res://shaders/perception_filter.gdshader" id="3_shader"]
-[ext_resource type="FontFile" uid="uid://jpbbftnqjnsq" path="res://assets/fonts/undertale-deltarune-extended-fixed.otf" id="4_font"]
+[ext_resource type="Script" path="res://scripts/menu/title_screen.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/ui/title_cover.png" id="2_cover"]
+[ext_resource type="Shader" path="res://shaders/fog_drift.gdshader" id="3_fog"]
+[ext_resource type="FontFile" path="res://assets/fonts/OMORI_GAME.ttf" id="4_title_font"]
+[ext_resource type="FontVariation" path="res://assets/fonts/omori_dialogue_font.tres" id="5_ui_font"]
+[ext_resource type="PackedScene" path="res://scenes/ui/save_load_panel.tscn" id="6_saveload"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_vhs"]
-shader = ExtResource("3_shader")
-shader_parameter/afternoon_mix = 0.0
-shader_parameter/night_mix = 0.0
-shader_parameter/unfiltered_mix = 0.0
-shader_parameter/vhs_scanline_alpha = 0.16
-shader_parameter/vhs_noise_intensity = 0.05
-shader_parameter/vhs_chromatic_aberration = 0.35
-shader_parameter/vhs_tracking_jitter = 0.35
-shader_parameter/vhs_crt_vignette = 0.4
-shader_parameter/vhs_tracking_band = 0.25
-shader_parameter/vhs_head_switch = 0.45
-shader_parameter/vhs_dropout = 0.0
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_mist"]
+shader = ExtResource("3_fog")
+shader_parameter/fog_color = Color(0.24, 0.30, 0.42, 0.42)
+shader_parameter/distorted_color = Color(0.14, 0.12, 0.24, 0.42)
+shader_parameter/fog_density = 0.20
+shader_parameter/distortion_mix = 0.0
+shader_parameter/drift_speed = Vector2(0.012, -0.004)
+shader_parameter/pixel_resolution = Vector2(320, 180)
+shader_parameter/edge_fade = 0.14
+shader_parameter/quantize_steps = 5.0
 
-[node name="TitleScreen" type="Control" unique_id=1444705771]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_omori"]
+bg_color = Color(0, 0, 0, 0.94)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 1)
+
+[node name="TitleScreen" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -28,48 +35,43 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 
-[node name="CoverTexture" type="TextureRect" parent="." unique_id=1008519296]
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02, 0.024, 0.036, 1)
+
+[node name="CoverArt" type="TextureRect" parent="."]
 texture_filter = 1
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -4.0
+offset_top = -4.0
+offset_right = 4.0
+offset_bottom = 4.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("2_cover")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="VBoxTitle" type="VBoxContainer" parent="." unique_id=1376127746]
-layout_mode = 0
-offset_left = 42.0
-offset_top = 28.0
-offset_right = 380.0
-offset_bottom = 120.0
-theme_override_constants/separation = 2
+[node name="Scrim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.015, 0.018, 0.03, 0.24)
 
-[node name="TitleLabel" type="Label" parent="VBoxTitle" unique_id=518800289]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.960784, 0.796078, 0.360784, 1)
-theme_override_colors/font_shadow_color = Color(0.0784314, 0.0705882, 0.0941176, 1)
-theme_override_constants/shadow_offset_x = 2
-theme_override_constants/shadow_offset_y = 2
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 36
-text = "HUWAG"
-
-[node name="SubtitleLabel" type="Label" parent="VBoxTitle" unique_id=1140548256]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.847059, 0.811765, 0.572549, 1)
-theme_override_colors/font_shadow_color = Color(0.05, 0.05, 0.08, 0.8)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-text = "Ang Katotohanan sa Likod ng Usok"
-
-[node name="PerceptionLayer" type="ColorRect" parent="." unique_id=132838758]
-material = SubResource("ShaderMaterial_vhs")
+[node name="MistOverlay" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_mist")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -78,285 +80,368 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="OsdRecDot" type="ColorRect" parent="."]
-layout_mode = 0
-offset_left = 14.0
-offset_top = 12.0
-offset_right = 22.0
-offset_bottom = 20.0
-mouse_filter = 2
-color = Color(0.92, 0.22, 0.18, 1)
-
-[node name="OsdRecLabel" type="Label" parent="."]
-layout_mode = 0
-offset_left = 26.0
-offset_top = 9.0
-offset_right = 120.0
-offset_bottom = 25.0
-mouse_filter = 2
-theme_override_colors/font_color = Color(0.93, 0.28, 0.23, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-text = "REC"
-
-[node name="OsdPlayLabel" type="Label" parent="."]
+[node name="AmbientFX" type="Control" parent="."]
 layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
+anchors_preset = 15
 anchor_right = 1.0
-offset_left = -160.0
-offset_top = 9.0
-offset_right = -14.0
-offset_bottom = 25.0
-grow_horizontal = 0
-mouse_filter = 2
-theme_override_colors/font_color = Color(0.86, 0.91, 0.82, 0.92)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-text = "► PLAY"
-horizontal_alignment = 2
-
-[node name="OsdTimecodeLabel" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -160.0
-offset_top = 25.0
-offset_right = -14.0
-offset_bottom = 41.0
-grow_horizontal = 0
-mouse_filter = 2
-theme_override_colors/font_color = Color(0.9, 0.95, 0.85, 0.8)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-text = "00:00:00"
-horizontal_alignment = 2
-
-[node name="OsdTapeLabel" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 14.0
-offset_top = -24.0
-offset_right = 200.0
-offset_bottom = -8.0
-grow_vertical = 0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.6, 0.66, 0.6, 0.7)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+
+[node name="HeaderBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+offset_left = 34.0
+offset_top = 24.0
+offset_right = 360.0
+offset_bottom = 102.0
+theme_override_constants/separation = 0
+mouse_filter = 2
+
+[node name="TitleLabel" type="Label" parent="HeaderBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.96)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("4_title_font")
+theme_override_font_sizes/font_size = 46
+text = "HUWAG"
+
+[node name="SubtitleLabel" type="Label" parent="HeaderBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.89, 0.95, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
-text = "SP  ·  TAPE 01"
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 15
+text = "Ang Katotohanan sa Likod ng Usok"
 
-[node name="MenuContainer" type="MarginContainer" parent="." unique_id=2004533854]
+[node name="MenuContainer" type="PanelContainer" parent="."]
+layout_mode = 1
+offset_left = 34.0
+offset_top = 114.0
+offset_right = 236.0
+offset_bottom = 292.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_omori")
+
+[node name="MenuVBox" type="VBoxContainer" parent="MenuContainer"]
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="BtnNewGame" type="Button" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.85, 0.90, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 16
+text = "NOVO JOGO"
+flat = true
+alignment = 0
+
+[node name="BtnContinue" type="Button" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.85, 0.90, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(0.42, 0.45, 0.52, 0.65)
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 16
+text = "CONTINUAR"
+flat = true
+alignment = 0
+
+[node name="BtnLoadGame" type="Button" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.85, 0.90, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 16
+text = "CARREGAR JOGO"
+flat = true
+alignment = 0
+
+[node name="BtnOptions" type="Button" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.85, 0.90, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 16
+text = "OPÇÕES & SOM"
+flat = true
+alignment = 0
+
+[node name="BtnMusicCredits" type="Button" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.85, 0.90, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 16
+text = "CRÉDITOS MUSICAIS"
+flat = true
+alignment = 0
+
+[node name="BtnExit" type="Button" parent="MenuContainer/MenuVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.85, 0.90, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 16
+text = "SAIR DO JOGO"
+flat = true
+alignment = 0
+
+[node name="HandCursor" type="TextureRect" parent="."]
+texture_filter = 1
 layout_mode = 0
 offset_left = 42.0
-offset_top = 138.0
-offset_right = 310.0
-offset_bottom = 318.0
+offset_top = 128.0
+offset_right = 60.0
+offset_bottom = 140.0
+mouse_filter = 2
+stretch_mode = 4
 
-[node name="MenuVBox" type="VBoxContainer" parent="MenuContainer" unique_id=1109885781]
-layout_mode = 2
-theme_override_constants/separation = 7
+[node name="SaveSummaryLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 34.0
+offset_top = 300.0
+offset_right = 400.0
+offset_bottom = 324.0
+theme_override_colors/font_color = Color(0.78, 0.82, 0.90, 0.92)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 13
+text = ""
 
-[node name="BtnNewGame" type="Button" parent="MenuContainer/MenuVBox" unique_id=1000417975]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.92, 0.94, 0.96, 1)
-theme_override_colors/font_focus_color = Color(1, 0.9, 0.45, 1)
-theme_override_colors/font_hover_color = Color(1, 0.9, 0.45, 1)
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 9
-text = "NOVO JOGO"
-alignment = 0
-
-[node name="BtnContinue" type="Button" parent="MenuContainer/MenuVBox" unique_id=1508482173]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.92, 0.94, 0.96, 1)
-theme_override_colors/font_focus_color = Color(1, 0.9, 0.45, 1)
-theme_override_colors/font_hover_color = Color(1, 0.9, 0.45, 1)
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 9
-text = "CONTINUAR"
-alignment = 0
-
-[node name="BtnOptions" type="Button" parent="MenuContainer/MenuVBox" unique_id=594043779]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.92, 0.94, 0.96, 1)
-theme_override_colors/font_focus_color = Color(1, 0.9, 0.45, 1)
-theme_override_colors/font_hover_color = Color(1, 0.9, 0.45, 1)
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 9
-text = "OPÇÕES & SOM"
-alignment = 0
-
-[node name="BtnExit" type="Button" parent="MenuContainer/MenuVBox" unique_id=615551207]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.92, 0.94, 0.96, 1)
-theme_override_colors/font_focus_color = Color(1, 0.9, 0.45, 1)
-theme_override_colors/font_hover_color = Color(1, 0.9, 0.45, 1)
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 9
-text = "SAIR DO JOGO"
-alignment = 0
-
-[node name="SaveInfoLabel" type="Label" parent="MenuContainer/MenuVBox" unique_id=1571457388]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.72, 0.65, 0.9)
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
-text = "Verificando arquivos de save..."
-
-[node name="VersionLabel" type="Label" parent="." unique_id=170600663]
+[node name="FooterLabel" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -170.0
-offset_top = -24.0
-offset_right = -12.0
-offset_bottom = -8.0
+offset_left = -220.0
+offset_top = -28.0
+offset_right = -18.0
+offset_bottom = -10.0
 grow_horizontal = 0
 grow_vertical = 0
-theme_override_colors/font_color = Color(0.48, 0.52, 0.58, 0.8)
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
-text = "Huwag · Agdangan, Quezon"
+theme_override_colors/font_color = Color(0.70, 0.74, 0.82, 0.88)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 13
+text = "Agdangan, Quezon · Demo"
 horizontal_alignment = 2
 
-[node name="OptionsModal" type="ColorRect" parent="." unique_id=1247262962]
+[node name="SaveLoadPanel" parent="." instance=ExtResource("6_saveload")]
+
+[node name="OptionsModal" type="ColorRect" parent="."]
 visible = false
+z_index = 45
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.04, 0.05, 0.08, 0.88)
+color = Color(0, 0, 0, 0.72)
 
-[node name="Card" type="PanelContainer" parent="OptionsModal" unique_id=407220214]
+[node name="Card" type="PanelContainer" parent="OptionsModal"]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -168.0
-offset_top = -104.0
-offset_right = 168.0
-offset_bottom = 104.0
+offset_left = -195.0
+offset_top = -132.0
+offset_right = 195.0
+offset_bottom = 132.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_omori")
 
-[node name="Margin" type="MarginContainer" parent="OptionsModal/Card" unique_id=13141597]
+[node name="Margin" type="MarginContainer" parent="OptionsModal/Card"]
 layout_mode = 2
 theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 10
+theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 10
+theme_override_constants/margin_bottom = 12
 
-[node name="VBox" type="VBoxContainer" parent="OptionsModal/Card/Margin" unique_id=499516394]
+[node name="VBox" type="VBoxContainer" parent="OptionsModal/Card/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 7
 
-[node name="Title" type="Label" parent="OptionsModal/Card/Margin/VBox" unique_id=584004538]
+[node name="Title" type="Label" parent="OptionsModal/Card/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 9
-text = "CONFIGURAÇÕES & ACESSIBILIDADE"
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 18
+text = "OPÇÕES & ÁUDIO"
 horizontal_alignment = 1
 
-[node name="ChkFlashes" type="CheckBox" parent="OptionsModal/Card/Margin/VBox" unique_id=1443620368]
+[node name="Divider" type="ColorRect" parent="OptionsModal/Card/Margin/VBox"]
+custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-text = "Reduzir flashes luminosos na tela"
+color = Color(1, 1, 1, 0.45)
 
-[node name="ChkVHS" type="CheckBox" parent="OptionsModal/Card/Margin/VBox" unique_id=581956162]
+[node name="MasterRow" type="HBoxContainer" parent="OptionsModal/Card/Margin/VBox"]
 layout_mode = 2
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-button_pressed = true
-text = "Efeitos VHS analógicos e instabilidade"
+
+[node name="Label" type="Label" parent="OptionsModal/Card/Margin/VBox/MasterRow"]
+custom_minimum_size = Vector2(130, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 14
+text = "Volume Geral"
+
+[node name="SliderMaster" type="HSlider" parent="OptionsModal/Card/Margin/VBox/MasterRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 100.0
+step = 5.0
+value = 85.0
+
+[node name="MusicRow" type="HBoxContainer" parent="OptionsModal/Card/Margin/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="OptionsModal/Card/Margin/VBox/MusicRow"]
+custom_minimum_size = Vector2(130, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 14
+text = "Música"
+
+[node name="SliderMusic" type="HSlider" parent="OptionsModal/Card/Margin/VBox/MusicRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 100.0
+step = 5.0
+value = 80.0
+
+[node name="SfxRow" type="HBoxContainer" parent="OptionsModal/Card/Margin/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="OptionsModal/Card/Margin/VBox/SfxRow"]
+custom_minimum_size = Vector2(130, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 14
+text = "Efeitos (SFX)"
+
+[node name="SliderSfx" type="HSlider" parent="OptionsModal/Card/Margin/VBox/SfxRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 100.0
+step = 5.0
+value = 85.0
 
 [node name="ChkFullscreen" type="CheckBox" parent="OptionsModal/Card/Margin/VBox"]
 layout_mode = 2
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-text = "Tela Cheia (desmarcado: Modo Janela adaptável)"
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 14
+text = "Tela Cheia (F11)"
 
-[node name="MasterRow" type="HBoxContainer" parent="OptionsModal/Card/Margin/VBox" unique_id=1786560475]
+[node name="ChkFlashes" type="CheckBox" parent="OptionsModal/Card/Margin/VBox"]
 layout_mode = 2
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 14
+text = "Reduzir Clarões"
 
-[node name="Label" type="Label" parent="OptionsModal/Card/Margin/VBox/MasterRow" unique_id=1308491924]
-custom_minimum_size = Vector2(80, 0)
+[node name="ChkVHS" type="CheckBox" parent="OptionsModal/Card/Margin/VBox"]
 layout_mode = 2
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-text = "Volume Geral:"
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 14
+button_pressed = true
+text = "Efeitos Atmosféricos de Tela"
 
-[node name="SliderMaster" type="HSlider" parent="OptionsModal/Card/Margin/VBox/MasterRow" unique_id=1722734850]
+[node name="BtnCloseOptions" type="Button" parent="OptionsModal/Card/Margin/VBox"]
+custom_minimum_size = Vector2(0, 26)
 layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-max_value = 1.0
-step = 0.05
-value = 1.0
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 15
+text = "FECHAR"
 
-[node name="MusicRow" type="HBoxContainer" parent="OptionsModal/Card/Margin/VBox" unique_id=87626737]
-layout_mode = 2
+[node name="CreditsModal" type="ColorRect" parent="."]
+visible = false
+z_index = 45
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.72)
 
-[node name="Label" type="Label" parent="OptionsModal/Card/Margin/VBox/MusicRow" unique_id=88611835]
-custom_minimum_size = Vector2(80, 0)
-layout_mode = 2
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-text = "Música/Ambiência:"
+[node name="Card" type="PanelContainer" parent="CreditsModal"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -245.0
+offset_top = -142.0
+offset_right = 245.0
+offset_bottom = 142.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_omori")
 
-[node name="SliderMusic" type="HSlider" parent="OptionsModal/Card/Margin/VBox/MusicRow" unique_id=1294409611]
+[node name="Margin" type="MarginContainer" parent="CreditsModal/Card"]
 layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-max_value = 1.0
-step = 0.05
-value = 0.8
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
 
-[node name="SfxRow" type="HBoxContainer" parent="OptionsModal/Card/Margin/VBox" unique_id=1743102909]
+[node name="VBox" type="VBoxContainer" parent="CreditsModal/Card/Margin"]
 layout_mode = 2
+theme_override_constants/separation = 6
 
-[node name="Label" type="Label" parent="OptionsModal/Card/Margin/VBox/SfxRow" unique_id=1052893949]
-custom_minimum_size = Vector2(80, 0)
+[node name="Title" type="Label" parent="CreditsModal/Card/Margin/VBox"]
 layout_mode = 2
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-text = "Efeitos Sonoros:"
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 18
+text = "CRÉDITOS MUSICAIS & RECURSOS"
+horizontal_alignment = 1
 
-[node name="SliderSfx" type="HSlider" parent="OptionsModal/Card/Margin/VBox/SfxRow" unique_id=903765483]
+[node name="Divider" type="ColorRect" parent="CreditsModal/Card/Margin/VBox"]
+custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-max_value = 1.0
-step = 0.05
-value = 0.9
+color = Color(1, 1, 1, 0.45)
 
-[node name="BtnCloseOptions" type="Button" parent="OptionsModal/Card/Margin/VBox" unique_id=76718602]
+[node name="CreditsList" type="VBoxContainer" parent="CreditsModal/Card/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
-theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
-text = "FECHAR CONFIGURAÇÕES"
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="BtnCloseCredits" type="Button" parent="CreditsModal/Card/Margin/VBox"]
+custom_minimum_size = Vector2(0, 26)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("5_ui_font")
+theme_override_font_sizes/font_size = 15
+text = "FECHAR"
+
+[node name="FadeOverlay" type="ColorRect" parent="."]
+visible = false
+z_index = 80
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0)

@@ -3,7 +3,9 @@
 [ext_resource type="Script" uid="uid://glx6m25po6tq" path="res://scripts/main/main.gd" id="1_main"]
 [ext_resource type="Shader" uid="uid://d37woo7mt4kxe" path="res://shaders/perception_filter.gdshader" id="2_shader"]
 [ext_resource type="PackedScene" path="res://scenes/ui/DialogueBox.tscn" id="3_dialogue"]
-[ext_resource type="FontFile" path="res://assets/fonts/undertale-deltarune-extended-fixed.otf" id="4_font"]
+[ext_resource type="FontVariation" path="res://assets/fonts/omori_dialogue_font.tres" id="4_font"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_over_ui.tscn" id="5_game_over_ui"]
+[ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="6_pause_menu"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_perception"]
 shader = ExtResource("2_shader")
@@ -101,7 +103,7 @@ theme_override_colors/font_shadow_color = Color(0.0352941, 0.0470588, 0.0705882,
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Água"
 
 [node name="StaminaBar" type="Control" parent="CanvasLayer/HudTopLeft/Margin/VBox" unique_id=891303734]
@@ -158,7 +160,7 @@ theme_override_colors/font_shadow_color = Color(0.0352941, 0.0470588, 0.0705882,
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "06:30 · Quarto de Huwag"
 horizontal_alignment = 2
 vertical_alignment = 1
@@ -170,8 +172,8 @@ theme_override_colors/font_shadow_color = Color(0.0352941, 0.0470588, 0.0705882,
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
-text = "[F1]"
+theme_override_font_sizes/font_size = 13
+text = "[ESC] Pausa · [F1] Controles"
 vertical_alignment = 1
 
 [node name="StatusLabel" type="Label" parent="CanvasLayer" unique_id=1132934902]
@@ -189,7 +191,7 @@ theme_override_colors/font_shadow_color = Color(0.0352941, 0.0470588, 0.0705882,
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 horizontal_alignment = 2
 vertical_alignment = 1
 
@@ -220,10 +222,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -212.0
-offset_top = -142.0
-offset_right = 212.0
-offset_bottom = 142.0
+offset_left = -224.0
+offset_top = -152.0
+offset_right = 224.0
+offset_bottom = 152.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -245,7 +247,7 @@ theme_override_colors/font_shadow_color = Color(0.0352941, 0.0470588, 0.0705882,
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 15
 text = "HUWAG — CONTROLES E PERCEPÇÃO"
 horizontal_alignment = 1
 
@@ -265,181 +267,185 @@ columns = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "WASD / Setas"
 
 [node name="D1" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1792539326]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Mover Huwag pelo mapa"
 
 [node name="K_Run" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1126915386]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Shift / Z, L"
 
 [node name="D_Run" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1792539327]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Correr / Esquivar (consome Estamina)"
 
 [node name="K2" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1102940779]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "E / Enter"
 
 [node name="D2" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1909891934]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Interagir, Conversar e Avançar Diálogo"
 
 [node name="K3" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1596278332]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "W / S / A / D"
 
 [node name="D3" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1936331950]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Selecionar escolhas nos diálogos"
 
 [node name="K4" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=858801206]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "J / Espaço"
 
 [node name="D4" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1536636145]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Ataque com Machado BFP (Estamina)"
 
 [node name="K5" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=95279738]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "K / Q"
 
 [node name="D5" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1446565519]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Magia de Água (chamas / combate)"
 
 [node name="K6" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1126333213]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "H / C"
 
 [node name="D6" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1628366152]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Usar Cápsula Calmante (Cura)"
 
 [node name="K7" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1925824259]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "U"
 
 [node name="D7" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=500069604]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Alternar Traje (Casual / BFP)"
 
 [node name="K8" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=2050720808]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Tab"
 
 [node name="D8" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=442187628]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Alternar Percepção Visual"
 
 [node name="K9" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1111066978]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "F5 / F9"
 
 [node name="D9" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1936171611]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Salvar / Carregar progresso"
 
 [node name="K10" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1267638151]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "M"
 
 [node name="D10" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1157156365]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Voltar ao Menu Inicial"
 
 [node name="K11" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1310514682]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "F11 / Alt+Enter"
 
 [node name="D11" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox/Grid" unique_id=1425214399]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Alternar Tela Cheia"
 
 [node name="OutfitButton" type="Button" parent="CanvasLayer/ControlsModal/Card/Margin/VBox" unique_id=1748201901]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.784, 0.294, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "Trocar Traje: Roupa Casual (Jaqueta Escura)"
 
 [node name="Footer" type="Label" parent="CanvasLayer/ControlsModal/Card/Margin/VBox" unique_id=1299166537]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.623529, 0.694118, 0.768627, 1)
 theme_override_fonts/font = ExtResource("4_font")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 13
 text = "[F1] ou [Esc] Fechar · [M] Menu Inicial"
 horizontal_alignment = 1
+
+[node name="DefeatOverlay" parent="." instance=ExtResource("5_game_over_ui")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("6_pause_menu")]

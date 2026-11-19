@@ -32,15 +32,15 @@ static func grade_color(c: Color, variant: String, sat_mul: float = 0.86, val_mu
 		var gray := clampf(lum * 0.92 + 0.03, 0.04, 0.90)
 		return Color(gray * 0.96, gray * 0.98, clampf(gray * 1.02, 0.0, 1.0), c.a)
 	if variant == "distorted":
-		# Ato II Dose Alta: cinza carbonizado/ardósia com vestígios carmesim
-		var d_lum := clampf((lum - 0.10) * 0.62 + 0.06, 0.03, 0.52)
-		var r := d_lum * 0.96
-		var g := d_lum * 0.72
-		var b := d_lum * 0.80
-		if c.r > c.g * 1.25 and lum > 0.25:
-			r = clampf(d_lum * 1.48, 0.16, 0.68)
-			g = d_lum * 0.34
-			b = d_lum * 0.38
+		# Ato II Dose Alta: preto abissal, cinza-chumbo e subtom índigo/violeta cadavérico (sem excesso rubro)
+		var d_lum := clampf((lum - 0.07) * 0.56 + 0.05, 0.03, 0.46)
+		var r := d_lum * 0.78
+		var g := d_lum * 0.76
+		var b := clampf(d_lum * 1.08, 0.04, 0.56)
+		if c.r > c.g * 1.25 and lum > 0.22:
+			r = clampf(d_lum * 0.84, 0.08, 0.42)
+			g = d_lum * 0.66
+			b = clampf(d_lum * 1.12, 0.12, 0.54)
 		return Color(clampf(r, 0.0, 1.0), clampf(g, 0.0, 1.0), clampf(b, 0.0, 1.0), c.a)
 
 	var r := lerpf(lum, c.r, sat_mul) * val_mul * tint.r
@@ -306,9 +306,38 @@ static func save_atlas_and_tileset(out_dir: String, name_base: String, img: Imag
 			var surf := str(surface_map.get(c, "water" if is_water else "ground"))
 			_apply_tile_metadata(src, c, is_solid, full_box, surf, is_water, blocks_l, 0, Vector2i.ZERO)
 
+	var scene_paths: Array = spec.get("scene_collection", [])
+	if not scene_paths.is_empty():
+		var sc_src := TileSetScenesCollectionSource.new()
+		for sc_path_v in scene_paths:
+			var sc_path := str(sc_path_v)
+			var ps := ResourceLoader.load(sc_path) as PackedScene
+			if ps != null:
+				sc_src.create_scene_tile(ps)
+			else:
+				push_warning("V2AtlasPainter: PackedScene não encontrada para TileSetScenesCollectionSource: %s" % sc_path)
+		ts.add_source(sc_src, 1)
+
+	var existing_uid := ""
+	var tres_abs := ProjectSettings.globalize_path(tres_res)
+	if FileAccess.file_exists(tres_abs):
+		var prev_first := FileAccess.get_file_as_string(tres_abs).get_slice("\n", 0)
+		var uid_pos := prev_first.find('uid="')
+		if uid_pos != -1:
+			var uid_end := prev_first.find('"', uid_pos + 5)
+			if uid_end != -1:
+				existing_uid = prev_first.substr(uid_pos, uid_end - uid_pos + 1)
+
 	var err := ResourceSaver.save(ts, tres_res)
 	if err != OK:
 		push_error("V2AtlasPainter: erro ao salvar TileSet %s (err=%d)" % [tres_res, err])
+	elif not existing_uid.is_empty():
+		var saved_txt := FileAccess.get_file_as_string(tres_abs)
+		if saved_txt.begins_with('[gd_resource type="TileSet" format=3]'):
+			var fw := FileAccess.open(tres_abs, FileAccess.WRITE)
+			if fw != null:
+				fw.store_string(saved_txt.replace('[gd_resource type="TileSet" format=3]', '[gd_resource type="TileSet" format=3 %s]' % existing_uid))
+				fw.close()
 
 
 static func _apply_tile_metadata(

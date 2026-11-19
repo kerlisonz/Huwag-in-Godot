@@ -1,5 +1,7 @@
 extends Node2D
 
+const GAME_OVER_UI_SCENE := preload("res://scenes/ui/game_over_ui.tscn")
+
 @onready var level_container: Node2D = $LevelContainer
 @onready var perception_rect: ColorRect = $PerceptionLayer/PerceptionRect
 @onready var hud_top_left: PanelContainer = $CanvasLayer/HudTopLeft
@@ -22,6 +24,10 @@ extends Node2D
 @onready var controls_grid: GridContainer = $CanvasLayer/ControlsModal/Card/Margin/VBox/Grid
 @onready var controls_footer: Label = $CanvasLayer/ControlsModal/Card/Margin/VBox/Footer
 @onready var outfit_button: Button = get_node_or_null("CanvasLayer/ControlsModal/Card/Margin/VBox/OutfitButton") as Button
+@onready var defeat_overlay: CanvasLayer = get_node_or_null("DefeatOverlay") as CanvasLayer
+@onready var pause_menu: PauseMenu = get_node_or_null("PauseMenu") as PauseMenu
+const PAUSE_MENU_SCENE := preload("res://scenes/ui/pause_menu.tscn")
+var _screen_edge_eyes: CorruptedEyeSwarm = null
 
 var _current_level: Node2D = null
 var _pending_dialogue_callback: Callable = Callable()
@@ -31,6 +37,7 @@ var _heart_textures: Dictionary = {}
 var _heart_pulse_time: float = 0.0
 var _hp_segments: int = 6
 var _ui_mode: String = "normal"
+var _defeat_handled: bool = false
 
 enum SleepFlowState {
 	NORMAL = 0,
@@ -44,6 +51,7 @@ var _sleep_timer: float = 0.0
 var _sleep_fade_rect: ColorRect = null
 
 func _ready() -> void:
+	get_tree().paused = false
 	_heart_textures = HuwagUiTheme.build_heart_textures()
 	for h in _get_heart_nodes():
 		h.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -51,6 +59,7 @@ func _ready() -> void:
 		status_label.visible = false
 
 	_ensure_sleep_fade_overlay()
+	_ensure_defeat_overlay()
 
 	GameState.perception_changed.connect(_on_perception_changed)
 	GameState.switch_changed.connect(func(_k: String, _v: bool) -> void: _update_hud())
@@ -77,6 +86,8 @@ func _ready() -> void:
 
 	_apply_hud_style(GameState.perception_mode)
 	_apply_shader_mode(GameState.perception_mode)
+	_ensure_pause_menu()
+	_ensure_screen_edge_eyes()
 	var start_scene := GameState.current_scene_path if not GameState.current_scene_path.is_empty() else "res://scenes/levels/RoomHuwag.tscn"
 	var start_tag := GameState.spawn_tag if not GameState.spawn_tag.is_empty() else "initial"
 	load_level(start_scene, start_tag)
@@ -127,11 +138,72 @@ func _process(delta: float) -> void:
 			_glitch_strength = 0.0
 			_apply_shader_mode(GameState.perception_mode)
 
+func _is_defeat_overlay_open() -> bool:
+	return defeat_overlay != null and is_instance_valid(defeat_overlay) and defeat_overlay.has_method("is_open") and bool(defeat_overlay.call("is_open"))
+
+
+func _is_pause_menu_open() -> bool:
+	return pause_menu != null and is_instance_valid(pause_menu) and pause_menu.is_open()
+
+
+func _ensure_pause_menu() -> void:
+	if pause_menu == null:
+		pause_menu = get_node_or_null("PauseMenu") as PauseMenu
+	if pause_menu == null and PAUSE_MENU_SCENE != null:
+		pause_menu = PAUSE_MENU_SCENE.instantiate() as PauseMenu
+		if pause_menu != null:
+			pause_menu.name = "PauseMenu"
+			add_child(pause_menu)
+
+
+func _ensure_screen_edge_eyes() -> void:
+	var canvas := get_node_or_null("CanvasLayer") as CanvasLayer
+	if canvas == null:
+		return
+	if _screen_edge_eyes == null or not is_instance_valid(_screen_edge_eyes):
+		_screen_edge_eyes = canvas.get_node_or_null("ScreenEdgeEyeLayer") as CorruptedEyeSwarm
+	if _screen_edge_eyes == null:
+		_screen_edge_eyes = CorruptedEyeSwarm.new()
+		_screen_edge_eyes.name = "ScreenEdgeEyeLayer"
+		_screen_edge_eyes.z_index = 4
+		canvas.add_child(_screen_edge_eyes)
+		canvas.move_child(_screen_edge_eyes, 0)
+		_screen_edge_eyes.setup_screen_edge_swarm()
+	else:
+		_screen_edge_eyes.refresh_visibility()
+
+
+func _capture_viewport_image_safe() -> Image:
+	if DisplayServer.get_name() == "headless":
+		return null
+	var vp := get_viewport()
+	if vp == null:
+		return null
+	var tex := vp.get_texture()
+	if tex == null:
+		return null
+	var img := tex.get_image()
+	if img == null or img.is_empty():
+		return null
+	return img
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _is_defeat_overlay_open() or _is_pause_menu_open():
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F1 or event.keycode == KEY_ESCAPE:
+		if event.keycode == KEY_F1:
 			_toggle_controls_modal()
 			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_ESCAPE:
+			if controls_modal and controls_modal.visible:
+				_toggle_controls_modal()
+				get_viewport().set_input_as_handled()
+			elif dialogue_box == null or not dialogue_box.is_open():
+				_ensure_pause_menu()
+				if pause_menu != null:
+					pause_menu.open_pause(_capture_viewport_image_safe())
+					get_viewport().set_input_as_handled()
 		elif controls_modal and controls_modal.visible and event.keycode == KEY_M:
 			get_tree().change_scene_to_file("res://scenes/menu/TitleScreen.tscn")
 			get_viewport().set_input_as_handled()
@@ -170,10 +242,99 @@ func _refresh_outfit_button() -> void:
 		return
 	outfit_button.text = "Trocar Traje (Atual: %s)" % GameState.get_equipped_outfit_label()
 
-func load_level(scene_path: String, spawn_tag: String = "default") -> void:
+func _ensure_defeat_overlay() -> void:
+	if defeat_overlay == null:
+		defeat_overlay = get_node_or_null("DefeatOverlay") as CanvasLayer
+	if defeat_overlay == null and GAME_OVER_UI_SCENE != null:
+		defeat_overlay = GAME_OVER_UI_SCENE.instantiate() as CanvasLayer
+		if defeat_overlay != null:
+			defeat_overlay.name = "DefeatOverlay"
+			add_child(defeat_overlay)
+	if defeat_overlay != null:
+		defeat_overlay.layer = 110
+		defeat_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+		if defeat_overlay.has_signal("retry_checkpoint_requested") and not defeat_overlay.is_connected("retry_checkpoint_requested", _on_defeat_retry_checkpoint):
+			defeat_overlay.connect("retry_checkpoint_requested", _on_defeat_retry_checkpoint)
+		if defeat_overlay.has_signal("main_menu_requested") and not defeat_overlay.is_connected("main_menu_requested", _on_defeat_return_to_menu):
+			defeat_overlay.connect("main_menu_requested", _on_defeat_return_to_menu)
+
+
+func _find_level_player(level_node: Node) -> Node2D:
+	if level_node == null:
+		return null
+	for rel_path in ["ObstaclesYsort/PlayerHuwag", "YSort/PlayerHuwag", "PlayerHuwag", "Player"]:
+		var candidate := level_node.get_node_or_null(rel_path) as Node2D
+		if candidate != null:
+			return candidate
+	var stack: Array[Node] = [level_node]
+	while not stack.is_empty():
+		var curr: Node = stack.pop_back()
+		if curr is Node2D and curr.is_in_group("player"):
+			return curr as Node2D
+		for ch in curr.get_children():
+			stack.append(ch)
+	return null
+
+
+func _on_player_died() -> void:
+	if _defeat_handled:
+		return
+	_defeat_handled = true
+	GameState.is_player_defeated = true
+	if controls_modal != null and controls_modal.visible:
+		controls_modal.visible = false
+	if dialogue_box != null and is_instance_valid(dialogue_box) and dialogue_box.is_open():
+		_pending_dialogue_callback = Callable()
+		dialogue_box.close_dialogue()
+	if _sleep_state != SleepFlowState.NORMAL:
+		_sleep_state = SleepFlowState.NORMAL
+		GameState.sleep_transition_active = false
+		if _sleep_fade_rect != null:
+			_sleep_fade_rect.visible = false
+			_sleep_fade_rect.color.a = 0.0
+	_ensure_defeat_overlay()
+	_update_hud()
+	get_tree().paused = true
+	if defeat_overlay != null and defeat_overlay.has_method("show_defeat"):
+		defeat_overlay.call("show_defeat", _ui_mode)
+
+
+func _on_defeat_retry_checkpoint() -> void:
+	if defeat_overlay != null and defeat_overlay.has_method("hide_defeat"):
+		defeat_overlay.call("hide_defeat")
+	get_tree().paused = false
+	_defeat_handled = false
+	GameState.restore_last_checkpoint()
+	load_level(GameState.current_scene_path, GameState.spawn_tag, false)
+	_on_notification_requested("Retornando ao último ponto seguro")
+
+
+func _on_defeat_return_to_menu() -> void:
+	if defeat_overlay != null and defeat_overlay.has_method("hide_defeat"):
+		defeat_overlay.call("hide_defeat")
+	if controls_modal != null:
+		controls_modal.visible = false
+	if dialogue_box != null and is_instance_valid(dialogue_box):
+		_pending_dialogue_callback = Callable()
+		dialogue_box.close_dialogue()
+	_sleep_state = SleepFlowState.NORMAL
+	_defeat_handled = false
+	GameState.clear_transient_state()
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/menu/TitleScreen.tscn")
+
+
+func load_level(scene_path: String, spawn_tag: String = "default", save_checkpoint_on_enter: bool = true) -> void:
 	if scene_path.find("EndingCredits") != -1:
+		get_tree().paused = false
 		get_tree().change_scene_to_file("res://scenes/menu/EndingCredits.tscn")
 		return
+
+	if _is_defeat_overlay_open():
+		defeat_overlay.call("hide_defeat")
+	get_tree().paused = false
+	_defeat_handled = false
+	GameState.is_player_defeated = false
 
 	if dialogue_box != null and is_instance_valid(dialogue_box):
 		dialogue_box.close_dialogue()
@@ -200,12 +361,32 @@ func load_level(scene_path: String, spawn_tag: String = "default") -> void:
 	if instance.has_signal("request_dialogue"):
 		instance.connect("request_dialogue", _on_request_dialogue)
 
+	var lvl_player := _find_level_player(instance)
+	if GameState.has_pending_checkpoint_spawn():
+		var cp_pos := GameState.consume_pending_checkpoint_spawn()
+		if lvl_player != null and cp_pos != Vector2.ZERO:
+			lvl_player.position = cp_pos
+			var cam := lvl_player.get_node_or_null("Camera2D") as Camera2D
+			if cam != null:
+				cam.reset_smoothing()
+				cam.force_update_scroll()
+	if lvl_player != null and lvl_player.has_signal("player_died"):
+		if not lvl_player.is_connected("player_died", _on_player_died):
+			lvl_player.connect("player_died", _on_player_died)
+	if save_checkpoint_on_enter:
+		var entry_pos := lvl_player.position if lvl_player != null else Vector2.ZERO
+		GameState.save_checkpoint(scene_path, entry_pos, spawn_tag)
+
+	_apply_hud_style(GameState.perception_mode)
+	_apply_shader_mode(GameState.perception_mode)
 	_update_hud()
 
 func _on_request_level_change(target_scene: String, spawn_tag: String) -> void:
 	call_deferred("load_level", target_scene, spawn_tag)
 
 func _on_request_dialogue(pages: Array, callback: Callable) -> void:
+	if _is_defeat_overlay_open():
+		return
 	if dialogue_box != null and dialogue_box.is_open():
 		return
 	_pending_dialogue_callback = callback
@@ -354,11 +535,10 @@ func _perform_curfew_wake_transition() -> void:
 			load_level("res://scenes/levels/RoomHuwag.tscn", "initial")
 	elif ato == 2:
 		if GameState.get_switch("019_Ato2_concluido"):
-			load_level("res://scenes/levels/vhs_memory_minigame.tscn", "from_curfew")
+			GameState.advance_to_act_3()
+			load_level("res://scenes/levels/RoomHuwag.tscn", "from_act2")
 		else:
-			GameState.set_switch("006c_Dose_escolhida_Ato2", false)
-			GameState.set_switch("006b_Dose_maior_pilulas", false)
-			GameState.set_intoxication_level(1)
+			# Preserva integralmente escolha de dose, flags do Capitão Reyes, Enfermeira, NPCs ajudados/derrotados e tarefas!
 			GameState.player_hp = GameState.player_max_hp
 			GameState.hp_changed.emit(GameState.player_hp, GameState.player_max_hp)
 			GameState.advance_day_preserving_tasks()
@@ -373,6 +553,8 @@ func _perform_curfew_wake_transition() -> void:
 
 
 func _apply_shader_mode(mode: int) -> void:
+	if _screen_edge_eyes != null and is_instance_valid(_screen_edge_eyes):
+		_screen_edge_eyes.refresh_visibility()
 	if perception_rect == null or perception_rect.material == null:
 		return
 	var mat := perception_rect.material as ShaderMaterial

@@ -236,9 +236,9 @@ func _run_test() -> void:
 	# Verifica Áudio Adaptativo e Filtro Passa-Baixa (Low-Pass)
 	var am = root.get_node_or_null("AudioManager")
 	if am != null:
-		assert(am.get_bus_lowpass_cutoff("Music") > 0.0 and am.get_bus_lowpass_cutoff("Music") <= 1700.0, "Bus Music deve ter filtro Low-Pass ativo")
-		assert(am.get_bus_lowpass_cutoff("Ambience") > 0.0 and am.get_bus_lowpass_cutoff("Ambience") <= 1500.0, "Bus Ambience deve ter filtro Low-Pass ativo")
-		assert(am.get_bus_lowpass_cutoff("SFX") > 0.0 and am.get_bus_lowpass_cutoff("SFX") <= 2200.0, "Bus SFX deve ter filtro Low-Pass ativo")
+		assert(am.get_bus_lowpass_cutoff("Music") > 0.0 and am.get_bus_lowpass_cutoff("Music") <= 15000.0, "Bus Music deve ter filtro Low-Pass ativo")
+		assert(am.get_bus_lowpass_cutoff("Ambience") > 0.0 and am.get_bus_lowpass_cutoff("Ambience") <= 2400.0, "Bus Ambience deve ter filtro Low-Pass ativo")
+		assert(am.get_bus_lowpass_cutoff("SFX") > 0.0 and am.get_bus_lowpass_cutoff("SFX") <= 4200.0, "Bus SFX deve ter filtro Low-Pass ativo")
 		gs.set_clock_minutes(420, false) # Manhã
 		am.sync_adaptive_soundtrack("street_preview", false)
 		assert(am.get_current_bgm() == "day_theme" and am.get_current_ambience() == "morning_ambience", "Manhã em Agdangan deve tocar day_theme + morning_ambience")

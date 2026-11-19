@@ -255,7 +255,7 @@ static func get_profile_data(raw_speaker: String, expression: String = "default"
 		"id": speaker_id,
 		"display_name": str(base.get("display_name", raw_speaker)),
 		"role_subtitle": str(base.get("role", "")),
-		"accent_color": base.get("accent", Color("#F5C84B")) if not is_dist else Color("#D9414E"),
+		"accent_color": base.get("accent", Color("#F5C84B")) if not is_dist else Color("#D4C8FF"),
 		"is_placeholder": bool(base.get("is_placeholder", false)),
 		"is_distorted": is_dist,
 		"portrait_path": portrait_path,

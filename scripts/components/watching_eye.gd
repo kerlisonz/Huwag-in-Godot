@@ -1,32 +1,52 @@
-extends Sprite2D
 class_name WatchingEye
+extends Sprite2D
 
-## Olho observador do Modo Corrompido (estilo 16-bit / Yume Nikki):
-## Esclera fixa em Sprite2D + pupila filha que rastreia dinamicamente player.global_position
-## com deslocamento limitado (clamp) e arredondado para pixels inteiros (TEXTURE_FILTER_NEAREST).
+## Olho observador surreal do Modo Corrompido (16-bit):
+## Esclera fixa com variantes visuais bizarras (sem vermelho sangrento) + pupila que
+## rastreia player.global_position com piscadas orgânicas, dilatação por proximidade e tremor sutil.
 
 @export var max_offset: Vector2 = Vector2(4.0, 2.0)
 @export var tracking_distance_scale: float = 36.0
+@export_range(0, 3) var eye_variant: int = 0
+@export var blink_interval_min: float = 2.4
+@export var blink_interval_max: float = 6.2
+@export var enable_proximity_dilation: bool = true
 
 var pupil_sprite: Sprite2D = null
 var pupil_offset: Vector2 = Vector2.ZERO
 
-static var _sclera_tex: ImageTexture = null
-static var _pupil_tex: ImageTexture = null
+var _blink_cooldown: float = 3.0
+var _blink_timer: float = 0.0
+var _tremor_phase: float = 0.0
+var _base_scale: Vector2 = Vector2.ONE
+
+static var _sclera_variants: Dictionary = {}
+static var _pupil_variants: Dictionary = {}
 
 
 func _init() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	texture = _get_sclera_texture()
+	texture = _get_sclera_texture(eye_variant)
 	_ensure_pupil_node()
 
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	if texture == null:
-		texture = _get_sclera_texture()
+	_base_scale = scale
+	if texture == null or eye_variant != 0:
+		texture = _get_sclera_texture(eye_variant)
 	_ensure_pupil_node()
+	_blink_cooldown = randf_range(blink_interval_min, blink_interval_max)
+	_tremor_phase = randf_range(0.0, TAU)
 	set_process(true)
+
+
+func set_variant(variant_idx: int) -> void:
+	eye_variant = posmod(variant_idx, 4)
+	texture = _get_sclera_texture(eye_variant)
+	_ensure_pupil_node()
+	if pupil_sprite:
+		pupil_sprite.texture = _get_pupil_texture(eye_variant)
 
 
 func _ensure_pupil_node() -> void:
@@ -38,13 +58,15 @@ func _ensure_pupil_node() -> void:
 		pupil_sprite.name = "PupilSprite"
 		add_child(pupil_sprite)
 	pupil_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	pupil_sprite.texture = _get_pupil_texture()
+	pupil_sprite.texture = _get_pupil_texture(eye_variant)
 	pupil_sprite.position = pupil_offset
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		return
+	_tremor_phase += delta * 14.0
+	_update_blink(delta)
 	var tree := get_tree()
 	if tree == null:
 		return
@@ -53,14 +75,30 @@ func _process(_delta: float) -> void:
 		update_tracking_for_position(player.global_position)
 
 
+func _update_blink(delta: float) -> void:
+	if _blink_timer > 0.0:
+		_blink_timer -= delta
+		var p := 1.0 - clampf(_blink_timer / 0.14, 0.0, 1.0)
+		var shut := sin(p * PI)
+		scale = Vector2(_base_scale.x, maxf(0.10, _base_scale.y * (1.0 - shut * 0.90)))
+		if _blink_timer <= 0.0:
+			scale = _base_scale
+	else:
+		_blink_cooldown -= delta
+		if _blink_cooldown <= 0.0:
+			_blink_timer = 0.14
+			_blink_cooldown = randf_range(blink_interval_min, blink_interval_max)
+
+
 func update_tracking_for_position(target_global_pos: Vector2) -> Vector2:
 	_ensure_pupil_node()
 	var delta_vec := target_global_pos - global_position
+	var dist := delta_vec.length()
 	if delta_vec.length_squared() < 0.001:
 		pupil_offset = Vector2.ZERO
 	else:
 		var dir := delta_vec.normalized()
-		var strength := clampf(delta_vec.length() / maxf(1.0, tracking_distance_scale), 0.0, 1.0)
+		var strength := clampf(dist / maxf(1.0, tracking_distance_scale), 0.0, 1.0)
 		var raw := Vector2(dir.x * max_offset.x, dir.y * max_offset.y) * strength
 		var clamped := Vector2(
 			clampf(raw.x, -max_offset.x, max_offset.x),
@@ -69,53 +107,101 @@ func update_tracking_for_position(target_global_pos: Vector2) -> Vector2:
 		pupil_offset = Vector2(roundf(clamped.x), roundf(clamped.y))
 	if pupil_sprite != null:
 		pupil_sprite.position = pupil_offset
+		if enable_proximity_dilation:
+			var dilate := 1.0 + clampf(1.0 - dist / 140.0, 0.0, 1.0) * 0.28
+			pupil_sprite.scale = Vector2(dilate, dilate)
 	return pupil_offset
 
 
-static func _get_sclera_texture() -> ImageTexture:
-	if _sclera_tex != null:
-		return _sclera_tex
+static func _get_sclera_texture(variant_idx: int) -> ImageTexture:
+	var key := posmod(variant_idx, 4)
+	if _sclera_variants.has(key):
+		return _sclera_variants[key] as ImageTexture
+	var outline := Color(0.04, 0.03, 0.08, 0.98)
+	var edge := Color(0.48, 0.45, 0.66, 0.96)
+	var inner := Color(0.86, 0.85, 0.96, 0.98)
+	var inner_shadow := Color(0.68, 0.65, 0.84, 0.96)
+
 	var img := Image.create_empty(24, 16, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
-	var outline := Color(0.08, 0.05, 0.09, 0.96)
-	var sclera_edge := Color(0.74, 0.68, 0.72, 0.96)
-	var sclera_inner := Color(0.90, 0.88, 0.85, 0.98)
-	var vein := Color(0.68, 0.22, 0.28, 0.92)
+	match key:
+		0:
+			# Olho amplo clássico de pálpebra pesada
+			_fill_rect(img, 3, 6, 18, 4, outline)
+			_fill_rect(img, 5, 4, 14, 8, outline)
+			_fill_rect(img, 7, 3, 10, 10, outline)
+			_fill_rect(img, 4, 6, 16, 4, edge)
+			_fill_rect(img, 6, 5, 12, 6, inner_shadow)
+			_fill_rect(img, 8, 4, 8, 8, inner)
+			_fill_rect(img, 7, 5, 10, 6, inner)
+		1:
+			# Olho redondo arregalado (surreal/pesadelo)
+			_fill_rect(img, 4, 3, 16, 10, outline)
+			_fill_rect(img, 6, 1, 12, 14, outline)
+			_fill_rect(img, 3, 5, 18, 6, outline)
+			_fill_rect(img, 5, 3, 14, 10, edge)
+			_fill_rect(img, 7, 2, 10, 12, inner_shadow)
+			_fill_rect(img, 6, 4, 12, 8, inner)
+			_fill_rect(img, 8, 3, 8, 10, Color(0.95, 0.94, 1.0, 0.98))
+		2:
+			# Olho estreito e paranoico de canto de sombra
+			_fill_rect(img, 2, 6, 20, 4, outline)
+			_fill_rect(img, 5, 5, 14, 6, outline)
+			_fill_rect(img, 3, 7, 18, 2, edge)
+			_fill_rect(img, 6, 6, 12, 4, inner)
+		_:
+			# Par de olhinhos pequenos aglomerados nas trevas
+			for ox in [0, 11]:
+				_fill_rect(img, ox + 2, 5, 9, 6, outline)
+				_fill_rect(img, ox + 3, 4, 7, 8, outline)
+				_fill_rect(img, ox + 3, 6, 7, 4, edge)
+				_fill_rect(img, ox + 4, 5, 5, 6, inner)
 
-	# Contorno amendoado 16-bit
-	_fill_rect(img, 3, 6, 18, 4, outline)
-	_fill_rect(img, 5, 4, 14, 8, outline)
-	_fill_rect(img, 7, 3, 10, 10, outline)
-
-	# Esclera clara com borda sombreada e veias sutis nos cantos
-	_fill_rect(img, 4, 6, 16, 4, sclera_edge)
-	_fill_rect(img, 6, 5, 12, 6, sclera_inner)
-	_fill_rect(img, 8, 4, 8, 8, sclera_inner)
-	_fill_rect(img, 5, 7, 2, 1, vein)
-	_fill_rect(img, 17, 8, 2, 1, vein)
-
-	_sclera_tex = ImageTexture.create_from_image(img)
-	return _sclera_tex
+	var tex := ImageTexture.create_from_image(img)
+	_sclera_variants[key] = tex
+	return tex
 
 
-static func _get_pupil_texture() -> ImageTexture:
-	if _pupil_tex != null:
-		return _pupil_tex
-	var img := Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)
+static func _get_pupil_texture(variant_idx: int) -> ImageTexture:
+	var key := posmod(variant_idx, 4)
+	if _pupil_variants.has(key):
+		return _pupil_variants[key] as ImageTexture
+	var img := Image.create_empty(16, 12, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
-	var iris := Color(0.68, 0.12, 0.18, 1.0)
-	var iris_hi := Color(0.86, 0.26, 0.30, 1.0)
-	var pupil := Color(0.05, 0.04, 0.07, 1.0)
-	var glint := Color(0.96, 0.94, 0.92, 1.0)
+	var iris := Color(0.32, 0.26, 0.58, 1.0)
+	var iris_hi := Color(0.56, 0.50, 0.88, 1.0)
+	var pupil := Color(0.03, 0.02, 0.06, 1.0)
+	var glint := Color(0.96, 0.96, 1.0, 1.0)
 
-	_fill_rect(img, 2, 1, 4, 6, iris)
-	_fill_rect(img, 1, 2, 6, 4, iris)
-	_fill_rect(img, 2, 2, 2, 2, iris_hi)
-	_fill_rect(img, 3, 2, 2, 4, pupil)
-	img.set_pixel(2, 2, glint)
+	match key:
+		0:
+			_fill_rect(img, 6, 3, 4, 6, iris)
+			_fill_rect(img, 5, 4, 6, 4, iris)
+			_fill_rect(img, 6, 4, 2, 2, iris_hi)
+			_fill_rect(img, 7, 4, 2, 4, pupil)
+			img.set_pixel(6, 4, glint)
+		1:
+			# Pupila dilatada abissal + anel índigo hipnótico
+			_fill_rect(img, 4, 2, 8, 8, iris)
+			_fill_rect(img, 3, 3, 10, 6, iris)
+			_fill_rect(img, 5, 3, 6, 6, pupil)
+			img.set_pixel(5, 3, iris_hi)
+			img.set_pixel(6, 3, glint)
+		2:
+			# Fenda fina observadora
+			_fill_rect(img, 6, 3, 4, 6, iris)
+			_fill_rect(img, 7, 3, 2, 6, pupil)
+			img.set_pixel(7, 4, glint)
+		_:
+			# Duas pupilas sincronizadas
+			for px in [1, 12]:
+				_fill_rect(img, px, 4, 3, 4, iris)
+				_fill_rect(img, px + 1, 5, 2, 2, pupil)
+				img.set_pixel(px, 4, glint)
 
-	_pupil_tex = ImageTexture.create_from_image(img)
-	return _pupil_tex
+	var tex := ImageTexture.create_from_image(img)
+	_pupil_variants[key] = tex
+	return tex
 
 
 static func _fill_rect(img: Image, x0: int, y0: int, w: int, h: int, col: Color) -> void:

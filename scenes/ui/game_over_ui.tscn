@@ -1,0 +1,131 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/game_over_ui.gd" id="1_game_over_ui"]
+[ext_resource type="FontVariation" path="res://assets/fonts/omori_dialogue_font.tres" id="2_font"]
+
+[node name="DefeatOverlay" type="CanvasLayer"]
+process_mode = 3
+layer = 110
+visible = false
+script = ExtResource("1_game_over_ui")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Backdrop" type="ColorRect" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.035, 0.01, 0.02, 0.82)
+
+[node name="Center" type="CenterContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="Card" type="PanelContainer" parent="Root/Center"]
+custom_minimum_size = Vector2(288, 0)
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Margin" type="MarginContainer" parent="Root/Center/Card"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 14
+
+[node name="VBox" type="VBoxContainer" parent="Root/Center/Card/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 7
+alignment = 1
+
+[node name="TopTag" type="Label" parent="Root/Center/Card/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.768627, 0.470588, 0.509804, 0.88)
+theme_override_colors/font_shadow_color = Color(0.0352941, 0.0470588, 0.0705882, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 12
+text = "// SINAL INTERROMPIDO"
+horizontal_alignment = 1
+
+[node name="TitleLabel" type="Label" parent="Root/Center/Card/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.901961, 0.223529, 0.27451, 1)
+theme_override_colors/font_shadow_color = Color(0.027451, 0.00784314, 0.0156863, 0.98)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 24
+text = "VOCÊ FOI DERROTADO"
+horizontal_alignment = 1
+
+[node name="Rule" type="ColorRect" parent="Root/Center/Card/Margin/VBox"]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(0.619608, 0.121569, 0.180392, 0.96)
+
+[node name="SubtitleLabel" type="Label" parent="Root/Center/Card/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.894118, 0.921569, 0.94902, 1)
+theme_override_colors/font_shadow_color = Color(0.0352941, 0.0470588, 0.0705882, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "O que deseja fazer?"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="Root/Center/Card/Margin/VBox"]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ButtonsBox" type="VBoxContainer" parent="Root/Center/Card/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BtnRetryCheckpoint" type="Button" parent="Root/Center/Card/Margin/VBox/ButtonsBox"]
+custom_minimum_size = Vector2(240, 24)
+layout_mode = 2
+mouse_filter = 0
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "►  Reiniciar do Último Ponto"
+alignment = 0
+
+[node name="BtnMainMenu" type="Button" parent="Root/Center/Card/Margin/VBox/ButtonsBox"]
+custom_minimum_size = Vector2(240, 24)
+layout_mode = 2
+mouse_filter = 0
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "   Voltar para o Menu"
+alignment = 0
+
+[node name="HintLabel" type="Label" parent="Root/Center/Card/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.623529, 0.694118, 0.768627, 0.9)
+theme_override_colors/font_shadow_color = Color(0.0352941, 0.0470588, 0.0705882, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 12
+text = "[W/S · ↑/↓] Navegar  ·  [Enter/Espaço] Confirmar"
+horizontal_alignment = 1

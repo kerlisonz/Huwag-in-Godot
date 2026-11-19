@@ -178,14 +178,17 @@ func _run() -> void:
 	street.queue_free()
 	await process_frame
 
-	# Verificar também FireStation com Senhora Luningning normal e distorcida
-	gs.set_higher_dose(false)
+	# Verificar também FireStation com Senhora Luningning e Reversão pela Enfermeira Maria
+	gs.set_higher_dose(true)
 	var station_sc: PackedScene = load("res://scenes/levels/FireStation.tscn")
 	var station := station_sc.instantiate()
 	root.add_child(station)
 	await process_frame
 	var velhinha: NpcEntity = station._npcs["Velhinha_Espera"]
 	_assert_ok(velhinha.normal_frames_path.ends_with("senhora_luningning_normal_spriteframes.tres"), "Velhinha_Espera usa senhora_luningning_normal_spriteframes.tres no Quartel")
+	gs.revert_corrupted_mode_via_nurse()
+	await process_frame
+	_assert_ok(not gs.is_corrupted_mode() and not velhinha.is_distorted, "Reversão pela Enfermeira restaura NPCs do Quartel ao estado pacífico normal")
 	station.queue_free()
 	await process_frame
 

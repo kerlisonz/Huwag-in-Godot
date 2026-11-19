@@ -100,12 +100,12 @@ void fragment() {
 
 	vec3 base_col = mix(filtered_col, drained_col, unfiltered_mix);
 
-	// 6a. Modo Corrompido legível: paleta fria/dessaturada com subtom rubro sutil e meio-tons preservados
+	// 6a. Modo Corrompido surreal: paleta fria/abissal com sombras índigo e violeta cadavérico (sem vermelho sangue)
 	if (corruption_mix > 0.001 && unfiltered_mix < 0.5) {
-		float lifted_luma = clamp(pow(max(luma, 0.001), 0.86) * 1.08 + 0.04, 0.06, 1.0);
-		vec3 cold_ash = mix(base_col, vec3(lifted_luma), 0.42);
-		vec3 corrupt_shadow = vec3(0.62, 0.48, 0.56);
-		vec3 corrupt_highlight = vec3(1.02, 0.90, 0.94);
+		float lifted_luma = clamp(pow(max(luma, 0.001), 0.86) * 1.04 + 0.03, 0.04, 0.96);
+		vec3 cold_ash = mix(base_col, vec3(lifted_luma), 0.48);
+		vec3 corrupt_shadow = vec3(0.42, 0.40, 0.58);
+		vec3 corrupt_highlight = vec3(0.84, 0.82, 0.96);
 		vec3 corrupt_col = cold_ash * mix(corrupt_shadow, corrupt_highlight, clamp(lifted_luma * 1.25, 0.0, 1.0));
 		base_col = mix(base_col, corrupt_col, corruption_mix);
 	}
@@ -149,8 +149,8 @@ void fragment() {
 	float vignette = clamp(1.0 - edge_dist * 0.24 * vhs_crt_vignette, 0.68, 1.0);
 	base_col *= vignette;
 	if (corruption_mix > 0.001 && unfiltered_mix < 0.5) {
-		float periph = smoothstep(0.55, 1.65, edge_dist) * corruption_mix * 0.28;
-		base_col = mix(base_col, vec3(0.24, 0.07, 0.11), periph);
+		float periph = smoothstep(0.55, 1.65, edge_dist) * corruption_mix * 0.34;
+		base_col = mix(base_col, vec3(0.05, 0.04, 0.11), periph);
 	}
 
 	COLOR = vec4(clamp(base_col, 0.0, 1.0), 1.0);

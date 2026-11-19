@@ -27,7 +27,7 @@ const OFF_Y := 10
 
 const DIRS := ["down", "up", "left", "right"]
 
-const ARTIFACT_DIR := "C:/Users/SnyX/.gemini/antigravity/brain/6f04634a-b7d4-4d6f-9c20-24b6fdf404a0"
+const ARTIFACT_DIR := "C:/Users/SnyX/.gemini/antigravity/brain/57f4ed94-3583-41fc-bbbe-9e9a2d546794/scratch"
 
 # ==============================================================================
 # MATRIZES BASE RECONSTRUÍDAS A PARTIR DA IMAGEM 1 (GRADE 32x32, CORPO 18x28)
@@ -876,7 +876,7 @@ func _render_base_grid(grid: Array[String], flip_h: bool, pal: Dictionary) -> Im
 
 
 func _apply_breathing_shift(src: Image, dy: int, include_head: bool) -> Image:
-	# Desloca apenas o tronco (ou cabeça+tronco) mantendo as pernas e os pés ancorados no chão!
+	# Desloca apenas o tronco (ou cabeça+tronco) mantendo as pernas ancoradas no chão e preenchendo a junta de 1px sem fenda transparente!
 	var dst := Image.create(CELL_W, CELL_H, false, Image.FORMAT_RGBA8)
 	dst.fill(Color(0, 0, 0, 0))
 	var split_top := OFF_Y + (0 if include_head else 17)
@@ -886,6 +886,19 @@ func _apply_breathing_shift(src: Image, dy: int, include_head: bool) -> Image:
 		for x in range(CELL_W):
 			if y < split_top or y >= split_bottom:
 				dst.set_pixel(x, y, src.get_pixel(x, y))
+	# Preenche a linha exposta pelo deslocamento antes de blitar o tronco deslocado (evita linha vazia de 1px no torso)
+	if dy > 0:
+		for extra_y in range(split_top, mini(CELL_H, split_top + dy)):
+			for x in range(CELL_W):
+				var seam_c := src.get_pixel(x, extra_y)
+				if seam_c.a > 0.0:
+					dst.set_pixel(x, extra_y, seam_c)
+	elif dy < 0:
+		for extra_y in range(maxi(0, split_bottom + dy), split_bottom):
+			for x in range(CELL_W):
+				var seam_c := src.get_pixel(x, extra_y)
+				if seam_c.a > 0.0:
+					dst.set_pixel(x, extra_y, seam_c)
 	for y in range(split_top, split_bottom):
 		var ty := clampi(y + dy, 0, CELL_H - 1)
 		for x in range(CELL_W):
@@ -922,13 +935,19 @@ func _shift_whole_character(src: Image, dx: int, dy: int) -> Image:
 
 
 func _shift_upper_body(src: Image, dx: int, dy: int) -> Image:
-	# Desloca cabeça + tronco (y < OFF_Y + 24) mantendo as pernas fixas no chão
+	# Desloca cabeça + tronco (y < OFF_Y + 24) mantendo as pernas fixas no chão e preenchendo junta
 	var dst := Image.create(CELL_W, CELL_H, false, Image.FORMAT_RGBA8)
 	dst.fill(Color(0, 0, 0, 0))
 	var hip_line := OFF_Y + 24
 	for y in range(hip_line, CELL_H):
 		for x in range(CELL_W):
 			dst.set_pixel(x, y, src.get_pixel(x, y))
+	if dy < 0:
+		for extra_y in range(maxi(0, hip_line + dy), hip_line):
+			for x in range(CELL_W):
+				var seam_c := src.get_pixel(x, extra_y)
+				if seam_c.a > 0.0:
+					dst.set_pixel(clampi(x + dx, 0, CELL_W - 1), extra_y, seam_c)
 	for y in range(0, hip_line):
 		for x in range(CELL_W):
 			var c := src.get_pixel(x, y)
@@ -962,8 +981,79 @@ func _apply_run_posture(src: Image, dir_name: String, lean_dx: int, lean_dy: int
 	return dst
 
 
+func _draw_axe_pixel_segment(img: Image, p0: Vector2, p1: Vector2, thickness: int, col: Color, outline: Color = Color.TRANSPARENT) -> void:
+	var steps := maxi(1, int(ceil(p0.distance_to(p1) * 2.0)))
+	for i in range(steps + 1):
+		var t := float(i) / float(steps)
+		var pt := p0.lerp(p1, t)
+		var px := int(round(pt.x))
+		var py := int(round(pt.y))
+		if outline.a > 0.05:
+			for oy in range(-1, 2):
+				for ox in range(-1, 2):
+					if img.get_pixel(clampi(px + ox, 0, CELL_W - 1), clampi(py + oy, 0, CELL_H - 1)).a <= 0.05:
+						_set_px_safe(img, px + ox, py + oy, outline)
+		_set_px_safe(img, px, py, col)
+		if thickness >= 2:
+			_set_px_safe(img, px + 1, py, col)
+
+
+func _draw_fire_axe_head(img: Image, head_pos: Vector2, blade_dir: Vector2, outline: Color, combo_stage: int) -> void:
+	var axe_red := Color("#C92A2A")
+	var axe_red_hi := Color("#F03E3E")
+	var steel_edge := Color("#F2F6FC") if combo_stage >= 3 else Color("#E2E8F2")
+	var steel_mid := Color("#98A4B8")
+	var norm := blade_dir.normalized()
+	var perp := Vector2(-norm.y, norm.x)
+
+	# Ponteira traseira do machado de bombeiro (pick spike)
+	var pick_tip := head_pos - norm * 3.5
+	_draw_axe_pixel_segment(img, head_pos - norm * 1.0, pick_tip, 1, steel_mid, outline)
+
+	# Corpo forjado vermelho do machado
+	for f in range(1, 4):
+		for w in range(-2, 3):
+			var bp := head_pos + norm * float(f) + perp * float(w) * 0.7
+			var bx := int(round(bp.x))
+			var by := int(round(bp.y))
+			for oy in range(-1, 2):
+				for ox in range(-1, 2):
+					var nx := clampi(bx + ox, 0, CELL_W - 1)
+					var ny := clampi(by + oy, 0, CELL_H - 1)
+					if img.get_pixel(nx, ny).a <= 0.05:
+						img.set_pixel(nx, ny, outline)
+			img.set_pixel(bx, by, axe_red_hi if w <= 0 else axe_red)
+
+	# Lâmina de corte prateada brilhante
+	for w in range(-3, 4):
+		var ep := head_pos + norm * 4.5 + perp * float(w) * 0.85
+		_set_px_safe(img, int(round(ep.x)), int(round(ep.y)), steel_edge)
+
+
+func _draw_fire_axe_in_hand(img: Image, hand_pos: Vector2, axe_dir: Vector2, blade_dir: Vector2, combo_stage: int, pal: Dictionary, behind_body: bool = false) -> void:
+	var target: Image = img
+	if behind_body:
+		target = Image.create(CELL_W, CELL_H, false, Image.FORMAT_RGBA8)
+		target.fill(Color(0, 0, 0, 0))
+	var wood_dk := Color("#6E4427")
+	var wood_lt := Color("#9E683E")
+	var outline: Color = pal["k"]
+	var dir_n := axe_dir.normalized()
+	var shaft_len := 10.5 if combo_stage < 3 else 12.0
+	var tip_pos := hand_pos + dir_n * shaft_len
+	_draw_axe_pixel_segment(target, hand_pos - dir_n * 2.0, tip_pos, 1, wood_dk, outline)
+	_draw_axe_pixel_segment(target, hand_pos, tip_pos - dir_n * 1.5, 1, wood_lt, Color.TRANSPARENT)
+	_draw_fire_axe_head(target, tip_pos, blade_dir, outline, combo_stage)
+	if behind_body:
+		for y in range(CELL_H):
+			for x in range(CELL_W):
+				var wc := target.get_pixel(x, y)
+				if wc.a > 0.05 and img.get_pixel(x, y).a <= 0.05:
+					img.set_pixel(x, y, wc)
+
+
 func _draw_slash_fx(img: Image, dir_name: String, phase: int, combo_stage: int, pal: Dictionary) -> void:
-	# Desenha o braço estendido + mão + lâmina/bastão e arco pixel art de ataque/combo sincronizado com a direção
+	# Desenha braço + mão + machado de bombeiro 16-bit + arco luminoso de impacto exclusivamente nos ataques/combos
 	var col_edge: Color = pal["A"]
 	var col_mid: Color = pal["D"] if combo_stage == 3 else pal["B"]
 	var col_trail: Color = pal["E"] if combo_stage == 3 else pal["C"]
@@ -972,38 +1062,75 @@ func _draw_slash_fx(img: Image, dir_name: String, phase: int, combo_stage: int, 
 	var col_outline: Color = pal["k"]
 
 	if phase == 0:
-		# Braço recuado preparando o golpe + brilho na ponta
-		var gx := 18 if dir_name == "left" else (29 if dir_name == "right" else 31)
-		var gy := 28 if dir_name == "up" else 29
-		_set_px_safe(img, gx, gy, col_hand)
-		_set_px_safe(img, gx + 1, gy - 1, col_mid)
-		_set_px_safe(img, gx + 1, gy - 2, col_edge)
+		# Recuo (windup) segurando o machado atrás do ombro/costas sem cobrir o rosto
+		var hand := Vector2(30, 28)
+		var axe_dir := Vector2(0.85, -0.60)
+		var blade_dir := Vector2(-0.4, 0.9)
+		var behind := false
+		match dir_name:
+			"down":
+				hand = Vector2(30, 28)
+				axe_dir = Vector2(0.85, -0.55)
+				blade_dir = Vector2(0.55, 0.85)
+			"up":
+				hand = Vector2(30, 24)
+				axe_dir = Vector2(0.75, -0.8)
+				blade_dir = Vector2(-0.7, -0.6)
+				behind = true
+			"left":
+				hand = Vector2(27, 29)
+				axe_dir = Vector2(0.88, -0.55)
+				blade_dir = Vector2(0.55, -0.85)
+				behind = true
+			"right":
+				hand = Vector2(20, 29)
+				axe_dir = Vector2(-0.88, -0.55)
+				blade_dir = Vector2(-0.55, -0.85)
+				behind = true
+		_set_px_safe(img, int(hand.x), int(hand.y), col_hand)
+		_draw_fire_axe_in_hand(img, hand, axe_dir, blade_dir, combo_stage, pal, behind)
 		return
 
 	if phase == 3:
-		# Dissipação curta do rastro
-		var tx := 11 if dir_name == "left" else (36 if dir_name == "right" else 24)
-		var ty := 42 if dir_name == "down" else (10 if dir_name == "up" else 31)
-		_set_px_safe(img, tx, ty, col_trail)
+		# Recuperação final com o machado baixado antes de guardar
+		var hand_r := Vector2(28, 32)
+		var dir_r := Vector2(0.55, 0.85)
+		var blade_r := Vector2(-0.85, 0.5)
+		var behind_r := (dir_name == "up")
+		match dir_name:
+			"up":
+				hand_r = Vector2(18, 26)
+				dir_r = Vector2(-0.75, -0.55)
+				blade_r = Vector2(0.5, -0.85)
+			"left":
+				hand_r = Vector2(16, 31)
+				dir_r = Vector2(-0.8, 0.65)
+				blade_r = Vector2(-0.5, 0.85)
+			"right":
+				hand_r = Vector2(31, 31)
+				dir_r = Vector2(0.8, 0.65)
+				blade_r = Vector2(0.5, 0.85)
+		_set_px_safe(img, int(hand_r.x), int(hand_r.y), col_hand)
+		_draw_fire_axe_in_hand(img, hand_r, dir_r, blade_r, combo_stage, pal, behind_r)
 		return
 
-	# Fases 1 (ataque pleno) e 2 (extensão máxima)
+	# Fases 1 (golpe ativo) e 2 (follow-through com arco de corte + machado em extensão)
 	var reach := (2 if combo_stage >= 2 else 0) + (1 if phase == 2 else 0)
+	var rev := -1 if combo_stage == 2 else 1
 	match dir_name:
 		"down":
-			# Braço estendido para baixo segurando a arma que conecta ao arco
 			var arm_x := 21 if combo_stage == 2 else 26
-			for ay in range(30, 35):
-				_set_px_safe(img, arm_x, ay, col_sleeve if ay < 33 else col_hand)
+			for ay in range(30, 34):
+				_set_px_safe(img, arm_x, ay, col_sleeve if ay < 32 else col_hand)
 				_set_px_safe(img, arm_x + 1, ay, col_outline)
-			var base_y := 39 + reach
-			for dy_b in range(35, base_y):
-				_set_px_safe(img, arm_x, dy_b, col_edge)
-				_set_px_safe(img, arm_x - 1, dy_b, col_mid)
+			var base_y := 40 + reach
+			var hand_d := Vector2(arm_x, 33)
+			var adir_d := Vector2(-0.32 * rev if phase == 1 else -0.65 * rev, 0.92).normalized()
+			_draw_fire_axe_in_hand(img, hand_d, adir_d, Vector2(float(rev), 0.25), combo_stage, pal, false)
 			for dx in range(-10, 11):
 				var curve := int(absf(float(dx)) * 0.35)
 				var py := base_y - curve
-				var px := 24 + (dx if combo_stage != 2 else -dx)
+				var px := 24 + dx * rev
 				if phase == 1 or dx >= -4:
 					_set_px_safe(img, px, py, col_edge)
 					_set_px_safe(img, px, py - 1, col_mid)
@@ -1011,51 +1138,50 @@ func _draw_slash_fx(img: Image, dir_name: String, phase: int, combo_stage: int, 
 						_set_px_safe(img, px, py - 2, col_trail)
 		"up":
 			var arm_x := 20 if combo_stage == 2 else 28
-			for ay in range(18, 24):
-				_set_px_safe(img, arm_x, ay, col_hand if ay < 20 else col_sleeve)
-			var base_y := 10 - reach
-			for dy_b in range(base_y + 1, 18):
-				_set_px_safe(img, arm_x, dy_b, col_edge)
-				_set_px_safe(img, arm_x - 1, dy_b, col_mid)
+			for ay in range(19, 24):
+				_set_px_safe(img, arm_x, ay, col_hand if ay < 21 else col_sleeve)
+			var base_y := 9 - reach
+			var hand_u := Vector2(arm_x, 19)
+			var adir_u := Vector2(-0.35 * rev if phase == 1 else -0.65 * rev, -0.92).normalized()
+			_draw_fire_axe_in_hand(img, hand_u, adir_u, Vector2(float(rev), -0.25), combo_stage, pal, true)
 			for dx in range(-10, 11):
 				var curve := int(absf(float(dx)) * 0.35)
 				var py := base_y + curve
-				var px := 24 + (dx if combo_stage != 2 else -dx)
+				var px := 24 + dx * rev
 				if phase == 1 or dx <= 4:
 					_set_px_safe(img, px, py, col_edge)
 					_set_px_safe(img, px, py + 1, col_mid)
 					if abs(dx) < 7:
 						_set_px_safe(img, px, py + 2, col_trail)
 		"left":
-			# Braço estendido para a esquerda (x=13..18, y=29..30) + lâmina até o arco
-			for ax in range(14, 19):
-				_set_px_safe(img, ax, 29, col_hand if ax < 16 else col_sleeve)
+			for ax in range(15, 20):
+				_set_px_safe(img, ax, 29, col_hand if ax < 17 else col_sleeve)
 				_set_px_safe(img, ax, 30, col_outline)
-			var base_x := 10 - reach
-			for bx in range(base_x + 1, 14):
-				_set_px_safe(img, bx, 29, col_edge)
-				_set_px_safe(img, bx, 28, col_mid)
+			var base_x := 9 - reach
+			var hand_l := Vector2(15, 29)
+			var adir_l := Vector2(-0.92, 0.35 * rev if phase == 1 else 0.65 * rev).normalized()
+			_draw_fire_axe_in_hand(img, hand_l, adir_l, Vector2(-0.25, float(rev)), combo_stage, pal)
 			for dy in range(-9, 10):
 				var curve := int(absf(float(dy)) * 0.38)
 				var px := base_x + curve
-				var py := 28 + (dy if combo_stage != 2 else -dy)
+				var py := 28 + dy * rev
 				if phase == 1 or dy <= 4:
 					_set_px_safe(img, px, py, col_edge)
 					_set_px_safe(img, px + 1, py, col_mid)
 					if abs(dy) < 6:
 						_set_px_safe(img, px + 2, py, col_trail)
 		"right":
-			for ax in range(29, 34):
-				_set_px_safe(img, ax, 29, col_hand if ax > 31 else col_sleeve)
+			for ax in range(28, 33):
+				_set_px_safe(img, ax, 29, col_hand if ax > 30 else col_sleeve)
 				_set_px_safe(img, ax, 30, col_outline)
-			var base_x := 37 + reach
-			for bx in range(34, base_x):
-				_set_px_safe(img, bx, 29, col_edge)
-				_set_px_safe(img, bx, 28, col_mid)
+			var base_x := 38 + reach
+			var hand_rt := Vector2(32, 29)
+			var adir_rt := Vector2(0.92, 0.35 * rev if phase == 1 else 0.65 * rev).normalized()
+			_draw_fire_axe_in_hand(img, hand_rt, adir_rt, Vector2(0.25, float(rev)), combo_stage, pal)
 			for dy in range(-9, 10):
 				var curve := int(absf(float(dy)) * 0.38)
 				var px := base_x - curve
-				var py := 28 + (dy if combo_stage != 2 else -dy)
+				var py := 28 + dy * rev
 				if phase == 1 or dy >= -4:
 					_set_px_safe(img, px, py, col_edge)
 					_set_px_safe(img, px - 1, py, col_mid)

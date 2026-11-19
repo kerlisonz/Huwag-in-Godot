@@ -5,13 +5,11 @@ signal dialogue_finished(choice_index: int)
 signal conflict_triggered(target_id: String, context: Dictionary)
 
 @onready var frame_panel: Panel = $FramePanel
-@onready var top_trim: ColorRect = $TopTrim
-@onready var vhs_scuff_left: ColorRect = $TopTrim/VhsScuffLeft
-@onready var vhs_scuff_right: ColorRect = $TopTrim/VhsScuffRight
+@onready var nameplate_panel: PanelContainer = $NameplatePanel
+@onready var speaker_label: Label = $NameplatePanel/NameplateMargin/SpeakerLabel
 @onready var portrait_frame: PanelContainer = $PortraitFrame
 @onready var portrait_texture: TextureRect = $PortraitFrame/SpeakerPortrait
 @onready var speech_area: Control = $SpeechArea
-@onready var speaker_label: Label = $SpeechArea/SpeakerLabel
 @onready var dialogue_label: Label = $SpeechArea/DialogueText
 @onready var choices_panel: PanelContainer = $ChoicesPanel
 @onready var choices_vbox: VBoxContainer = $ChoicesPanel/ChoicesMargin/ChoicesVBox
@@ -24,6 +22,7 @@ var _current_choices: Array = []
 var _selected_choice: int = 0
 var _choice_labels: Array[Label] = []
 var _choice_boxes: Array[PanelContainer] = []
+var _choice_cursors: Array[TextureRect] = []
 var _full_text: String = ""
 var _revealed_chars: float = 0.0
 var _typing: bool = false
@@ -35,39 +34,38 @@ var _cursor_timer: float = 0.0
 var _is_corrupted_theme: bool = false
 var _theme_mode: String = "normal"
 var _advance_cooldown: float = 0.0
+var _base_hint_pos_x: float = 0.0
+var _base_hint_pos_y: float = 0.0
 
-const ADVANCE_COOLDOWN_SEC := 0.08
-const POST_CLOSE_COOLDOWN_SEC := 0.28
-const CURSOR_BASE_TOP := -12.0
-const PIXEL_FONT := preload("res://assets/fonts/undertale-deltarune-extended-fixed.otf")
+const SCROLL_ACCENT_COLOR_DEFAULT := Color(1.0, 1.0, 1.0, 1.0)
 
 
 func _ready() -> void:
-	hide()
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	visible = false
+	active = false
+	choices_panel.visible = false
+	continue_hint.visible = false
+	if continue_hint:
+		_base_hint_pos_x = continue_hint.position.x
+		_base_hint_pos_y = continue_hint.position.y
 	if portrait_texture:
 		portrait_texture.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		portrait_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		portrait_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	if continue_hint:
-		continue_hint.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_apply_theme("normal")
-
 	if has_node("/root/GameState"):
 		var gs := get_node("/root/GameState")
-		if gs.has_signal("perception_changed") and not gs.is_connected("perception_changed", _on_perception_changed):
-			gs.connect("perception_changed", _on_perception_changed)
+		if gs.has_signal("perception_changed"):
+			gs.perception_changed.connect(_on_perception_changed)
+	_apply_theme(_resolve_base_theme_mode())
 
 
 func _on_perception_changed(_mode: int) -> void:
-	if active and _page_index >= 0 and _page_index < _pages.size():
-		_show_current_page()
+	if visible:
+		_apply_theme("distorted" if _is_corrupted_theme else _resolve_base_theme_mode())
 	else:
 		_apply_theme(_resolve_base_theme_mode())
 
 
 func is_open() -> bool:
-	return active and visible
+	return visible and active
 
 
 func _resolve_base_theme_mode() -> String:
@@ -85,78 +83,76 @@ func start_dialogue(pages: Array) -> void:
 	_pages = pages.duplicate(true)
 	_page_index = 0
 	active = true
-	_advance_cooldown = ADVANCE_COOLDOWN_SEC
+	visible = true
+	_advance_cooldown = 0.14
 	if has_node("/root/GameState"):
 		var gs := get_node("/root/GameState")
 		gs.dialogue_active = true
-		gs.dialogue_cooldown = POST_CLOSE_COOLDOWN_SEC
-	if not is_visible_in_tree():
-		_last_speaker_id = ""
-		_last_expression = ""
-	show()
+	_last_speaker_id = ""
+	_last_expression = ""
 	_show_current_page()
+	_play_box_open_animation()
 
 
 func _process(delta: float) -> void:
-	if _advance_cooldown > 0.0:
-		_advance_cooldown = maxf(0.0, _advance_cooldown - delta)
 	if not active:
 		return
-
+	if _advance_cooldown > 0.0:
+		_advance_cooldown -= delta
 	if _typing:
-		_revealed_chars += _chars_per_sec * delta
+		_revealed_chars += delta * _chars_per_sec
 		var chars_now: int = mini(int(_revealed_chars), _full_text.length())
 		dialogue_label.visible_characters = chars_now
 		if chars_now >= _full_text.length():
 			_finish_typing()
-	elif continue_hint and continue_hint.visible:
+	if continue_hint.visible:
 		_cursor_timer += delta
-		var step := int(fmod(_cursor_timer * 3.5, 4.0))
-		var dy := 0.0 if step == 0 else (1.0 if step in [1, 3] else 2.0)
-		continue_hint.offset_top = CURSOR_BASE_TOP + dy
-		continue_hint.offset_bottom = CURSOR_BASE_TOP + 6.0 + dy
+		var step := int(fmod(_cursor_timer * 4.0, 4.0))
+		var dx := 0.0 if step == 0 else (1.5 if step in [1, 3] else 3.0)
+		var base_x := frame_panel.position.x + frame_panel.size.x - 28.0 if frame_panel else _base_hint_pos_x
+		var base_y := frame_panel.position.y + frame_panel.size.y - 20.0 if frame_panel else _base_hint_pos_y
+		continue_hint.position.x = base_x + dx
+		continue_hint.position.y = base_y
 
 
 func _input(event: InputEvent) -> void:
-	if not active:
+	if not is_open():
 		return
 	_handle_dialogue_input(event)
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not active:
+	if not is_open():
 		return
 	_handle_dialogue_input(event)
 
 
 func _handle_dialogue_input(event: InputEvent) -> void:
-	if not active or get_viewport().is_input_handled():
+	if _advance_cooldown > 0.0:
 		return
 
-	if _current_choices.size() > 0:
-		if event.is_action_pressed("ui_up") or (event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_W or event.keycode == KEY_UP)):
+	if not _typing and not _current_choices.is_empty():
+		if event.is_action_pressed("ui_up") or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_W):
 			_move_choice(-1)
 			get_viewport().set_input_as_handled()
 			return
-		elif event.is_action_pressed("ui_down") or (event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_S or event.keycode == KEY_DOWN)):
+		elif event.is_action_pressed("ui_down") or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_S):
 			_move_choice(1)
 			get_viewport().set_input_as_handled()
 			return
 
 	var accept: bool = (
-		event.is_action_pressed("ui_accept")
-		or event.is_action_pressed("interact")
-		or (event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_E or event.keycode == KEY_ENTER or event.keycode == KEY_SPACE or event.keycode == KEY_Z))
-		or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and _current_choices.is_empty())
+		event.is_action_pressed("interact")
+		or event.is_action_pressed("ui_accept")
+		or (event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_E, KEY_Z, KEY_ENTER, KEY_SPACE])
+		or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
 	)
-
 	if accept:
 		get_viewport().set_input_as_handled()
-		if _advance_cooldown > 0.0:
-			return
-		_advance_cooldown = ADVANCE_COOLDOWN_SEC
 		if _typing:
 			_finish_typing()
+		elif not _current_choices.is_empty():
+			_advance_page()
 		else:
 			_advance_page()
 
@@ -164,29 +160,30 @@ func _handle_dialogue_input(event: InputEvent) -> void:
 func _move_choice(delta_idx: int) -> void:
 	if _current_choices.is_empty():
 		return
-	_selected_choice = wrapi(_selected_choice + delta_idx, 0, _current_choices.size())
+	_selected_choice = (_selected_choice + delta_idx + _current_choices.size()) % _current_choices.size()
 	_refresh_choices_visual()
-	_play_ui_sfx("ui_hover")
+	_play_ui_sfx("ui_move")
 
 
 func _infer_expression(speaker_id: String, text: String, explicit_expr: String) -> String:
 	if not explicit_expr.strip_edges().is_empty():
 		return explicit_expr.strip_edges().to_lower()
-	if speaker_id != "huwag":
-		return "default"
-
+	if has_node("/root/GameState"):
+		var gs := get_node("/root/GameState")
+		if gs.has_method("is_corrupted_mode") and bool(gs.call("is_corrupted_mode")) and speaker_id != "huwag":
+			return "distorted"
 	var low := text.to_lower()
-	if "não aguento" in low or "desabou" in low or "sangue" in low or "breu" in low or "vazio" in low or "sufoc" in low or "fumaça" in low:
+	if low.contains("socorro") or low.contains("medo") or low.contains("pavor") or low.contains("monstro") or low.contains("olhos") or low.contains("sangue"):
 		return "scared"
-	if "!" in text and ("afaste" in low or "atacar" in low or "chega" in low or "agora" in low or "fora" in low):
+	if low.contains("raiva") or low.contains("basta") or low.contains("pare") or low.contains("mentira") or low.contains("não vou") or low.contains("fogo!"):
 		return "angry"
-	if "?" in text and ("como" in low or "o que" in low or "onde" in low or "quem" in low):
+	if low.contains("?") and (low.contains("como") or low.contains("quem") or low.contains("que") or low.contains("espera") or low.contains("sério")):
 		return "surprised"
-	if "cansa" in low or "dorm" in low or "noite" in low or "exaust" in low or "hospital" in low:
-		return "tired"
-	if "culpa" in low or "receio" in low or "remédio" in low or "comprimid" in low or "triste" in low or "temo" in low:
+	if low.contains("desculp") or low.contains("cuidado") or low.contains("perigo") or low.contains("preocup") or low.contains("sinto muito") or low.contains("dose"):
 		return "worried"
-	if "obrigado" in low or "bom dia" in low or "salamat" in low or "calma" in low or "equilíbrio" in low:
+	if low.contains("cansad") or low.contains("sono") or low.contains("noite") or low.contains("pesadel") or low.contains("exausto") or low.contains("..."):
+		return "tired"
+	if low.contains("obrigad") or low.contains("bom dia") or low.contains("sorri") or low.contains("gentil"):
 		return "uneasy_smile"
 	return "neutral"
 
@@ -212,9 +209,9 @@ func _load_cached_texture(path: String) -> Texture2D:
 
 
 func _show_current_page() -> void:
-	if _page_index >= _pages.size():
-		_close_dialogue()
-		return
+	choices_panel.visible = false
+	continue_hint.visible = false
+	_current_choices.clear()
 
 	var page: Dictionary = _pages[_page_index]
 	var raw_speaker: String = str(page.get("speaker", "Huwag Matitiis"))
@@ -228,7 +225,7 @@ func _show_current_page() -> void:
 	var outfit_id := explicit_outfit if not explicit_outfit.is_empty() else "casual"
 	if has_node("/root/GameState"):
 		var gs := get_node("/root/GameState")
-		is_act3 = bool(gs.call("is_unfiltered_act3"))
+		is_act3 = gs.has_method("is_unfiltered_act3") and bool(gs.call("is_unfiltered_act3"))
 		if explicit_outfit.is_empty() and gs.get("equipped_outfit") != null:
 			outfit_id = str(gs.get("equipped_outfit"))
 
@@ -239,79 +236,77 @@ func _show_current_page() -> void:
 	var display_name: String = str(profile.get("display_name", raw_speaker))
 	var portrait_path: String = str(profile.get("portrait_path", ""))
 	var explicit_portrait: String = str(page.get("portrait", ""))
-	if explicit_portrait.begins_with("res://") and ResourceLoader.exists(explicit_portrait):
+	if not explicit_portrait.is_empty():
 		portrait_path = explicit_portrait
 
 	var resolved_expr: String = str(profile.get("expression", expr))
 	_is_corrupted_theme = (
 		resolved_expr == "distorted"
 		or bool(page.get("distorted", false))
-		or (speaker_id == "vulto_bosque" and not is_act3)
 	)
 	var target_mode := "distorted" if _is_corrupted_theme else _resolve_base_theme_mode()
 	_apply_theme(target_mode)
 
 	if speaker_label:
 		speaker_label.text = display_name.to_upper()
-		speaker_label.visible = not display_name.is_empty() and not is_monologue
-		var pal := HuwagUiTheme.get_palette(target_mode)
-		speaker_label.add_theme_color_override("font_color", profile.get("accent_color", pal["accent"]))
+	if nameplate_panel:
+		var show_name := (not display_name.is_empty()) and (not is_monologue)
+		nameplate_panel.visible = show_name
+		if show_name:
+			nameplate_panel.reset_size()
+			var target_w := maxf(76.0, speaker_label.get_minimum_size().x + 24.0)
+			nameplate_panel.offset_right = nameplate_panel.offset_left + target_w
 
-	if portrait_frame and portrait_texture:
-		var tex := _load_cached_texture(portrait_path)
-		var show_p := (not hide_portrait) and (tex != null)
-		portrait_frame.visible = show_p
-		if show_p:
-			portrait_texture.texture = tex
-			portrait_texture.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			portrait_texture.modulate = Color.WHITE
-		if speech_area:
-			speech_area.offset_left = 90.0 if show_p else 14.0
+	var pal := HuwagUiTheme.get_palette(target_mode)
+	if speaker_label:
+		speaker_label.add_theme_color_override("font_color", pal["text"])
 
-	if dialogue_label:
-		dialogue_label.offset_top = 12.0 if (speaker_label and speaker_label.visible) else 2.0
-		var trimmed := text.strip_edges()
-		var short_centered := (trimmed.length() <= 92 and trimmed.count("\n") <= 1)
-		dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if short_centered else HORIZONTAL_ALIGNMENT_LEFT
-		dialogue_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		dialogue_label.text = text
+	var tex := _load_cached_texture(portrait_path)
+	var show_p := (not hide_portrait) and (tex != null)
+	portrait_frame.visible = show_p
+	if show_p:
+		portrait_texture.texture = tex
+		portrait_texture.modulate = Color.WHITE
 
-	_full_text = text
+	var trimmed := text.strip_edges()
+	dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	dialogue_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	dialogue_label.text = trimmed
+	dialogue_label.add_theme_color_override("font_color", pal["text_muted"] if is_monologue else pal["text"])
+
+	_full_text = trimmed
 	_revealed_chars = 0.0
-	_typing = true
 	dialogue_label.visible_characters = 0
 
-	if continue_hint:
-		continue_hint.visible = false
-	_cursor_timer = 0.0
+	if page.has("choices") and typeof(page["choices"]) == TYPE_ARRAY:
+		_current_choices = page["choices"].duplicate()
 
-	for child in choices_vbox.get_children():
-		child.queue_free()
-	_choice_labels.clear()
-	_choice_boxes.clear()
-	_current_choices = page.get("choices", [])
-	_selected_choice = 0
-	if choices_panel:
-		choices_panel.visible = false
+	if _full_text.is_empty():
+		_typing = false
+		_finish_typing()
+	else:
+		_typing = true
+		_play_ui_sfx("ui_dialogue")
 
-	if _page_index == 0 and speaker_id != _last_speaker_id:
-		_play_box_open_animation()
+	if _last_speaker_id.is_empty() and show_p:
+		_last_speaker_id = speaker_id
+		_last_expression = resolved_expr
 	elif speaker_id != _last_speaker_id or resolved_expr != _last_expression:
-		_play_speaker_switch_transition()
-
-	_last_speaker_id = speaker_id
-	_last_expression = resolved_expr
+		if show_p:
+			_play_speaker_switch_transition()
+		_last_speaker_id = speaker_id
+		_last_expression = resolved_expr
 
 
 func _play_box_open_animation() -> void:
-	if portrait_texture:
+	if portrait_frame.visible:
 		portrait_texture.modulate.a = 0.0
 		var ptw := create_tween()
 		ptw.tween_property(portrait_texture, "modulate:a", 1.0, 0.14)
 
 
 func _play_speaker_switch_transition() -> void:
-	if portrait_texture:
+	if portrait_frame.visible:
 		portrait_texture.modulate.a = 0.35
 		var ptw := create_tween()
 		ptw.tween_property(portrait_texture, "modulate:a", 1.0, 0.12)
@@ -320,12 +315,12 @@ func _play_speaker_switch_transition() -> void:
 func _finish_typing() -> void:
 	_typing = false
 	dialogue_label.visible_characters = -1
-	if _current_choices.size() > 0:
+	if not _current_choices.is_empty():
 		_populate_choices()
 	else:
-		if continue_hint:
-			continue_hint.visible = true
+		continue_hint.visible = true
 		_cursor_timer = 0.0
+		continue_hint.position.x = _base_hint_pos_x
 
 
 func _populate_choices() -> void:
@@ -333,47 +328,59 @@ func _populate_choices() -> void:
 		child.queue_free()
 	_choice_labels.clear()
 	_choice_boxes.clear()
+	_choice_cursors.clear()
 
 	for i in range(_current_choices.size()):
 		var btn_box := PanelContainer.new()
-		btn_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn_box.mouse_filter = Control.MOUSE_FILTER_STOP
-		var lbl := Label.new()
-		lbl.custom_minimum_size = Vector2(220, 0)
-		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		lbl.text = "► " + str(_current_choices[i])
-		lbl.add_theme_font_override("font", PIXEL_FONT)
-		lbl.add_theme_font_size_override("font_size", 7)
-		lbl.add_theme_constant_override("shadow_offset_x", 1)
-		lbl.add_theme_constant_override("shadow_offset_y", 1)
-		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		btn_box.add_child(lbl)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-		btn_box.mouse_entered.connect(func():
-			_selected_choice = i
-			_refresh_choices_visual()
-			_play_ui_sfx("ui_hover")
-		)
+		var cursor_icon := TextureRect.new()
+		cursor_icon.custom_minimum_size = Vector2(18, 12)
+		cursor_icon.texture = HuwagUiTheme.build_omori_hand_cursor_texture()
+		cursor_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		cursor_icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+		cursor_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(cursor_icon)
+
+		var lbl := Label.new()
+		lbl.text = str(_current_choices[i])
+		var f := HuwagUiTheme.get_ui_font()
+		if f:
+			lbl.add_theme_font_override("font", f)
+		lbl.add_theme_font_size_override("font_size", 16)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(lbl)
+
+		btn_box.add_child(row)
+		var idx := i
 		btn_box.gui_input.connect(func(ev: InputEvent):
 			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
-				btn_box.accept_event()
+				_selected_choice = idx
+				_refresh_choices_visual()
 				get_viewport().set_input_as_handled()
-				if _advance_cooldown > 0.0:
-					return
-				_advance_cooldown = ADVANCE_COOLDOWN_SEC
-				_selected_choice = i
 				_advance_page()
 		)
-
+		btn_box.mouse_entered.connect(func():
+			if _selected_choice != idx:
+				_selected_choice = idx
+				_refresh_choices_visual()
+				_play_ui_sfx("ui_move")
+		)
 		choices_vbox.add_child(btn_box)
-		_choice_boxes.append(btn_box)
 		_choice_labels.append(lbl)
+		_choice_boxes.append(btn_box)
+		_choice_cursors.append(cursor_icon)
 
-	if choices_panel:
-		choices_panel.custom_minimum_size = Vector2(252, 0)
-		choices_panel.visible = true
-		choices_panel.reset_size()
+	_selected_choice = 0
+	var bottom_y := -146.0 if (nameplate_panel != null and nameplate_panel.visible) else -116.0
+	choices_panel.offset_bottom = bottom_y
+	choices_panel.offset_top = bottom_y - float(maxi(1, _current_choices.size()) * 26 + 16)
 	_refresh_choices_visual()
+	choices_panel.visible = true
 
 
 func _refresh_choices_visual() -> void:
@@ -381,17 +388,17 @@ func _refresh_choices_visual() -> void:
 	for i in range(_choice_labels.size()):
 		var lbl := _choice_labels[i]
 		var box := _choice_boxes[i]
+		var cur := _choice_cursors[i]
 		var is_sel := (i == _selected_choice)
-		var txt := str(_current_choices[i])
-		lbl.text = ("► " + txt) if is_sel else ("  " + txt)
+		lbl.text = str(_current_choices[i])
+		cur.visible = is_sel
+		cur.modulate = Color.WHITE if is_sel else Color(1, 1, 1, 0)
 		if is_sel:
-			box.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["choice_sel_bg"], pal["choice_sel_border"], 1, 6, 3))
-			lbl.add_theme_color_override("font_color", pal["accent"])
-			lbl.add_theme_color_override("font_shadow_color", pal["text_shadow"])
+			box.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["choice_sel_bg"], pal["choice_sel_border"], 6, 3))
+			lbl.add_theme_color_override("font_color", pal["text"])
 		else:
-			box.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["choice_bg"], pal["border"], 1, 6, 3))
+			box.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["choice_bg"], Color(pal["border"].r, pal["border"].g, pal["border"].b, 0.35), 6, 3))
 			lbl.add_theme_color_override("font_color", pal["text_muted"])
-			lbl.add_theme_color_override("font_shadow_color", pal["text_shadow"])
 
 
 func _advance_page() -> void:
@@ -399,16 +406,14 @@ func _advance_page() -> void:
 	var current_page: Dictionary = _pages[_page_index] if (_page_index >= 0 and _page_index < _pages.size()) else {}
 	var chosen: int = _selected_choice if not _current_choices.is_empty() else -1
 	var conflict_target: String = _resolve_conflict_target(current_page, chosen)
-
 	_page_index += 1
 	if _page_index >= _pages.size():
 		_close_dialogue()
 		dialogue_finished.emit(chosen)
 		if not conflict_target.is_empty():
 			conflict_triggered.emit(conflict_target, {
-				"choice_index": chosen,
+				"choice": chosen,
 				"speaker": str(current_page.get("speaker", "")),
-				"page_index": _page_index - 1
 			})
 	else:
 		_show_current_page()
@@ -434,18 +439,17 @@ func close_dialogue() -> void:
 
 
 func _close_dialogue() -> void:
-	active = false
 	_is_corrupted_theme = false
-	_advance_cooldown = ADVANCE_COOLDOWN_SEC
-	if choices_panel:
-		choices_panel.visible = false
-	hide()
+	active = false
+	visible = false
+	choices_panel.visible = false
+	continue_hint.visible = false
+	_current_choices.clear()
 	if has_node("/root/GameState"):
 		var gs := get_node("/root/GameState")
+		gs.dialogue_active = false
 		if gs.has_method("notify_dialogue_closed"):
-			gs.call("notify_dialogue_closed", POST_CLOSE_COOLDOWN_SEC)
-		else:
-			gs.dialogue_active = false
+			gs.notify_dialogue_closed(0.28)
 
 
 func _apply_theme(mode: String) -> void:
@@ -453,27 +457,30 @@ func _apply_theme(mode: String) -> void:
 	var pal := HuwagUiTheme.get_palette(mode)
 
 	if frame_panel:
-		frame_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["bg"], pal["border"], 1))
+		frame_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 8, 6))
+	if nameplate_panel:
+		nameplate_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 0, 0))
 	if portrait_frame:
-		var p_border: Color = Color("#591320") if mode == "distorted" else pal["border"]
-		portrait_frame.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["bg_inner"], p_border, 1, 1, 1))
+		portrait_frame.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg_inner"], pal["border"], 4, 4))
 	if choices_panel:
-		choices_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_box_style(pal["bg"], pal["border"], 1, 0, 0))
-	if top_trim:
-		top_trim.color = pal["trim"]
-	if vhs_scuff_left:
-		vhs_scuff_left.color = pal["trim_dark"]
-	if vhs_scuff_right:
-		vhs_scuff_right.color = pal["trim_dark"]
-	if dialogue_label:
-		dialogue_label.add_theme_color_override("font_color", pal["text"])
-		dialogue_label.add_theme_color_override("font_shadow_color", pal["text_shadow"])
+		choices_panel.add_theme_stylebox_override("panel", HuwagUiTheme.make_omori_box_style(pal["bg"], pal["border"], 2, 2))
+
+	var ui_font := HuwagUiTheme.get_ui_font()
+	if ui_font:
+		if speaker_label:
+			speaker_label.add_theme_font_override("font", ui_font)
+		if dialogue_label:
+			dialogue_label.add_theme_font_override("font", ui_font)
+
 	if speaker_label:
-		speaker_label.add_theme_color_override("font_shadow_color", pal["text_shadow"])
+		speaker_label.add_theme_font_size_override("font_size", 16)
+		speaker_label.add_theme_color_override("font_color", pal["text"])
+	if dialogue_label:
+		dialogue_label.add_theme_font_size_override("font_size", 16)
+		dialogue_label.add_theme_color_override("font_color", pal["text"])
 	if continue_hint:
-		continue_hint.texture = HuwagUiTheme.build_down_arrow_texture(pal["cursor"], pal["border"])
-	if not _choice_boxes.is_empty():
-		_refresh_choices_visual()
+		continue_hint.texture = HuwagUiTheme.build_omori_hand_cursor_texture()
+		continue_hint.modulate = Color.WHITE
 
 
 func _play_ui_sfx(sfx_name: String) -> void:

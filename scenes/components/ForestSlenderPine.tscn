@@ -1,0 +1,27 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/components/forest_prop.gd" id="1_forest_prop"]
+[ext_resource type="Texture2D" path="res://assets/tilesets/v2/forest_v2_normal.png" id="2_forest_tex"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_slender_trunk"]
+radius = 5.0
+
+[node name="ForestSlenderPine" type="StaticBody2D"]
+y_sort_enabled = true
+collision_layer = 1
+collision_mask = 6
+script = ExtResource("1_forest_prop")
+wind_strength = 1.5
+wind_speed = 1.75
+fade_radius = 28.0
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture_filter = 0
+texture = ExtResource("2_forest_tex")
+offset = Vector2(0, -34)
+region_enabled = true
+region_rect = Rect2(176, 208, 16, 96)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -1)
+shape = SubResource("CircleShape2D_slender_trunk")

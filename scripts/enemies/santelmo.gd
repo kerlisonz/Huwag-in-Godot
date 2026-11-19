@@ -17,6 +17,8 @@ signal enemy_defeated(position: Vector2)
 enum State { IDLE, WANDER, PATROL, AMBUSH_WAIT, CHASE, TELEGRAPH, ATTACK, HURT, DEAD }
 var current_state: State = State.IDLE
 
+const HUMANOID_FRAMES: SpriteFrames = preload("res://assets/sprites/enemies/santelmo/santelmo_humanoid_spriteframes.tres")
+
 var player: Node2D = null
 var spawn_origin: Vector2 = Vector2.ZERO
 var wander_target: Vector2 = Vector2.ZERO
@@ -26,10 +28,13 @@ var knockback_velocity: Vector2 = Vector2.ZERO
 var _patrol_index: int = 0
 var _telegraph_timer: float = 0.0
 var _telegraph_dir: Vector2 = Vector2.DOWN
+var _telegraph_kind: String = "melee"
+var _ranged_cooldown: float = 0.0
+var _facing: String = "down"
 var _flame_vfx: AnimatedSprite2D = null
 var _killed_by_water: bool = false
 
-@onready var sprite: Sprite2D = $Sprite2D
+@onready var sprite: AnimatedSprite2D = get_node_or_null("AnimatedSprite2D") as AnimatedSprite2D
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var hurtbox: Area2D = $Hurtbox
 @onready var hitbox: Area2D = $Hitbox
@@ -44,13 +49,17 @@ func _ready() -> void:
 	spawn_origin = global_position
 	current_health = max_health
 	_update_health_bar()
-	_flame_vfx = VfxLibrary.attach_loop(self, "santelmo_flame", Vector2(0.0, 0.0), {
-		"scale": Vector2(0.46, 0.46),
-		"modulate": Color(1.0, 0.92, 0.84, 0.86),
-		"z_index": 0,
+	_flame_vfx = VfxLibrary.attach_loop(self, "santelmo_flame", Vector2(0.0, -2.0), {
+		"scale": Vector2(0.32, 0.32),
+		"modulate": Color(1.0, 0.88, 0.76, 0.44),
+		"z_index": -1,
 	})
 	if sprite:
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sprite.sprite_frames = HUMANOID_FRAMES
+		sprite.scale = Vector2.ONE
+		if sprite.sprite_frames and sprite.sprite_frames.has_animation("idle_down"):
+			sprite.play("idle_down")
 
 	if behavior_mode == "patrol" and patrol_waypoints.size() >= 2:
 		current_state = State.PATROL
@@ -95,6 +104,8 @@ func _physics_process(delta: float) -> void:
 
 	if attack_cooldown > 0.0:
 		attack_cooldown -= delta
+	if _ranged_cooldown > 0.0:
+		_ranged_cooldown -= delta
 
 	if not player or not is_instance_valid(player):
 		var players := get_tree().get_nodes_in_group("player")
@@ -191,13 +202,18 @@ func _state_machine_logic(delta: float) -> void:
 				velocity = _compute_steered_velocity(dir, chase_speed, delta)
 
 			if dist_to_player <= attack_range and attack_cooldown <= 0.0:
-				_begin_attack_telegraph()
+				_begin_attack_telegraph("melee")
+			elif dist_to_player >= 78.0 and dist_to_player <= 150.0 and attack_cooldown <= 0.0 and _ranged_cooldown <= 0.0:
+				_begin_attack_telegraph("ranged")
 
 		State.TELEGRAPH:
 			velocity = Vector2.ZERO
 			_telegraph_timer -= delta
 			if _telegraph_timer <= 0.0:
-				_perform_attack_dash()
+				if _telegraph_kind == "ranged":
+					_perform_ranged_orb_attack()
+				else:
+					_perform_attack_dash()
 
 		State.ATTACK:
 			velocity = velocity.move_toward(Vector2.ZERO, 220.0 * delta)
@@ -214,16 +230,16 @@ func _pick_new_wander_target() -> void:
 	current_state = State.WANDER if randf() > 0.25 else State.IDLE
 
 
-func _begin_attack_telegraph() -> void:
+func _begin_attack_telegraph(kind: String = "melee") -> void:
 	current_state = State.TELEGRAPH
-	_telegraph_timer = 0.30
+	_telegraph_kind = kind
+	_telegraph_timer = 0.42 if kind == "ranged" else 0.30
 	if player and is_instance_valid(player):
 		_telegraph_dir = (player.global_position - global_position).normalized()
 	if _telegraph_dir.length_squared() < 0.01:
 		_telegraph_dir = Vector2.DOWN
-	if sprite:
-		var tw := create_tween()
-		tw.tween_property(sprite, "scale", Vector2(1.28, 1.28), 0.26)
+	_update_facing(_telegraph_dir)
+	_play_anim("attack2" if kind == "ranged" else "attack1")
 
 
 func _perform_attack_dash() -> void:
@@ -235,16 +251,45 @@ func _perform_attack_dash() -> void:
 		_telegraph_dir = (player.global_position - global_position).normalized()
 	if _telegraph_dir.length_squared() < 0.01:
 		_telegraph_dir = Vector2.DOWN
+	_update_facing(_telegraph_dir)
+	_play_anim("attack1")
 	knockback_velocity = _telegraph_dir * 185.0
-	if sprite:
-		var tween := create_tween()
-		tween.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.22)
-		tween.tween_callback(func():
-			if current_state != State.DEAD:
-				current_state = State.CHASE
-		)
-	else:
-		current_state = State.CHASE
+	var tween := create_tween()
+	tween.tween_interval(0.26)
+	tween.tween_callback(func():
+		if current_state != State.DEAD:
+			current_state = State.CHASE
+	)
+
+
+func _perform_ranged_orb_attack() -> void:
+	if current_state == State.DEAD:
+		return
+	current_state = State.ATTACK
+	attack_cooldown = 1.65
+	_ranged_cooldown = 3.2
+	if player and is_instance_valid(player):
+		_telegraph_dir = (player.global_position - global_position).normalized()
+	if _telegraph_dir.length_squared() < 0.01:
+		_telegraph_dir = Vector2.DOWN
+	_update_facing(_telegraph_dir)
+	_play_anim("attack2")
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("santelmo_cry", -10.5, 1.22)
+	if is_inside_tree() and get_parent() != null:
+		var orb := _SantelmoFireOrb.new()
+		orb.shooter = self
+		orb.direction = _telegraph_dir
+		orb.damage = attack_damage
+		orb.collision_mask = (hitbox.collision_mask if hitbox else 1) | 1
+		orb.global_position = global_position + _telegraph_dir * 14.0
+		get_parent().add_child(orb)
+	var tween := create_tween()
+	tween.tween_interval(0.32)
+	tween.tween_callback(func():
+		if current_state != State.DEAD:
+			current_state = State.CHASE
+	)
 
 
 func take_damage(amount: int, knockback_source: Vector2 = Vector2.ZERO, is_water_damage: bool = false) -> void:
@@ -277,6 +322,7 @@ func take_damage(amount: int, knockback_source: Vector2 = Vector2.ZERO, is_water
 		_die()
 	else:
 		current_state = State.HURT
+		_play_anim("hurt")
 		var t := get_tree().create_timer(0.20)
 		t.timeout.connect(func():
 			if current_state != State.DEAD:
@@ -316,10 +362,11 @@ func _die() -> void:
 		"scale": Vector2(0.75, 0.75) if _killed_by_water else Vector2(0.55, 0.55),
 		"z_index": 7,
 	})
+	_play_anim("death")
 	var tween := create_tween()
+	tween.tween_interval(0.32)
 	if sprite:
-		tween.parallel().tween_property(sprite, "scale", Vector2(0.1, 0.1), 0.35)
-		tween.parallel().tween_property(sprite, "modulate:a", 0.0, 0.35)
+		tween.parallel().tween_property(sprite, "modulate:a", 0.0, 0.26)
 	if _flame_vfx and is_instance_valid(_flame_vfx):
 		tween.parallel().tween_property(_flame_vfx, "scale", Vector2(0.08, 0.08), 0.30)
 		tween.parallel().tween_property(_flame_vfx, "modulate:a", 0.0, 0.30)
@@ -338,19 +385,112 @@ func _update_health_bar() -> void:
 		health_bar.visible = (current_health < max_health and current_health > 0)
 
 
+func _update_facing(vec: Vector2) -> void:
+	if vec.length_squared() < 0.01:
+		return
+	if absf(vec.x) > absf(vec.y):
+		_facing = "right" if vec.x >= 0.0 else "left"
+	else:
+		_facing = "down" if vec.y >= 0.0 else "up"
+
+
+func _play_anim(prefix: String) -> void:
+	if not sprite or not sprite.sprite_frames:
+		return
+	var anim_name := "%s_%s" % [prefix, _facing]
+	if sprite.sprite_frames.has_animation(anim_name):
+		if sprite.animation != anim_name or not sprite.is_playing():
+			sprite.play(anim_name)
+
+
 func _animate_sprite(_delta: float) -> void:
 	if not sprite:
 		return
-	if current_state != State.TELEGRAPH:
-		var pulse := sin(Time.get_ticks_msec() * 0.008) * 0.08
-		sprite.scale = Vector2(1.0 + pulse, 1.0 - pulse)
+	if velocity.length_squared() > 4.0 and current_state not in [State.HURT, State.DEAD, State.TELEGRAPH, State.ATTACK]:
+		_update_facing(velocity)
+	var prefix := "idle"
+	match current_state:
+		State.DEAD:
+			prefix = "death"
+		State.HURT:
+			prefix = "hurt"
+		State.TELEGRAPH, State.ATTACK:
+			prefix = "attack2" if _telegraph_kind == "ranged" else "attack1"
+		State.CHASE:
+			prefix = "run" if velocity.length() > 12.0 else "idle"
+		State.WANDER, State.PATROL:
+			prefix = "walk" if velocity.length() > 8.0 else "idle"
+		_:
+			prefix = "idle"
+	_play_anim(prefix)
 
 
 func _draw() -> void:
 	if current_state == State.TELEGRAPH and _telegraph_timer > 0.0:
-		var p := 1.0 - clampf(_telegraph_timer / 0.30, 0.0, 1.0)
-		draw_arc(Vector2.ZERO, lerpf(10.0, 22.0, p), 0.0, TAU, 20, Color(1.0, 0.42, 0.22, 0.75), 1.5)
-		draw_line(Vector2.ZERO, _telegraph_dir * 26.0, Color(1.0, 0.62, 0.25, 0.80), 2.0)
+		var total_t := 0.42 if _telegraph_kind == "ranged" else 0.30
+		var p := 1.0 - clampf(_telegraph_timer / total_t, 0.0, 1.0)
+		var arc_col := Color(0.32, 0.85, 1.0, 0.85) if _telegraph_kind == "ranged" else Color(1.0, 0.42, 0.22, 0.75)
+		draw_arc(Vector2.ZERO, lerpf(10.0, 24.0, p), 0.0, TAU, 20, arc_col, 1.6)
+		draw_line(Vector2.ZERO, _telegraph_dir * (36.0 if _telegraph_kind == "ranged" else 26.0), Color(1.0, 0.62, 0.25, 0.85), 2.0)
+
+
+class _SantelmoFireOrb extends Area2D:
+	var shooter: Node2D = null
+	var direction: Vector2 = Vector2.RIGHT
+	var speed: float = 165.0
+	var damage: int = 12
+	var _life: float = 1.15
+	var _t: float = 0.0
+
+	func _ready() -> void:
+		z_index = 6
+		monitoring = true
+		monitorable = false
+		var col := CollisionShape2D.new()
+		var circ := CircleShape2D.new()
+		circ.radius = 6.0
+		col.shape = circ
+		add_child(col)
+		body_entered.connect(_on_body_entered)
+
+	func _physics_process(delta: float) -> void:
+		if has_node("/root/GameState"):
+			var gs := get_node("/root/GameState")
+			if bool(gs.get("dialogue_active")) or bool(gs.get("sleep_transition_active")):
+				return
+		_t += delta
+		_life -= delta
+		position += direction * speed * delta
+		queue_redraw()
+		if _life <= 0.0:
+			queue_free()
+
+	func _draw() -> void:
+		var r := 5.5 + sin(_t * 18.0) * 1.1
+		draw_circle(Vector2.ZERO, r + 2.0, Color(1.0, 0.46, 0.14, 0.55))
+		draw_circle(Vector2.ZERO, r, Color(1.0, 0.72, 0.20, 0.92))
+		draw_circle(Vector2.ZERO, r * 0.55, Color(0.32, 0.86, 1.0, 0.98))
+		draw_circle(Vector2.ZERO, 1.8, Color(1.0, 0.98, 0.90, 1.0))
+
+	func _on_body_entered(body: Node) -> void:
+		if body == null or body == shooter or body is SantelmoEnemy:
+			return
+		if body.is_in_group("player"):
+			if body.has_method("apply_hit"):
+				body.call("apply_hit", damage, global_position)
+			elif body.has_method("take_damage"):
+				body.call("take_damage", damage, global_position)
+			VfxLibrary.spawn_burst(get_parent(), "santelmo_flame", global_position, {
+				"scale": Vector2(0.42, 0.42),
+				"z_index": 7,
+			})
+			queue_free()
+		elif body is StaticBody2D or body is TileMapLayer:
+			VfxLibrary.spawn_burst(get_parent(), "santelmo_flame", global_position, {
+				"scale": Vector2(0.32, 0.32),
+				"z_index": 7,
+			})
+			queue_free()
 
 
 func _on_hurtbox_area_entered(area: Area2D) -> void:

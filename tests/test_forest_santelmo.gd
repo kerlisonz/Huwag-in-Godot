@@ -61,7 +61,9 @@ func _run_forest_suite() -> void:
 	var s5 = trail.get_node_or_null("ObstaclesYsort/Santelmo5")
 	assert(s1 != null and s2 != null and s3 != null and s4 != null and s5 != null, "Inimigos Santelmo originais e expandidos devem estar na trilha!")
 	assert(trail.ground_normal.tile_set.resource_path.ends_with("forest_v2_normal_tileset.tres"), "ForestTrail deve usar forest_v2_normal_tileset.tres!")
-	assert(trail.get_node_or_null("V2CanopyLayer") != null, "ForestTrail deve conter V2CanopyLayer com shader de copa!")
+	var trail_trees := trail.get_node_or_null("ObstaclesYsort/ForestTrees") as Node2D
+	assert(trail_trees != null and trail_trees.y_sort_enabled and trail_trees.get_child_count() >= 300,
+		"ForestTrail deve conter ObstaclesYsort/ForestTrees com y_sort_enabled e pinheiros escalonados!")
 	assert(trail._santelmos.size() >= 8, "ForestTrail deve ter >= 8 Santelmos distribuídos (atual=%d)!" % trail._santelmos.size())
 	print("[PASS] ForestTrail v2 + %d Santelmos (wander/patrol/ambush) confirmados!" % trail._santelmos.size())
 
@@ -108,10 +110,10 @@ func _run_forest_suite() -> void:
 			img_trail.save_png("res://docs/screenshots/forest_trail_validated.png")
 			print("[OK] Captura da trilha salva em docs/screenshots/forest_trail_validated.png")
 
-	var trail_understory := trail.find_child("V2UnderstoryLayer", true, false) as TileMapLayer
-	var trail_canopy := trail.find_child("V2CanopyLayer", true, false) as TileMapLayer
-	assert(trail_understory != null and trail_understory.collision_enabled == true, "V2UnderstoryLayer da trilha deve ter colisão ativa!")
-	assert(trail_canopy != null and trail_canopy.collision_enabled == true, "V2CanopyLayer da trilha deve ter colisão ativa!")
+	assert(trail.find_child("V2UnderstoryLayer", true, false) == null, "V2UnderstoryLayer procedural não deve existir em ForestTrail otimizada")
+	assert(trail.find_child("V2CanopyLayer", true, false) == null, "V2CanopyLayer procedural não deve existir em ForestTrail otimizada")
+	var trail_walls := trail.get_node_or_null("WallsNormal") as TileMapLayer
+	assert(trail_walls != null and trail_walls.collision_enabled == true, "WallsNormal da trilha deve ter colisão ativa para cerca/riachos/rochedos!")
 	if player != null:
 		player.position = Vector2(160, 360)
 		for _i in range(14):
@@ -123,6 +125,42 @@ func _run_forest_suite() -> void:
 			player.move_and_collide(Vector2(0, 4))
 		assert(player.position.y <= 550.0, "Árvores ao sul da trilha devem bloquear travessia (y=%f)" % player.position.y)
 		print("[PASS] Colisão física da cerca e árvores na ForestTrail validada!")
+
+		# 4b. Confirmação de saída da floresta para Agdangan (ExitToCityArea)
+		var exit_state := {"prompts": 0, "choices": [], "cb": Callable(), "changed_scene": "", "changed_tag": ""}
+		trail.request_dialogue.connect(func(pages: Array, cb: Callable) -> void:
+			exit_state["prompts"] = int(exit_state["prompts"]) + 1
+			if pages.size() > 0:
+				exit_state["choices"] = pages[0].get("choices", [])
+			exit_state["cb"] = cb
+		)
+		trail.request_level_change.connect(func(scene_p: String, tag: String) -> void:
+			exit_state["changed_scene"] = scene_p
+			exit_state["changed_tag"] = tag
+		)
+		player.position = Vector2(20, 384)
+		trail._on_exit_city_area_body_entered(player)
+		assert(int(exit_state["prompts"]) == 1, "Sair da floresta deve abrir confirmação antes de mudar de cena!")
+		assert((exit_state["choices"] as Array).size() == 2, "Confirmação de saída deve oferecer 2 opções!")
+		assert(str(exit_state["changed_scene"]).is_empty(), "Não deve trocar de cena antes da confirmação do jogador!")
+
+		# Jogador cancela / escolhe continuar na floresta (choice = 1)
+		(exit_state["cb"] as Callable).call(1)
+		assert(str(exit_state["changed_scene"]).is_empty(), "Escolher 'Continuar na Floresta' não deve sair da cena!")
+		assert(player.position.x >= 56.0, "Ao cancelar saída, Huwag deve recuar para fora da área de saída (x=%f)" % player.position.x)
+		# Cooldown evita reabertura imediata
+		trail._on_exit_city_area_body_entered(player)
+		assert(int(exit_state["prompts"]) == 1, "Cooldown deve evitar reabertura imediata do prompt de saída!")
+
+		# Após expirar o cooldown, confirmar saída (choice = 0) leva a StreetPreview
+		trail.set("_exit_city_cooldown", 0.0)
+		player.position = Vector2(20, 384)
+		trail._on_exit_city_area_body_entered(player)
+		assert(int(exit_state["prompts"]) == 2, "Nova entrada na saída após cooldown deve abrir confirmação novamente!")
+		(exit_state["cb"] as Callable).call(0)
+		assert(str(exit_state["changed_scene"]) == "res://scenes/levels/StreetPreview.tscn" and str(exit_state["changed_tag"]) == "from_forest",
+			"Confirmar saída deve emitir transição para StreetPreview com spawn_tag 'from_forest'!")
+		print("[PASS] Confirmação de saída da floresta (cancelar + confirmar) validada!")
 
 	trail.queue_free()
 	await process_frame
@@ -197,17 +235,23 @@ func _run_forest_suite() -> void:
 			img_clearing.save_png("res://docs/screenshots/forest_clearing_validated.png")
 			print("[OK] Captura da clareira salva em docs/screenshots/forest_clearing_validated.png")
 
-	var clear_understory := clearing.find_child("V2UnderstoryLayer", true, false) as TileMapLayer
-	var clear_canopy := clearing.find_child("V2CanopyLayer", true, false) as TileMapLayer
-	assert(clear_understory != null and clear_understory.collision_enabled == true, "V2UnderstoryLayer da clareira deve ter colisão ativa!")
-	assert(clear_canopy != null and clear_canopy.collision_enabled == true, "V2CanopyLayer da clareira deve ter colisão ativa!")
+	assert(clearing.find_child("V2UnderstoryLayer", true, false) == null, "V2UnderstoryLayer procedural não deve existir na clareira limpa")
+	assert(clearing.find_child("V2CanopyLayer", true, false) == null, "V2CanopyLayer procedural não deve existir na clareira limpa")
+	assert(clearing.find_child("V2GroundClutterLayer", true, false) == null, "V2GroundClutterLayer procedural não deve existir na clareira limpa")
+	var clear_walls := clearing.get_node_or_null("WallsNormal") as TileMapLayer
+	assert(clear_walls != null and clear_walls.get_cell_source_id(Vector2i(1, 1)) == -1, "Paredões automáticos removidos de WallsNormal")
+	assert(clear_walls.get_cell_source_id(Vector2i(31, 14)) != -1, "Água da Lagoa Azul preservada em WallsNormal")
 	var clear_player := clearing.get_node_or_null("ObstaclesYsort/PlayerHuwag") as CharacterBody2D
 	if clear_player != null:
-		clear_player.position = Vector2(752, 312)
+		clear_player.position = Vector2(816, 344)
 		for _i in range(18):
+			clear_player.move_and_collide(Vector2(0, -4))
+		assert(clear_player.position.y >= 312.0, "Tronco da ForestAncientTree deve bloquear o player (y=%f)" % clear_player.position.y)
+		clear_player.position = Vector2(936, 240)
+		for _i in range(16):
 			clear_player.move_and_collide(Vector2(4, 0))
-		assert(clear_player.position.x <= 792.0, "Tronco da Árvore Anciã deve bloquear o player (x=%f)" % clear_player.position.x)
-		print("[PASS] Colisão física das árvores e Árvore Anciã na ForestClearing validada!")
+		assert(clear_player.position.x <= 960.0, "ClearingBoundaries deve manter o jogador dentro dos limites do mapa (x=%f)" % clear_player.position.x)
+		print("[PASS] Clareira limpa (solo + Lagoa + Guardiã + ovos), ForestAncientTree e bordas invisíveis validados!")
 
 	clearing.queue_free()
 	await process_frame

@@ -1,3 +1,4 @@
+@tool
 extends Node2D
 
 ## ForestTrail — Trilha da Floresta de Agdangan (Atos 1, 2 e 3)
@@ -28,6 +29,7 @@ const MAP_H := 48
 @onready var decals_layer: Node2D = $DecalsLayer
 @onready var interactables_root: Node2D = $Interactables
 @onready var ysort_obstacles: Node2D = $ObstaclesYsort
+@onready var painted_props_layer: TileMapLayer = get_node_or_null("ObstaclesYsort/PaintedPropsLayer") as TileMapLayer
 @onready var lights_layer: Node2D = $LightsLayer
 @onready var fire_embers: CPUParticles2D = $FireEmbers
 @onready var exit_area: Area2D = get_node_or_null("ExitToClearingArea")
@@ -41,15 +43,17 @@ var _lights: Array[PointLight2D] = []
 var _santelmos: Array[Node] = []
 var _stalker_npc: NpcEntity = null
 var _ambient_dust: CPUParticles2D = null
-var _clutter_layer: TileMapLayer = null
-var _understory_layer: TileMapLayer = null
-var _canopy_layer: TileMapLayer = null
-var _canopy_material: ShaderMaterial = null
 var _fog_overlay: ColorRect = null
 var _time_acc: float = 0.0
+var _exit_city_prompt_open: bool = false
+var _exit_city_cooldown: float = 0.0
 
 
 func _ready() -> void:
+	if Engine.is_editor_hint():
+		_setup_editor_preview()
+		return
+
 	if player:
 		if GameState.spawn_tag == "from_clearing":
 			player.position = Vector2(2480, 384)
@@ -94,10 +98,53 @@ func _ready() -> void:
 				am.play_ambience("night_forest")
 
 
+func _setup_editor_preview() -> void:
+	RetroLevelHelpers.cleanup_editor_preview(self)
+	_normal_props.clear()
+	_distorted_props.clear()
+	_distorted_decals.clear()
+	_lights.clear()
+	_santelmos.clear()
+	_ambient_dust = null
+	_fog_overlay = null
+	var has_baked_floor := ground_normal != null and not ground_normal.get_used_cells().is_empty()
+	if has_baked_floor:
+		ground_normal.tile_set = NORMAL_TS
+		if walls_normal != null:
+			walls_normal.tile_set = NORMAL_TS
+		_build_forest_props_and_lights()
+		_setup_interactables_and_pickups()
+		_spawn_expanded_forest_enemies()
+	else:
+		var orig_gn := ground_normal
+		var orig_wn := walls_normal
+		var orig_gd := ground_distorted
+		var orig_wd := walls_distorted
+		ground_normal = RetroLevelHelpers.create_preview_tilemap(self, "EditorPreviewGround", -3)
+		walls_normal = RetroLevelHelpers.create_preview_tilemap(self, "EditorPreviewWalls", -2)
+		var tmp_gd := TileMapLayer.new()
+		var tmp_wd := TileMapLayer.new()
+		ground_distorted = tmp_gd
+		walls_distorted = tmp_wd
+		_build_forest_tilemaps()
+		_build_forest_props_and_lights()
+		_setup_interactables_and_pickups()
+		_spawn_expanded_forest_enemies()
+		ground_normal = orig_gn
+		walls_normal = orig_wn
+		ground_distorted = orig_gd
+		walls_distorted = orig_wd
+		tmp_gd.free()
+		tmp_wd.free()
+	RetroLevelHelpers.mark_unowned_preview_children([self, ysort_obstacles, decals_layer, lights_layer, interactables_root])
+
+
 func _process(delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
+	if _exit_city_cooldown > 0.0:
+		_exit_city_cooldown = maxf(0.0, _exit_city_cooldown - delta)
 	_time_acc += delta
-	if _canopy_material != null and player != null and is_instance_valid(player):
-		_canopy_material.set_shader_parameter("player_world_pos", player.global_position)
 	var higher := _is_higher_dose_active()
 	for i in range(_lights.size()):
 		var lt := _lights[i]
@@ -116,289 +163,133 @@ func apply_higher_dose_world(_active: bool) -> void:
 
 
 func _is_higher_dose_active() -> bool:
+	if Engine.is_editor_hint():
+		return false
 	return GameState.has_method("is_higher_dose") and GameState.is_higher_dose()
 
 
 func _build_forest_tilemaps() -> void:
+	var active_base_ts: TileSet = ACT3_TS if RetroLevelHelpers.is_act3_unfiltered() else NORMAL_TS
 	for layer in [ground_normal, walls_normal]:
-		layer.tile_set = NORMAL_TS
+		layer.tile_set = active_base_ts
 	for layer in [ground_distorted, walls_distorted]:
 		layer.tile_set = DISTORTED_TS
 
-	# Matriz booleana 160x48 para esculpir caminhos curvos, bifurcações e riacho
-	var walkable: Array = []
-	for x in range(MAP_W):
-		var col: Array = []
-		col.resize(MAP_H)
-		col.fill(false)
-		walkable.append(col)
+	# Preserva GroundNormal/WallsNormal salvos no .tscn (só gera o padrão caso estejam vazios)
+	if ground_normal.get_used_cells().is_empty():
+		walls_normal.clear()
+		var walkable: Array = []
+		for x in range(MAP_W):
+			var col: Array = []
+			col.resize(MAP_H)
+			col.fill(false)
+			walkable.append(col)
 
-	var carve := func(x0: int, y0: int, w: int, h: int) -> void:
-		for x in range(maxi(0, x0), mini(MAP_W, x0 + w)):
-			for y in range(maxi(0, y0), mini(MAP_H, y0 + h)):
-				walkable[x][y] = true
+		var carve := func(x0: int, y0: int, w: int, h: int) -> void:
+			for x in range(maxi(0, x0), mini(MAP_W, x0 + w)):
+				for y in range(maxi(0, y0), mini(MAP_H, y0 + h)):
+					walkable[x][y] = true
 
-	# 1. Portão oeste & clareira de entrada (mantém borda norte acima de y=20 arborizada sem bolsão)
-	carve.call(0, 21, 5, 6)
-	carve.call(2, 21, 24, 10)
-	carve.call(24, 16, 7, 15)
-	carve.call(29, 17, 7, 5)
-	carve.call(24, 3, 18, 15)
+		carve.call(0, 21, 5, 6)
+		carve.call(2, 21, 24, 10)
+		carve.call(24, 16, 7, 15)
+		carve.call(29, 17, 7, 5)
+		carve.call(24, 3, 18, 15)
+		carve.call(34, 6, 54, 11)
+		carve.call(26, 28, 16, 13)
+		carve.call(40, 30, 48, 13)
+		carve.call(84, 12, 20, 25)
+		carve.call(102, 5, 38, 13)
+		carve.call(130, 16, 10, 12)
+		carve.call(100, 29, 44, 13)
+		carve.call(132, 20, 25, 14)
+		carve.call(156, 21, 4, 6)
 
-	# 2. Bifurcação 1 -> Rota Norte (Serra das Cinzas, estreita e perigosa)
-	carve.call(34, 6, 54, 11)
+		var f_cat := V2TileCatalog.FOREST_TILES
 
-	# 3. Bifurcação 1 -> Rota Sul (Riacho da Cruz, pontes de madeira & abrigo)
-	carve.call(26, 28, 16, 13)
-	carve.call(40, 30, 48, 13)
+		for sx in [52, 53, 68, 69]:
+			for sy in range(30, 43):
+				if sy >= 35 and sy <= 37:
+					continue
+				walkable[sx][sy] = false
+				var water_coord: Vector2i = f_cat["waterfall_top"] if sy == 30 else (f_cat["waterfall_mid"] if sy == 31 else f_cat["water_deep_anim"])
+				walls_normal.set_cell(Vector2i(sx, sy), 0, water_coord)
 
-	# 4. Bacia Central Silenciosa (Yume Nikki empty pocket)
-	carve.call(84, 12, 20, 25)
+		for fx in range(2, 23, 3):
+			walls_normal.set_cell(Vector2i(fx, 20), 0, f_cat["fence_left"])
+			walls_normal.set_cell(Vector2i(fx + 1, 20), 0, f_cat["fence_mid"])
+			walls_normal.set_cell(Vector2i(fx + 2, 20), 0, f_cat["fence_right"])
 
-	# 5. Bifurcação 2 -> Norte-Leste (Clareira Morta / Poço Seco)
-	carve.call(102, 5, 38, 13)
-	carve.call(130, 16, 10, 12)
-
-	# 6. Desfiladeiro em Brasas & Portão Leste para a Lagoa
-	carve.call(100, 29, 44, 13)
-	carve.call(132, 20, 25, 14)
-	carve.call(156, 21, 4, 6)
-
-	# Obstáculos internos (rochedos & poço seco) preservando amplas rotas de desvio
-	var f_cat := V2TileCatalog.FOREST_TILES
-	var solid_rock := func(x0: int, y0: int, w: int, h: int) -> void:
-		for x in range(x0, x0 + w):
-			for y in range(y0, y0 + h):
-				walkable[x][y] = false
-				for wl in [walls_normal, walls_distorted]:
-					wl.set_cell(Vector2i(x, y), 0, f_cat["rock_round_a"])
-
-	solid_rock.call(50, 10, 2, 2)
-	solid_rock.call(69, 11, 2, 2)
-	solid_rock.call(117, 9, 4, 3)   # Poço seco / cratera na clareira morta
-	solid_rock.call(114, 33, 2, 2)
-	solid_rock.call(126, 36, 2, 2)
-
-	# Riachos animados cortando a Rota Sul em x=52..53 e x=68..69, cruzados por pontes em y=35..37
-	for sx in [52, 53, 68, 69]:
-		for sy in range(30, 43):
-			if sy >= 35 and sy <= 37:
-				continue
-			walkable[sx][sy] = false
-			var water_coord: Vector2i = f_cat["waterfall_top"] if sy == 30 else (f_cat["waterfall_mid"] if sy == 31 else f_cat["water_deep_anim"])
-			for wl in [walls_normal, walls_distorted]:
-				wl.set_cell(Vector2i(sx, sy), 0, water_coord)
-
-	# Preenchimento 100% opaco do piso e barreiras de penhasco com forest_v2 (16x16, zero buracos!)
-	for x in range(MAP_W):
-		for y in range(MAP_H):
-			var base_grass: Vector2i = f_cat["grass_a"] if ((x + y) % 2 == 0) else f_cat["grass_b"]
-			for gl in [ground_normal, ground_distorted]:
-				gl.set_cell(Vector2i(x, y), 0, base_grass)
-			if not walkable[x][y]:
-				var already_special := walls_normal.get_cell_source_id(Vector2i(x, y)) != -1
-				if not already_special:
-					# Apenas as células de borda junto à trilha recebem penhasco com colisão física; o interior recebe vegetação densa
-					var near_walkable := false
-					for dy in range(-1, 2):
-						for dx in range(-1, 2):
-							var nx: int = x + dx
-							var ny: int = y + dy
-							if nx >= 0 and nx < MAP_W and ny >= 0 and ny < MAP_H and walkable[nx][ny]:
-								near_walkable = true
-								break
-						if near_walkable:
-							break
-					if near_walkable:
-						var wall_coord: Vector2i = f_cat["cliff_face_mid"] if (y + 1 < MAP_H and walkable[x][y + 1]) else f_cat["cliff_top_mid"]
-						for wl in [walls_normal, walls_distorted]:
-							wl.set_cell(Vector2i(x, y), 0, wall_coord)
-			else:
-				var tile: Vector2i = f_cat["grass_a"]
-				if (x * 7 + y * 11) % 9 <= 2:
-					tile = f_cat["grass_b"]
-				if x >= 34 and x <= 87 and y <= 16:
-					tile = f_cat["soil_dark"] if (x + y) % 4 != 0 else f_cat["soil_a"]
-				elif x >= 84 and x <= 103 and y >= 15 and y <= 33:
-					tile = f_cat["needle_grass_b"] if (x * 3 + y) % 4 != 0 else f_cat["grass_b"]
-					if x >= 90 and x <= 96 and y >= 21 and y <= 27:
+		for x in range(MAP_W):
+			for y in range(MAP_H):
+				var tile: Vector2i = f_cat["grass_a"] if ((x + y) % 2 == 0) else f_cat["grass_b"]
+				if walkable[x][y]:
+					if (x * 7 + y * 11) % 9 <= 2:
+						tile = f_cat["grass_b"]
+					if x >= 34 and x <= 87 and y <= 16:
+						tile = f_cat["soil_dark"] if (x + y) % 4 != 0 else f_cat["soil_a"]
+					elif x >= 84 and x <= 103 and y >= 15 and y <= 33:
+						tile = f_cat["grass_b"] if ((x + y) % 2 == 0) else f_cat["grass_a"]
+						if x >= 90 and x <= 96 and y >= 21 and y <= 27:
+							tile = f_cat["mud_patch_center"]
+					elif (x == 52 or x == 53 or x == 68 or x == 69) and y >= 35 and y <= 37:
+						tile = f_cat["bridge_v_mid_l"] if x in [52, 68] else f_cat["bridge_v_mid_r"]
+					elif x >= 49 and x <= 72 and y >= 31 and y <= 42:
+						tile = f_cat["grass_b"] if (x + y) % 3 != 0 else f_cat["grass_a"]
+					elif x >= 115 and x <= 122 and y >= 7 and y <= 13:
 						tile = f_cat["mud_patch_center"]
-				elif (x == 52 or x == 53 or x == 68 or x == 69) and y >= 35 and y <= 37:
-					tile = f_cat["bridge_v_mid_l"] if x in [52, 68] else f_cat["bridge_v_mid_r"]
-				elif x >= 49 and x <= 72 and y >= 31 and y <= 42:
-					tile = f_cat["grass_b"] if (x + y) % 3 != 0 else f_cat["grass_a"]
-				elif x >= 115 and x <= 122 and y >= 7 and y <= 13:
-					tile = f_cat["mud_patch_center"]
-				for gl in [ground_normal, ground_distorted]:
-					gl.set_cell(Vector2i(x, y), 0, tile)
+				ground_normal.set_cell(Vector2i(x, y), 0, tile)
 
-	# Trilhas principais marcadas com terra batida e lama (forest_v2)
-	var paint_trail := func(x0: int, y0: int, w: int, h: int, coord: Vector2i) -> void:
-		for gl in [ground_normal, ground_distorted]:
-			V2TileCatalog.fill_rect(gl, Rect2i(x0, y0, w, h), coord)
+		var paint_trail := func(x0: int, y0: int, w: int, h: int, coord: Vector2i) -> void:
+			V2TileCatalog.fill_rect(ground_normal, Rect2i(x0, y0, w, h), coord)
 
-	paint_trail.call(0, 23, 28, 3, f_cat["soil_a"])
-	paint_trail.call(26, 11, 3, 26, f_cat["soil_a"])
-	paint_trail.call(29, 11, 56, 3, f_cat["soil_b"])
-	paint_trail.call(29, 35, 56, 3, f_cat["soil_a"])
-	for gx in [52, 53, 68, 69]:
-		var b_coord: Vector2i = f_cat["bridge_v_mid_l"] if gx in [52, 68] else f_cat["bridge_v_mid_r"]
-		paint_trail.call(gx, 35, 1, 3, b_coord)
-	paint_trail.call(85, 12, 3, 25, f_cat["soil_b"])
-	paint_trail.call(88, 23, 14, 3, f_cat["soil_a"])
-	paint_trail.call(94, 10, 3, 14, f_cat["soil_b"])
-	paint_trail.call(97, 10, 37, 2, f_cat["soil_b"])
-	paint_trail.call(132, 11, 3, 18, f_cat["soil_a"])
-	paint_trail.call(101, 35, 34, 3, f_cat["soil_dark"])
-	paint_trail.call(134, 23, 26, 3, f_cat["soil_a"])
+		paint_trail.call(0, 23, 28, 3, f_cat["soil_a"])
+		paint_trail.call(26, 11, 3, 26, f_cat["soil_a"])
+		paint_trail.call(29, 11, 56, 3, f_cat["soil_b"])
+		paint_trail.call(29, 35, 56, 3, f_cat["soil_a"])
+		for gx in [52, 53, 68, 69]:
+			var b_coord: Vector2i = f_cat["bridge_v_mid_l"] if gx in [52, 68] else f_cat["bridge_v_mid_r"]
+			paint_trail.call(gx, 35, 1, 3, b_coord)
+		paint_trail.call(85, 12, 3, 25, f_cat["soil_b"])
+		paint_trail.call(88, 23, 14, 3, f_cat["soil_a"])
+		paint_trail.call(94, 10, 3, 14, f_cat["soil_b"])
+		paint_trail.call(97, 10, 37, 2, f_cat["soil_b"])
+		paint_trail.call(132, 11, 3, 18, f_cat["soil_a"])
+		paint_trail.call(101, 35, 34, 3, f_cat["soil_dark"])
+		paint_trail.call(134, 23, 26, 3, f_cat["soil_a"])
 
-	# Camada de sub-bosque + copas de árvores em múltiplas camadas densas + neblina fog_drift
-	_setup_v2_canopy_and_fog(walkable)
+	ground_distorted.tile_map_data = ground_normal.tile_map_data
+	walls_distorted.tile_map_data = walls_normal.tile_map_data
+
+	if not Engine.is_editor_hint() and _fog_overlay == null:
+		_fog_overlay = AtmosphereRig.create_fog_overlay(Rect2(0, 0, MAP_W * 16, MAP_H * 16), Color(0.16, 0.22, 0.20, 1.0), 0.14)
+		add_child(_fog_overlay)
 
 	ground_distorted.collision_enabled = false
 	walls_distorted.collision_enabled = false
 
 
-func _setup_v2_canopy_and_fog(walkable: Array) -> void:
-	var f_cat := V2TileCatalog.FOREST_TILES
-	var active_ts: TileSet = ACT3_TS if GameState.is_unfiltered_act3() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
-
-	if _clutter_layer == null:
-		_clutter_layer = TileMapLayer.new()
-		_clutter_layer.name = "V2GroundClutterLayer"
-		_clutter_layer.z_index = -1
-		_clutter_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		_clutter_layer.collision_enabled = false
-		add_child(_clutter_layer)
-	_clutter_layer.tile_set = active_ts
-	_clutter_layer.clear()
-
-	if _understory_layer == null:
-		_understory_layer = TileMapLayer.new()
-		_understory_layer.name = "V2UnderstoryLayer"
-		_understory_layer.z_index = 0
-		_understory_layer.y_sort_enabled = true
-		_understory_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		_understory_layer.collision_enabled = true
-		if ysort_obstacles != null:
-			ysort_obstacles.add_child(_understory_layer)
-		else:
-			add_child(_understory_layer)
-	_understory_layer.tile_set = active_ts
-	_understory_layer.clear()
-
-	if _canopy_layer == null:
-		_canopy_layer = TileMapLayer.new()
-		_canopy_layer.name = "V2CanopyLayer"
-		_canopy_layer.z_index = 4
-		_canopy_layer.y_sort_enabled = true
-		_canopy_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		_canopy_layer.collision_enabled = true
-		_canopy_material = AtmosphereRig.create_canopy_material(36.0, 0.36)
-		_canopy_layer.material = _canopy_material
-		add_child(_canopy_layer)
-	_canopy_layer.tile_set = active_ts
-	_canopy_layer.clear()
-
-	# Cerca de madeira contínua na entrada oeste (y=20, alinhada ao paredão norte sem bolsão atrás)
-	for fx in range(2, 23, 3):
-		_understory_layer.set_cell(Vector2i(fx, 20), 0, f_cat["fence_left"])
-		_understory_layer.set_cell(Vector2i(fx + 1, 20), 0, f_cat["fence_mid"])
-		_understory_layer.set_cell(Vector2i(fx + 2, 20), 0, f_cat["fence_right"])
-
-	for gx in range(2, MAP_W - 2, 2):
-		for gy in range(2, MAP_H - 2, 2):
-			if walls_normal.get_cell_source_id(Vector2i(gx, gy)) != -1:
-				continue
-			if walkable[gx][gy]:
-				if (gx * 11 + gy * 7) % 23 == 0 and gy > 4 and gy < MAP_H - 4:
-					_clutter_layer.set_cell(Vector2i(gx, gy), 0, f_cat["pebbles"])
-				continue
-			var h := (gx * 13 + gy * 17) % 9
-			if h == 0:
-				_clutter_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_a"])
-			elif h == 1:
-				_clutter_layer.set_cell(Vector2i(gx, gy), 0, f_cat["fern_b"])
-			elif h == 2:
-				_clutter_layer.set_cell(Vector2i(gx, gy), 0, f_cat["mushrooms_a"])
-			elif h == 3 and gx + 1 < MAP_W and gy + 1 < MAP_H and not walkable[gx + 1][gy + 1] and walls_normal.get_cell_source_id(Vector2i(gx + 1, gy + 1)) == -1:
-				V2TileCatalog.stamp_rect(_understory_layer, Vector2i(gx, gy), f_cat["stump_rooted"], Vector2i(2, 2))
-			elif h == 4 and gx + 1 < MAP_W and gy + 1 < MAP_H and not walkable[gx + 1][gy + 1] and walls_normal.get_cell_source_id(Vector2i(gx + 1, gy + 1)) == -1:
-				V2TileCatalog.stamp_rect(_understory_layer, Vector2i(gx, gy), f_cat["moss_boulder"], Vector2i(2, 2))
-
-	# Preenchimento denso e orgânico em 2 camadas de árvores sem alinhamento artificial em régua
-	for gy in range(-3, MAP_H - 2, 2):
-		var row_shift := ((gy + 10) % 4)
-		for gx in range(-1 + (row_shift % 2), MAP_W - 1, 2):
-			var tx := gx + ((gx * 3 + gy * 5) % 2)
-			var y_jit := ((gx * 7 + gy * 11 + 3) & 1)
-			var sty := gy + y_jit
-			var pick := (tx * 11 + sty * 13 + tx * sty + 100) % 7
-			var stamp_w := 5 if pick == 3 else (1 if pick >= 5 else 3)
-			var trunk_x := tx + (2 if pick == 3 else (1 if stamp_w == 3 else 0))
-			var base_y := sty + 5
-			if trunk_x < 0 or trunk_x >= MAP_W or base_y < 0 or base_y >= MAP_H:
-				continue
-			if trunk_x >= 1 and trunk_x <= 23 and base_y >= 19 and base_y <= 21:
-				continue
-			if (trunk_x >= 38 and trunk_x <= 44 and base_y >= 29 and base_y <= 35) or (trunk_x >= 108 and trunk_x <= 114 and base_y >= 27 and base_y <= 33):
-				continue
-			var blocked_zone := false
-			for cx in range(maxi(0, trunk_x - 1), mini(MAP_W, trunk_x + 2)):
-				if walkable[cx][base_y]:
-					blocked_zone = true
-					break
-				if base_y + 1 < MAP_H and walkable[cx][base_y + 1]:
-					blocked_zone = true
-					break
-				var wcell := walls_normal.get_cell_atlas_coords(Vector2i(cx, base_y))
-				if wcell in [f_cat["water_deep_anim"], f_cat["water_ripple_anim"], f_cat["waterfall_top"], f_cat["waterfall_mid"], f_cat["waterfall_foam"], f_cat["rock_round_a"]]:
-					blocked_zone = true
-					break
-			if blocked_zone:
-				continue
-			if (trunk_x <= 4 or trunk_x >= MAP_W - 4) and base_y >= 19 and base_y <= 29:
-				continue
-
-			var target_layer: TileMapLayer = _canopy_layer if ((tx + sty) % 2 == 0) else _understory_layer
-			if pick == 0 or pick == 1:
-				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, sty), f_cat["pine_dark"], Vector2i(3, 6))
-			elif pick == 2 or pick == 4:
-				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, sty), f_cat["pine_withered"], Vector2i(3, 6))
-			elif pick == 3 and tx + 4 < MAP_W:
-				V2TileCatalog.stamp_rect(target_layer, Vector2i(tx, sty), f_cat["tree_gnarled_mid"], Vector2i(5, 6))
-			else:
-				V2TileCatalog.stamp_rect(target_layer, Vector2i(trunk_x, sty), f_cat["pine_slender"], Vector2i(1, 6))
-
-	# Árvores Anciãs monumentais (14x18) nos grandes bolsões da floresta
-	V2TileCatalog.stamp_rect(_canopy_layer, Vector2i(34, 16), f_cat["ancient_tree"], Vector2i(14, 18))
-	V2TileCatalog.stamp_rect(_canopy_layer, Vector2i(104, 14), f_cat["ancient_tree"], Vector2i(14, 18))
-
-	if _fog_overlay == null:
-		_fog_overlay = AtmosphereRig.create_fog_overlay(Rect2(0, 0, MAP_W * 16, MAP_H * 16), Color(0.16, 0.22, 0.20, 1.0), 0.14)
-		add_child(_fog_overlay)
-
-
 func _build_forest_props_and_lights() -> void:
-	# Poeira e esporos flutuantes contínuos na floresta (árvores e vegetação vêm 100% das camadas v2)
-	_ambient_dust = CPUParticles2D.new()
-	_ambient_dust.name = "ForestAmbientDust"
-	_ambient_dust.position = Vector2(1280, 384)
-	_ambient_dust.z_index = 4
-	_ambient_dust.amount = 90
-	_ambient_dust.lifetime = 5.0
-	_ambient_dust.preprocess = 2.0
-	_ambient_dust.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	_ambient_dust.emission_rect_extents = Vector2(1240, 340)
-	_ambient_dust.direction = Vector2(0.7, -0.3)
-	_ambient_dust.spread = 45.0
-	_ambient_dust.gravity = Vector2(1.5, -3.5)
-	_ambient_dust.initial_velocity_min = 5.0
-	_ambient_dust.initial_velocity_max = 15.0
-	_ambient_dust.scale_amount_min = 1.5
-	_ambient_dust.scale_amount_max = 2.5
-	_ambient_dust.color = Color(0.75, 0.85, 0.78, 0.30)
-	add_child(_ambient_dust)
+	if not Engine.is_editor_hint():
+		# Poeira e esporos flutuantes contínuos na floresta (árvores e vegetação vêm 100% das camadas v2)
+		_ambient_dust = CPUParticles2D.new()
+		_ambient_dust.name = "ForestAmbientDust"
+		_ambient_dust.position = Vector2(1280, 384)
+		_ambient_dust.z_index = 4
+		_ambient_dust.amount = 90
+		_ambient_dust.lifetime = 5.0
+		_ambient_dust.preprocess = 2.0
+		_ambient_dust.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+		_ambient_dust.emission_rect_extents = Vector2(1240, 340)
+		_ambient_dust.direction = Vector2(0.7, -0.3)
+		_ambient_dust.spread = 45.0
+		_ambient_dust.gravity = Vector2(1.5, -3.5)
+		_ambient_dust.initial_velocity_min = 5.0
+		_ambient_dust.initial_velocity_max = 15.0
+		_ambient_dust.scale_amount_min = 1.5
+		_ambient_dust.scale_amount_max = 2.5
+		_ambient_dust.color = Color(0.75, 0.85, 0.78, 0.30)
+		add_child(_ambient_dust)
 
 	# Manchas ambientais no piso (Ato 2 Dose Maior destaca sangue/cinzas & olhos Yume Nikki)
 	var stain_spots := [
@@ -441,6 +332,19 @@ func _build_forest_props_and_lights() -> void:
 		lights_layer.add_child(lt)
 		_lights.append(lt)
 
+	var swarm := get_node_or_null("CorruptedEyeSwarm") as CorruptedEyeSwarm
+	if swarm == null:
+		swarm = CorruptedEyeSwarm.new()
+		swarm.name = "CorruptedEyeSwarm"
+		add_child(swarm)
+	swarm.setup_world_swarm([
+		Vector2(180, 310), Vector2(360, 440), Vector2(610, 300), Vector2(780, 220),
+		Vector2(980, 120), Vector2(1140, 230), Vector2(780, 500), Vector2(960, 620),
+		Vector2(1280, 490), Vector2(1480, 320), Vector2(1680, 440), Vector2(1860, 120),
+		Vector2(2040, 230), Vector2(1960, 620), Vector2(2160, 320), Vector2(2360, 320),
+		Vector2(540, 440), Vector2(1240, 140), Vector2(1620, 140), Vector2(2280, 448)
+	], 7419, 0.92)
+
 
 func _add_dual_prop(kind: String, pos: Vector2, parent_node: Node2D, offset_px: Vector2 = Vector2.ZERO) -> void:
 	var n := RetroLevelHelpers.create_prop_sprite(kind, false)
@@ -476,7 +380,7 @@ func _setup_interactables_and_pickups() -> void:
 			"id": "Placa_Bifurcacao",
 			"title": "Marco da Bifurcação",
 			"verb": "Examinar",
-			"pos": Vector2(544, 304)
+			"pos": Vector2(402, 356)
 		},
 		{
 			"id": "Placa_Bacia",
@@ -494,14 +398,14 @@ func _setup_interactables_and_pickups() -> void:
 	_create_calm_pickup("pickup_trail_creek", Vector2(976, 628))
 	_create_calm_pickup("pickup_trail_pit", Vector2(2016, 224))
 
-	if not GameState.is_unfiltered_act3():
+	if not RetroLevelHelpers.is_act3_unfiltered():
 		_create_interactable("Vestigios_Santelmo", "Brasas de Santelmo", "Observar", Vector2(308, 392), 26.0, func() -> void:
 			_on_sign_interacted("Vestigios_Santelmo")
 		)
 
 
 func _create_calm_pickup(pickup_key: String, pos: Vector2) -> void:
-	if GameState.get_self_switch("forest_trail", pickup_key):
+	if not Engine.is_editor_hint() and GameState.get_self_switch("forest_trail", pickup_key):
 		return
 	var holder := Node2D.new()
 	holder.position = pos
@@ -634,8 +538,9 @@ func _spawn_expanded_forest_enemies() -> void:
 	]
 	for spec in extra_spawns:
 		var s_name := str(spec["name"])
-		if not GameState.is_unfiltered_act3() and GameState.is_forest_santelmo_defeated(s_name):
-			continue
+		if not Engine.is_editor_hint():
+			if not GameState.is_unfiltered_act3() and GameState.is_forest_santelmo_defeated(s_name):
+				continue
 		if ysort_obstacles.has_node(s_name):
 			continue
 		var enemy := SANTELMO_SCENE.instantiate() as SantelmoEnemy
@@ -751,12 +656,9 @@ func _sync_forest_atmosphere() -> void:
 	ground_normal.tile_set = active_base_ts
 	walls_normal.tile_set = active_base_ts
 	ground_distorted.collision_enabled = false
-	if _clutter_layer != null:
-		_clutter_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
-	if _understory_layer != null:
-		_understory_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
-	if _canopy_layer != null:
-		_canopy_layer.tile_set = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
+	var target_ts: TileSet = ACT3_TS if act3 else (DISTORTED_TS if higher else NORMAL_TS)
+	if painted_props_layer != null and painted_props_layer.tile_set != target_ts:
+		painted_props_layer.tile_set = target_ts
 	ground_normal.visible = not higher
 	walls_normal.visible = not higher
 	ground_distorted.visible = higher
@@ -789,13 +691,13 @@ func _sync_forest_atmosphere() -> void:
 
 	if fire_embers:
 		fire_embers.emitting = not act3 and (fire_active or higher)
-		fire_embers.color = Color(0.95, 0.18, 0.22, 0.85) if higher else Color(1.0, 0.52, 0.14, 0.78)
+		fire_embers.color = Color(0.56, 0.52, 0.94, 0.82) if higher else Color(1.0, 0.52, 0.14, 0.78)
 
 	if _ambient_dust:
 		if act3:
 			_ambient_dust.color = Color(0.76, 0.78, 0.82, 0.22)
 		elif higher:
-			_ambient_dust.color = Color(0.90, 0.24, 0.26, 0.40)
+			_ambient_dust.color = Color(0.52, 0.48, 0.86, 0.36)
 		elif fire_active:
 			_ambient_dust.color = Color(0.95, 0.60, 0.32, 0.36)
 		else:
@@ -837,9 +739,13 @@ func _sync_forest_atmosphere() -> void:
 		if act3:
 			lt.color = Color(0.84, 0.86, 0.88)
 		elif higher:
-			lt.color = Color(0.88, 0.14, 0.20)
+			lt.color = Color(0.56, 0.52, 0.88)
 		elif fire_active:
 			lt.color = Color(1.0, 0.46, 0.18)
+
+	var swarm := get_node_or_null("CorruptedEyeSwarm") as CorruptedEyeSwarm
+	if swarm != null:
+		swarm.refresh_visibility()
 
 
 func _on_exit_area_body_entered(body: Node2D) -> void:
@@ -848,5 +754,46 @@ func _on_exit_area_body_entered(body: Node2D) -> void:
 
 
 func _on_exit_city_area_body_entered(body: Node2D) -> void:
-	if body.is_in_group("player"):
-		request_level_change.emit("res://scenes/levels/StreetPreview.tscn", "from_forest")
+	if not body.is_in_group("player"):
+		return
+	if _exit_city_prompt_open or _exit_city_cooldown > 0.0:
+		return
+	if bool(GameState.get("dialogue_active")) or bool(GameState.get("sleep_transition_active")):
+		return
+
+	_exit_city_prompt_open = true
+	if body is CharacterBody2D:
+		(body as CharacterBody2D).velocity = Vector2.ZERO
+
+	var ato: int = int(GameState.get_var("Ato", 1))
+	var act3 := GameState.is_unfiltered_act3()
+	var higher := _is_higher_dose_active()
+	var exit_msg := (
+		"A estrada de terra leva de volta às ruas silenciosas de Agdangan. Deseja sair da floresta?"
+		if act3 else (
+			"A névoa vermelha pesa atrás de você, mas o retorno a Agdangan ainda está aberto. Deseja sair da floresta?"
+			if higher else (
+				"O caminho de volta a Agdangan fica logo atrás, longe das brasas. Deseja sair da floresta?"
+				if ato == 2 else
+				"A trilha de saída leva de volta a Agdangan. Deseja sair da floresta?"
+			)
+		)
+	)
+	request_dialogue.emit([
+		{
+			"speaker": "Huwag Matitiis",
+			"expression": "scared" if higher else "neutral",
+			"text": exit_msg,
+			"choices": ["Sair para Agdangan", "Continuar na Floresta"]
+		}
+	], func(choice: int) -> void:
+		_exit_city_prompt_open = false
+		if choice == 0:
+			request_level_change.emit("res://scenes/levels/StreetPreview.tscn", "from_forest")
+		else:
+			_exit_city_cooldown = 0.35
+			if player != null and is_instance_valid(player):
+				player.position.x = maxf(player.position.x, 56.0)
+				player.facing_dir = Vector2.RIGHT
+				player.velocity = Vector2.ZERO
+	)

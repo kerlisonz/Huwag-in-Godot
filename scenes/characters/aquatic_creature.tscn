@@ -29,9 +29,9 @@ scale_amount_min = 2.0
 scale_amount_max = 3.5
 color = Color(0.4, 0.85, 1, 0.6)
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
-texture_filter = 0
-texture = ExtResource("2_aquatic_tex")
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+texture_filter = 1
+position = Vector2(0, -10)
 
 [node name="CreatureInteractable" type="Area2D" parent="."]
 collision_layer = 4

@@ -316,6 +316,35 @@ Reconstrução estética, narrativa e estrutural dos 4 cenários principais segu
   - `shaders/fog_drift.gdshader`: Névoa pixelada quantizada compatível com `gl_compatibility` e filtro `Nearest`, com mistura para névoa rubra no modo distorcido (`distortion_mix`).
   - `shaders/canopy_proximity.gdshader`: Balanço sutil pixel-snapped para copas e atenuação suave (`proximity_fade_enabled`) ao passar atrás da vegetação (`player_world_pos`).
   - `scripts/levels/atmosphere_rig.gd` (`AtmosphereRig`): Presets de `CanvasModulate`, `PointLight2D` com `SHADOW_FILTER_NONE`, `LightOccluder2D` e `attach_lit_vfx()` (integrado ao `VfxLibrary`, preservando supressão automática de fogs/chamas sobrenaturais no Ato III via `is_act3`).
+- **Componentes Reutilizáveis de Vegetação com Colisão (`scenes/components/`, `scripts/components/forest_prop.gd`):**
+  - `ForestTree.tscn` (`pine_dark` `3×6`), `ForestWitheredPine.tscn` (`pine_withered` `3×6`), `ForestSlenderPine.tscn` (`pine_slender` `1×6`), `ForestGnarledTree.tscn` (`tree_gnarled_mid` `5×6`), `ForestRoundTree.tscn` (`tree_canopy_round` `4×4` limpa `222..288`), `ForestCoconutTree.tscn` (`coconut_palm` `3×6`), `ForestAncientTree.tscn` (`ancient_tree` `14×18`) e `ForestBush.tscn` (`bush_dense` `2×2` corrigido no `build_v2_world_tilesets.gd`): Cenas `StaticBody2D` Y-sorted reutilizáveis com `CollisionShape2D` calibrado na base/tronco e script `@tool` `ForestProp`, todas registradas no `TileSetScenesCollectionSource` (`source 1`, IDs `1..9` junto com `ForestRock.tscn`) de `forest_v2_{normal,distorted,act3}_tileset.tres` para pintura por arraste na `PaintedPropsLayer`, usando exclusivamente regiões do atlas já licenciado `res://assets/tilesets/v2/forest_v2_{normal,distorted,act3}.png` com troca automática de percepção nos Atos 1–3 e atenuação de copa ao passar atrás. Nenhum asset ou plugin externo adicional.
+
+### 2.23 UI de Derrota, Props Procedurais de Agdangan/BFP e Encerramento da Demo
+- **Origem & Licença:** 100% código e arte procedural 16-bit nativos em Godot 4.7 / GDScript (MIT interno do projeto, zero plugins ou assets externos adicionais):
+  - `scenes/ui/game_over_ui.tscn` + `scripts/ui/game_over_ui.gd` (`DefeatOverlay`, `CanvasLayer` `layer = 110`, estilo 16-bit/VHS nativo via `HuwagUiTheme`).
+  - `scripts/levels/retro_level_helpers.gd`: geradores procedurais em memória (`_build_town_ambient_prop_image` e `_build_bfp_interior_prop_image`) para adereços costeiros, quintais, calçadas de Agdangan e equipamentos/mobília das 4 alas do Quartel BFP (com suporte às variantes `normal`, `distorted` e `act3`).
+  - `scenes/menu/EndingCredits.tscn` + `scripts/menu/ending_credits.gd`: Tela de Encerramento da Demo em estilo VHS/16-bit com resumo dinâmico de rota.
+
+### 2.24 Atualização Geral — UI *Omori*, Trilha Incompetech, Retratos Transparentes, Humanoides, Machado BFP e Modo Corrompido Surreal
+- **Trilha Sonora CC-BY 4.0 (`res://assets/audio/bgm/`, registrado em `AudioManager.BGM_FILE_MAP` e `AudioManager.MUSIC_CREDITS`):**
+  - *Study and Relax* (`res://assets/audio/bgm/study_and_relax.mp3`) — Music by Kevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution 4.0 License.
+  - *Evening Melodrama* (`res://assets/audio/bgm/evening_melodrama.mp3`) — Music by Kevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution 4.0 License.
+  - *Comfortable Mystery 2* (`res://assets/audio/bgm/comfortable_mystery_2.mp3`) — Music by Kevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution 4.0 License.
+  - *Dark Fog* (`res://assets/audio/bgm/dark_fog.mp3`) — Music by Kevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution 4.0 License.
+  - *Giant Wyrm* (`res://assets/audio/bgm/giant_wyrm.mp3`) — Music by Kevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution 4.0 License.
+  - *Tempting Secrets* (`res://assets/audio/bgm/tempting_secrets.mp3`) — Music by Kevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution 4.0 License.
+- **Tipografia da Interface (`assets/fonts/`):**
+  - `OMORI_GAME.ttf`, `OMORI_GAME2.ttf`, `omori_ptbr_accents.tres` e `omori_dialogue_font.tres` configurados globalmente em `project.godot` (`gui/theme/custom_font`) para todo o jogo, garantindo acentuação completa em PT-BR e estética *Omori*.
+- **Interface *Omori*, Capa Limpa, Pause `ESC` vs `[F1]` e Save/Load Multi-Slot:**
+  - `scenes/menu/TitleScreen.tscn` + `scripts/menu/title_screen.gd` + `res://assets/ui/title_cover.png`: Tela inicial limpa sem poluição OSD VHS, com névoa animada, vaga-lumes, luzes e modal de Créditos Musicais.
+  - `scenes/ui/DialogueBox.tscn` + `scripts/ui/dialogue_box.gd` + `scripts/ui/huwag_ui_theme.gd`: Caixa `#000000` com borda branca rabiscada à mão, nameplate superior esquerdo, retrato flutuante superior direito sem fundo e cursor mãozinha animado.
+  - `scenes/ui/pause_menu.tscn` + `scripts/ui/pause_menu.gd` + `scenes/ui/save_load_panel.tscn` + `scripts/ui/save_load_panel.gd` + `scripts/autoload/game_state.gd`: Desacoplamento `[ESC]` (pausa da `SceneTree` com Continuar, Salvar, Carregar, Opções, Menu Principal) vs `[F1]` (`ControlsModal`) e 3 slots persistidos em `user://saves/` com JSON + thumbnail PNG `320×180`.
+- **Retratos 96×96 RGBA Transparentes, Machado no Protagonista, Humanoides & Modo Corrompido Surreal:**
+  - `scripts/tools/process_portraits_alpha.gd` -> 48 retratos `96×96` RGBA com fundo 100% transparente (`alpha == 0.0`, sem halo chroma e sem carmesim nas variantes distorcidas) em `res://assets/characters/portraits/`.
+  - `scripts/tools/build_huwag_rebuilt_sprites.gd`: correção da fenda torso/pescoço no `idle` e adição do machado de bombeiro BFP exclusivamente em `attack`, `combo2` e `combo3`.
+  - `scripts/tools/build_entity_humanoids.gd` + `scenes/enemies/santelmo.tscn` + `scripts/enemies/santelmo.gd` + `scenes/characters/aquatic_creature.tscn` + `scripts/characters/aquatic_creature.gd`: spritesheets humanoides 4 direções (`idle`, `walk`, `run`, `attack1`, `attack2`, `hurt`, `death`) com orbe ígneo telegrafado (`attack2`) no Santelmo.
+  - `scripts/components/watching_eye.gd` + `scripts/components/corrupted_eye_swarm.gd` + shaders/tilesets v2 atualizados: substituição do excesso vermelho-sangue no Modo Corrompido por paleta abissal índigo/violeta-cinza com enxames de olhos observadores no cenário e bordas da tela (`ScreenEdgeEyeLayer`) rastreando `player.global_position`.
+
 
 
 

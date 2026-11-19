@@ -7,7 +7,7 @@ shader_type canvas_item;
 uniform float distortion_intensity : hint_range(0.0, 1.0) = 0.0;
 uniform float hostile_boost : hint_range(0.0, 1.0) = 0.0;
 uniform float phase_seed : hint_range(0.0, 10.0) = 0.0;
-uniform vec4 dark_red_tint : source_color = vec4(0.88, 0.18, 0.22, 1.0);
+uniform vec4 dark_red_tint : source_color = vec4(0.52, 0.48, 0.82, 1.0);
 
 float hash12(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
@@ -56,17 +56,17 @@ void fragment() {
 		float b_shift = texture(TEXTURE, vec2(clamp(uv_center.x - chroma_offset * 0.65, u_min, u_max), uv_center.y)).b;
 
 		vec3 chroma_col = vec3(
-			mix(src.r, r_shift, 0.72),
-			src.g * (1.0 - 0.34 * distortion_intensity),
-			mix(src.b, b_shift, 0.6) * (1.0 - 0.30 * distortion_intensity)
+			mix(src.r, r_shift, 0.55) * (1.0 - 0.14 * distortion_intensity),
+			src.g * (1.0 - 0.24 * distortion_intensity),
+			mix(src.b, b_shift, 0.85)
 		);
 
-		// Descoloração + tingimento rubro controlado preservando nitidez de silhueta e leitura em combate
+		// Descoloração surreal em índigo abissal e chumbo preservando silhueta nítida
 		float luma = dot(chroma_col, vec3(0.299, 0.587, 0.114));
-		vec3 grayscale_dark = vec3(clamp(luma * (0.92 - hostile_boost * 0.08) + 0.05, 0.06, 1.0));
-		vec3 crimson_shadow = grayscale_dark * dark_red_tint.rgb + vec3(luma * 0.28 * (0.30 + hostile_boost * 0.45), 0.04, 0.05);
-		float tint_mix = clamp(distortion_intensity * (0.42 + hostile_boost * 0.16), 0.0, 0.58);
-		vec3 final_rgb = mix(chroma_col, crimson_shadow, tint_mix);
+		vec3 grayscale_dark = vec3(clamp(luma * (0.88 - hostile_boost * 0.06) + 0.04, 0.04, 0.96));
+		vec3 void_shadow = grayscale_dark * dark_red_tint.rgb + vec3(luma * 0.08, luma * 0.07, luma * 0.24 * (0.35 + hostile_boost * 0.45));
+		float tint_mix = clamp(distortion_intensity * (0.44 + hostile_boost * 0.16), 0.0, 0.62);
+		vec3 final_rgb = mix(chroma_col, void_shadow, tint_mix);
 
 		// Scanline horizontal sutil de interferência no sprite distorcido
 		float scan = 1.0 - (mod(slice_id, 2.0) * 0.05 * distortion_intensity);

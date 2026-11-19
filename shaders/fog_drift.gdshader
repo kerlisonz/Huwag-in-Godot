@@ -4,7 +4,7 @@ shader_type canvas_item;
 // Quantizada em texels virtuais para evitar desfoque liso sobre pixel art.
 
 uniform vec4 fog_color : source_color = vec4(0.58, 0.65, 0.76, 1.0);
-uniform vec4 distorted_color : source_color = vec4(0.55, 0.16, 0.22, 1.0);
+uniform vec4 distorted_color : source_color = vec4(0.14, 0.12, 0.24, 1.0);
 uniform float fog_density : hint_range(0.0, 1.0) = 0.28;
 uniform float distortion_mix : hint_range(0.0, 1.0) = 0.0;
 uniform vec2 drift_speed = vec2(0.018, -0.007);

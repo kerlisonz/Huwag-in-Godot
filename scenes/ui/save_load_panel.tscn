@@ -1,0 +1,96 @@
+[gd_scene format=3 uid="uid://cs34r4saveload1"]
+
+[ext_resource type="Script" path="res://scripts/ui/save_load_panel.gd" id="1_script"]
+[ext_resource type="FontVariation" path="res://assets/fonts/omori_dialogue_font.tres" id="2_font"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+bg_color = Color(0, 0, 0, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 1)
+
+[node name="SaveLoadPanel" type="Control"]
+process_mode = 3
+visible = false
+z_index = 40
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Card" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -225.0
+offset_top = -136.0
+offset_right = 225.0
+offset_bottom = 136.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="Margin" type="MarginContainer" parent="Card"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Card/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HeaderRow" type="HBoxContainer" parent="Card/Margin/VBox"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="Card/Margin/VBox/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+text = "CARREGAR JOGO"
+
+[node name="HintLabel" type="Label" parent="Card/Margin/VBox/HeaderRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.75, 0.82, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 13
+text = "[E] Confirmar  ·  [ESC] Voltar"
+vertical_alignment = 1
+
+[node name="Divider" type="ColorRect" parent="Card/Margin/VBox"]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(1, 1, 1, 0.45)
+
+[node name="SlotsVBox" type="VBoxContainer" parent="Card/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="FooterRow" type="HBoxContainer" parent="Card/Margin/VBox"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="Card/Margin/VBox/FooterRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.84, 0.87, 0.94, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 13
+text = "Selecione um slot."
+
+[node name="BtnBack" type="Button" parent="Card/Margin/VBox/FooterRow"]
+custom_minimum_size = Vector2(78, 24)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "VOLTAR"

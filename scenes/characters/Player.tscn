@@ -1,7 +1,7 @@
 [gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/characters/player.gd" id="1_player"]
-[ext_resource type="FontFile" path="res://assets/fonts/undertale-deltarune-extended-fixed.otf" id="2_font"]
+[ext_resource type="FontVariation" path="res://assets/fonts/omori_dialogue_font.tres" id="2_font"]
 [ext_resource type="Script" path="res://scripts/components/rotate_towards_mouse.gd" id="3_rotate_mouse"]
 [ext_resource type="SpriteFrames" path="res://assets/sprites/huwag_v3/casual/huwag_casual_spriteframes.tres" id="4_huwag_casual"]
 
@@ -50,7 +50,7 @@ theme_override_colors/font_color = Color(0.98, 0.84, 0.42, 1)
 theme_override_colors/font_outline_color = Color(0.06, 0.05, 0.1, 1)
 theme_override_constants/outline_size = 3
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 13
 text = "[E] Examinar"
 horizontal_alignment = 1
 

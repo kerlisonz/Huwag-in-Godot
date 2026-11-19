@@ -1,0 +1,247 @@
+[gd_scene format=3 uid="uid://cs34r4pausemn1"]
+
+[ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="1_script"]
+[ext_resource type="FontVariation" path="res://assets/fonts/omori_dialogue_font.tres" id="2_font"]
+[ext_resource type="PackedScene" path="res://scenes/ui/save_load_panel.tscn" id="3_saveload"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_omori"]
+bg_color = Color(0, 0, 0, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 1)
+
+[node name="PauseMenu" type="CanvasLayer"]
+process_mode = 3
+layer = 100
+visible = false
+script = ExtResource("1_script")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.62)
+
+[node name="MainCard" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -126.0
+offset_right = 150.0
+offset_bottom = 126.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_omori")
+
+[node name="Margin" type="MarginContainer" parent="MainCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="MainCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="MainCard/Margin/VBox"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 20
+text = "PAUSA"
+horizontal_alignment = 1
+
+[node name="ContextLabel" type="Label" parent="MainCard/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.78, 0.85, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 13
+text = "Ato 1 · Quarto de Huwag · 06:30"
+horizontal_alignment = 1
+
+[node name="Divider" type="ColorRect" parent="MainCard/Margin/VBox"]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(1, 1, 1, 0.45)
+
+[node name="ButtonsVBox" type="VBoxContainer" parent="MainCard/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 5
+
+[node name="OptionsPanel" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -190.0
+offset_top = -128.0
+offset_right = 190.0
+offset_bottom = 128.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_omori")
+
+[node name="Margin" type="MarginContainer" parent="OptionsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="OptionsPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OptTitle" type="Label" parent="OptionsPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+text = "OPÇÕES & SOM"
+horizontal_alignment = 1
+
+[node name="Divider" type="ColorRect" parent="OptionsPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(1, 1, 1, 0.45)
+
+[node name="RowMaster" type="HBoxContainer" parent="OptionsPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="LblMaster" type="Label" parent="OptionsPanel/Margin/VBox/RowMaster"]
+custom_minimum_size = Vector2(126, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "Volume Geral"
+
+[node name="SliderMaster" type="HSlider" parent="OptionsPanel/Margin/VBox/RowMaster"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 100.0
+value = 85.0
+
+[node name="RowMusic" type="HBoxContainer" parent="OptionsPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="LblMusic" type="Label" parent="OptionsPanel/Margin/VBox/RowMusic"]
+custom_minimum_size = Vector2(126, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "Música"
+
+[node name="SliderMusic" type="HSlider" parent="OptionsPanel/Margin/VBox/RowMusic"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 100.0
+value = 80.0
+
+[node name="RowSfx" type="HBoxContainer" parent="OptionsPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="LblSfx" type="Label" parent="OptionsPanel/Margin/VBox/RowSfx"]
+custom_minimum_size = Vector2(126, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "Efeitos (SFX)"
+
+[node name="SliderSfx" type="HSlider" parent="OptionsPanel/Margin/VBox/RowSfx"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 100.0
+value = 85.0
+
+[node name="CheckFullscreen" type="CheckButton" parent="OptionsPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "Tela Cheia (F11)"
+
+[node name="CheckFlash" type="CheckButton" parent="OptionsPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "Reduzir Clarões"
+
+[node name="BtnOptionsBack" type="Button" parent="OptionsPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 26)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "VOLTAR"
+
+[node name="ConfirmPanel" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -175.0
+offset_top = -66.0
+offset_right = 175.0
+offset_bottom = 66.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_omori")
+
+[node name="Margin" type="MarginContainer" parent="ConfirmPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="ConfirmPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Prompt" type="Label" parent="ConfirmPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 15
+text = "VOLTAR AO MENU PRINCIPAL?"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Sub" type="Label" parent="ConfirmPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.75, 0.82, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 13
+text = "Progresso não salvo será perdido."
+horizontal_alignment = 1
+
+[node name="Btns" type="HBoxContainer" parent="ConfirmPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BtnConfirmYes" type="Button" parent="ConfirmPanel/Margin/VBox/Btns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "SIM"
+
+[node name="BtnConfirmNo" type="Button" parent="ConfirmPanel/Margin/VBox/Btns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 14
+text = "NÃO"
+
+[node name="SaveLoadPanel" parent="." instance=ExtResource("3_saveload")]

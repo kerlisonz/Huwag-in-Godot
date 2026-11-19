@@ -1,4 +1,4 @@
-[gd_resource type="TileSet" format=3]
+[gd_resource type="TileSet" format=3 uid="uid://xn8ljqgx0tuw"]
 
 [ext_resource type="Texture2D" path="res://assets/tilesets/v2/interiors_v2_act3.png" id="1_wr218"]
 

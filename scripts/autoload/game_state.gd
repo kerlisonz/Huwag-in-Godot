@@ -15,6 +15,8 @@ signal clock_minute_changed(total_minutes: int, formatted_hhmm: String)
 signal day_period_changed(period_id: String)
 signal sleep_curfew_triggered(current_act: int)
 signal task_state_changed(task_id: String, active: bool, completed: bool)
+signal checkpoint_saved(snapshot: Dictionary)
+signal checkpoint_restored(snapshot: Dictionary)
 
 @export var in_game_minutes_per_real_second: float = 2.0
 @export var day_start_minutes: int = 390 # 06:30
@@ -34,6 +36,9 @@ var switches: Dictionary = {
 	"004_Ovos_e_derrotou": false,
 	"005_Chefe_liberou_cidade": false,
 	"006_Dormir_avancou_para_Ato2": false,
+	"006b_Dose_maior_pilulas": false,
+	"006c_Dose_escolhida_Ato2": false,
+	"006d_Enfermeira_reverteu_dose": false,
 	"007_Chefe_Ato2_apresentado": false,
 	"008_Missao_chave1_aberta": false,
 	"009_Missao_chave1_concluida": false,
@@ -51,6 +56,7 @@ var switches: Dictionary = {
 	"021_Recompensa_entregue": false,
 	# Switches do Ato 3
 	"022_Ato3_iniciado": false,
+	"022b_Ato3_despertar_visto": false,
 	"023_Ato3_pesadelo_vhs_concluido": false,
 	"024_Ato3_revelacao_reyes": false,
 	"025_Ato3_confronto_lagoa": false,
@@ -77,6 +83,28 @@ var dialogue_cooldown: float = 0.0
 var spawn_tag: String = "default"
 var current_scene_path: String = "res://scenes/levels/RoomHuwag.tscn"
 var saved_player_pos: Vector2 = Vector2.ZERO
+var is_player_defeated: bool = false
+
+# Snapshot leve do último checkpoint seguro (entrada de mapa, novo dia ou evento importante)
+var _last_checkpoint: Dictionary = {}
+var _pending_checkpoint_spawn_pos: Vector2 = Vector2.ZERO
+var _has_pending_checkpoint_spawn: bool = false
+var _is_restoring_checkpoint: bool = false
+
+const CHECKPOINT_MILESTONE_SWITCHES := {
+	"002_Chefe_Ato1_apresentado": true,
+	"003_Ovos_sem_derrotar": true,
+	"004_Ovos_e_derrotou": true,
+	"005_Chefe_liberou_cidade": true,
+	"007_Chefe_Ato2_apresentado": true,
+	"014_Floresta_liberada": true,
+	"016_Magia_de_agua_obtida": true,
+	"017_Gatinho_encontrado": true,
+	"018_Gatinho_devolvido": true,
+	"019_Ato2_concluido": true,
+	"024_Ato3_revelacao_reyes": true,
+	"025_Ato3_confronto_lagoa": true,
+}
 
 var player_hp: int = 100
 var player_max_hp: int = 100
@@ -86,10 +114,20 @@ var water_boss_defeated: bool = false
 var equipped_outfit: String = "casual" # "casual" (Imagem 3) ou "bfp" (Uniforme de Bombeiro)
 
 const FOREST_SANTELMO_TOTAL := 16
+const ACT2_STREET_TASK_NPCS: Array[String] = ["NPC_Aling_Nena", "NPC_Mang_Carding", "NPC_Feirante"]
+const ACT2_NORMAL_MISSION_SWITCHES: Array[String] = [
+	"009_Missao_chave1_concluida",
+	"011_Missao_chave2_concluida",
+	"013_Missao_chave3_concluida",
+]
+var corrupted_mode: bool = false
+var nurse_reverted_corrupted: bool = false
+var act2_route_completed: String = "" # "normal", "corrupted", "reverted"
 var day_number: int = 1
 var active_tasks: Dictionary = {}
 var completed_tasks: Dictionary = {}
 var defeated_forest_santelmos: Dictionary = {}
+var defeated_corrupted_npcs: Dictionary = {}
 
 # Configurações de acessibilidade e preferência
 var setting_flash_reduction: bool = false
@@ -112,6 +150,8 @@ func set_fullscreen(fullscreen: bool) -> void:
 	window_mode_changed.emit(fullscreen)
 
 const SAVE_PATH := "user://huwag_save.json"
+const SAVE_SLOTS_DIR := "user://saves"
+const MAX_SAVE_SLOTS := 3
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -136,18 +176,18 @@ func notify_dialogue_closed(cooldown_sec: float = 0.28) -> void:
 
 
 func is_interaction_blocked() -> bool:
-	return dialogue_active or sleep_transition_active or dialogue_cooldown > 0.0
+	return dialogue_active or sleep_transition_active or is_player_defeated or dialogue_cooldown > 0.0
 
 
 func _should_advance_clock() -> bool:
-	if clock_paused or dialogue_active or sleep_transition_active:
+	if clock_paused or dialogue_active or sleep_transition_active or is_player_defeated:
 		return false
 	if in_game_minutes_per_real_second <= 0.0:
 		return false
 	if current_scene_path.ends_with("vhs_memory_minigame.tscn") or current_scene_path.ends_with("EndingCredits.tscn") or current_scene_path.ends_with("TitleScreen.tscn"):
 		return false
 	var tree := get_tree()
-	if tree == null:
+	if tree == null or tree.paused:
 		return false
 	return tree.get_first_node_in_group("player") != null
 
@@ -245,6 +285,12 @@ func reset_to_new_game() -> void:
 	_last_emitted_period = "morning"
 	perception_mode = PerceptionMode.FILTERED_MORNING
 	dialogue_active = false
+	dialogue_cooldown = 0.0
+	is_player_defeated = false
+	_last_checkpoint.clear()
+	_pending_checkpoint_spawn_pos = Vector2.ZERO
+	_has_pending_checkpoint_spawn = false
+	_is_restoring_checkpoint = false
 	spawn_tag = "initial"
 	current_scene_path = "res://scenes/levels/RoomHuwag.tscn"
 	saved_player_pos = Vector2.ZERO
@@ -255,9 +301,13 @@ func reset_to_new_game() -> void:
 	water_boss_defeated = false
 	equipped_outfit = "casual"
 	day_number = 1
+	corrupted_mode = false
+	nurse_reverted_corrupted = false
+	act2_route_completed = ""
 	active_tasks.clear()
 	completed_tasks.clear()
 	defeated_forest_santelmos.clear()
+	defeated_corrupted_npcs.clear()
 	hp_changed.emit(player_hp, player_max_hp)
 	stamina_changed.emit(player_stamina, player_max_stamina)
 	perception_changed.emit(perception_mode)
@@ -291,6 +341,8 @@ func set_switch(key: String, value: bool) -> void:
 	_sync_task_for_switch(key, value)
 	if prev != value:
 		switch_changed.emit(key, value)
+		if value and not _is_restoring_checkpoint and CHECKPOINT_MILESTONE_SWITCHES.has(key):
+			save_checkpoint()
 
 func get_var(var_name: String, default_value: Variant = 0) -> Variant:
 	return variables.get(var_name, default_value)
@@ -319,12 +371,25 @@ func has_item(item_id: String) -> bool:
 	return get_item_count(item_id) > 0
 
 func damage_player(amount: int) -> void:
-	player_hp = clampi(player_hp - amount, 1, player_max_hp)
+	player_hp = clampi(player_hp - maxi(0, amount), 0, player_max_hp)
 	hp_changed.emit(player_hp, player_max_hp)
 
 func heal_player(amount: int) -> void:
-	player_hp = clampi(player_hp + amount, 1, player_max_hp)
+	player_hp = clampi(player_hp + maxi(0, amount), 0, player_max_hp)
 	hp_changed.emit(player_hp, player_max_hp)
+
+func restore_full_vitals() -> void:
+	player_hp = player_max_hp
+	player_stamina = player_max_stamina
+	hp_changed.emit(player_hp, player_max_hp)
+	stamina_changed.emit(player_stamina, player_max_stamina)
+
+func clear_transient_state() -> void:
+	dialogue_active = false
+	dialogue_cooldown = 0.0
+	sleep_transition_active = false
+	clock_paused = false
+	is_player_defeated = false
 
 func consume_stamina(amount: float) -> void:
 	var prev := player_stamina
@@ -375,6 +440,14 @@ func is_higher_dose() -> bool:
 	return int(get_var("Ato", 1)) == 2 and get_switch("006b_Dose_maior_pilulas")
 
 
+func is_corrupted_mode() -> bool:
+	return is_higher_dose()
+
+
+func set_corrupted_mode(active: bool) -> void:
+	set_higher_dose(active)
+
+
 func get_intoxication_level() -> int:
 	return int(variables.get("Intoxicacao", 2 if is_higher_dose() else 0))
 
@@ -383,6 +456,7 @@ func set_intoxication_level(level: int) -> void:
 	var clamped := clampi(level, 0, 3)
 	variables["Intoxicacao"] = clamped
 	if clamped >= 2:
+		corrupted_mode = (int(variables.get("Ato", 1)) == 2)
 		switches["006c_Dose_escolhida_Ato2"] = true
 		set_switch("006b_Dose_maior_pilulas", true)
 		variable_changed.emit("Intoxicacao", clamped)
@@ -398,6 +472,7 @@ func set_act(act_number: int) -> void:
 	var tox := (2 if is_higher_dose() else 1) if act_number == 2 else 0
 	variables["Intoxicacao"] = tox
 	set_var("Ato", act_number)
+	corrupted_mode = is_higher_dose()
 	variable_changed.emit("Intoxicacao", tox)
 
 
@@ -405,6 +480,7 @@ func set_higher_dose(active: bool) -> void:
 	var act_num: int = int(variables.get("Ato", 1))
 	var tox: int = 2 if active else (1 if act_num == 2 else 0)
 	variables["Intoxicacao"] = tox
+	corrupted_mode = active and (act_num == 2)
 	set_switch("006c_Dose_escolhida_Ato2", true)
 	set_switch("006b_Dose_maior_pilulas", active)
 	variable_changed.emit("Intoxicacao", tox)
@@ -416,9 +492,14 @@ func advance_to_act_2() -> void:
 	day_number = maxi(2, day_number + 1)
 	variables["Ato"] = 2
 	variables["Intoxicacao"] = 1
+	corrupted_mode = false
+	nurse_reverted_corrupted = false
+	act2_route_completed = ""
+	defeated_corrupted_npcs.clear()
 	set_switch("006_Dormir_avancou_para_Ato2", true)
 	set_switch("006b_Dose_maior_pilulas", false)
 	set_switch("006c_Dose_escolhida_Ato2", false)
+	set_switch("006d_Enfermeira_reverteu_dose", false)
 	variable_changed.emit("Ato", 2)
 	variable_changed.emit("Intoxicacao", 1)
 	is_afternoon = false
@@ -435,6 +516,7 @@ func advance_to_act_2() -> void:
 	clock_minute_changed.emit(clock_minutes, get_formatted_time(clock_minutes))
 	day_period_changed.emit("morning")
 	autosave(current_scene_path, "initial")
+	save_checkpoint(current_scene_path, Vector2.ZERO, "initial")
 	notification_requested.emit("06:30 — Um novo turno começa em Agdangan")
 
 
@@ -464,10 +546,13 @@ func update_task_progress(task_id: String, progress_val: int, title_text: String
 
 
 func complete_task(task_id: String) -> void:
+	var already := bool(completed_tasks.get(task_id, false))
 	completed_tasks[task_id] = true
 	if active_tasks.has(task_id):
 		active_tasks.erase(task_id)
 	task_state_changed.emit(task_id, false, true)
+	if not already and not _is_restoring_checkpoint:
+		save_checkpoint()
 
 
 func is_task_active(task_id: String) -> bool:
@@ -493,6 +578,7 @@ func advance_day_preserving_tasks() -> int:
 	if player_hp < player_max_hp:
 		heal_player(25)
 	reset_stamina()
+	save_checkpoint(current_scene_path, Vector2.ZERO, "initial")
 	notification_requested.emit("Dia %d — 06:30 · Tarefas em andamento preservadas" % day_number)
 	return day_number
 
@@ -503,28 +589,140 @@ func _sync_task_for_switch(key: String, value: bool) -> void:
 	match key:
 		"002_Chefe_Ato1_apresentado":
 			complete_task("ato1_apresentacao_reyes")
-			start_task("ato1_ovos_floresta", "Investigar fumaça e ovos na Floresta Leste")
+			start_task("ato1_ovos_floresta", "Coletar os ovos na Floresta Leste")
 		"003_Ovos_sem_derrotar", "004_Ovos_e_derrotou":
 			complete_task("ato1_ovos_floresta")
+			start_task("ato1_reportar_chefe", "Reportar os ovos ao Capitão Reyes no Quartel")
+		"005_Chefe_liberou_cidade":
+			complete_task("ato1_reportar_chefe")
+			start_task("ato1_dormir_quarto", "Descansar na cama em casa")
+		"006_Dormir_avancou_para_Ato2":
+			complete_task("ato1_dormir_quarto")
 		"007_Chefe_Ato2_apresentado":
-			start_task("ato2_ocorrencias_cidade", "Atender ocorrências em Agdangan", 3)
+			if is_higher_dose():
+				start_task("ato2_corrompido_rua", "Enfrentar os moradores distorcidos da rua", ACT2_STREET_TASK_NPCS.size())
+			else:
+				start_task("ato2_ocorrencias_cidade", "Ajudar os 3 moradores de Agdangan na rua", ACT2_NORMAL_MISSION_SWITCHES.size())
 		"008_Missao_chave1_aberta":
-			start_task("ato2_missao_1", "Ajuda na costa (Mang Carding)")
+			start_task("ato2_missao_1", "Fixar aviso BFP na praça da Igreja (Feirante)")
 		"009_Missao_chave1_concluida":
 			complete_task("ato2_missao_1")
 		"010_Missao_chave2_aberta":
-			start_task("ato2_missao_2", "Bomba e hidrante da Rua")
+			start_task("ato2_missao_2", "Entregar suprimentos e água para Aling Nena")
 		"011_Missao_chave2_concluida":
 			complete_task("ato2_missao_2")
 		"012_Missao_chave3_aberta":
-			start_task("ato2_missao_3", "Vistoria na feira leste")
+			start_task("ato2_missao_3", "Recolher cesto e corda na areia para Mang Carding")
 		"013_Missao_chave3_concluida":
 			complete_task("ato2_missao_3")
 		"014_Floresta_liberada":
-			complete_task("ato2_ocorrencias_cidade")
 			start_task("ato2_resgate_floresta", "Purificar os 16 Santelmos e resgatar o gatinho", FOREST_SANTELMO_TOTAL)
 		"018_Gatinho_devolvido":
 			complete_task("ato2_resgate_floresta")
+		"019_Ato2_concluido":
+			complete_task("ato2_ocorrencias_cidade")
+			complete_task("ato2_corrompido_rua")
+			start_task("ato2_dormir_quarto", "Descansar na cama em casa (Ato 3)")
+
+
+func mark_corrupted_npc_defeated(npc_id: String) -> void:
+	if npc_id.is_empty():
+		return
+	defeated_corrupted_npcs[npc_id] = true
+	var count := get_defeated_corrupted_street_npc_count()
+	if count >= ACT2_STREET_TASK_NPCS.size():
+		update_task_progress("ato2_corrompido_rua", count, "Retornar ao Capitão Reyes no Quartel BFP", ACT2_STREET_TASK_NPCS.size())
+		notification_requested.emit("Todos os moradores hostis da rua caíram. Retorne ao Capitão Reyes no Quartel.")
+	elif ACT2_STREET_TASK_NPCS.has(npc_id):
+		update_task_progress("ato2_corrompido_rua", count, "Enfrentar os moradores distorcidos da rua", ACT2_STREET_TASK_NPCS.size())
+		notification_requested.emit("Morador derrotado (%d/%d)" % [count, ACT2_STREET_TASK_NPCS.size()])
+	if not _is_restoring_checkpoint:
+		save_checkpoint()
+
+
+func is_corrupted_npc_defeated(npc_id: String) -> bool:
+	return bool(defeated_corrupted_npcs.get(npc_id, false))
+
+
+func get_defeated_corrupted_street_npc_count() -> int:
+	var c := 0
+	for nid in ACT2_STREET_TASK_NPCS:
+		if bool(defeated_corrupted_npcs.get(nid, false)):
+			c += 1
+	return c
+
+
+func are_all_corrupted_street_npcs_defeated() -> bool:
+	return get_defeated_corrupted_street_npc_count() >= ACT2_STREET_TASK_NPCS.size()
+
+
+func get_completed_normal_street_mission_count() -> int:
+	var c := 0
+	for sw in ACT2_NORMAL_MISSION_SWITCHES:
+		if get_switch(sw):
+			c += 1
+	return c
+
+
+func are_all_normal_street_missions_completed() -> bool:
+	return get_completed_normal_street_mission_count() >= ACT2_NORMAL_MISSION_SWITCHES.size()
+
+
+func complete_corrupted_route_at_chief() -> void:
+	act2_route_completed = "corrupted"
+	complete_task("ato2_corrompido_rua")
+	set_switch("019_Ato2_concluido", true)
+	autosave(current_scene_path, spawn_tag)
+	save_checkpoint()
+	notification_requested.emit("A rua ficou em silêncio. Retorne para a cama em casa.")
+
+
+## Reverte o Modo Corrompido após a checagem e medicação da Enfermeira Maria no Quartel BFP.
+func revert_corrupted_mode_via_nurse() -> void:
+	nurse_reverted_corrupted = true
+	defeated_corrupted_npcs.clear()
+	if inventory.has("antidoto_reversao"):
+		inventory.erase("antidoto_reversao")
+	if active_tasks.has("ato2_corrompido_rua"):
+		active_tasks.erase("ato2_corrompido_rua")
+	set_switch("006d_Enfermeira_reverteu_dose", true)
+	set_higher_dose(false)
+	if get_switch("007_Chefe_Ato2_apresentado") and not are_all_normal_street_missions_completed():
+		start_task("ato2_ocorrencias_cidade", "Ajudar os 3 moradores de Agdangan na rua", ACT2_NORMAL_MISSION_SWITCHES.size())
+		update_task_progress("ato2_ocorrencias_cidade", get_completed_normal_street_mission_count(), "Ajudar os 3 moradores de Agdangan na rua", ACT2_NORMAL_MISSION_SWITCHES.size())
+	autosave(current_scene_path, spawn_tag)
+	save_checkpoint()
+	notification_requested.emit("Medicação aplicada — percepção estabilizada. As missões normais da rua foram restauradas.")
+
+
+func get_demo_route_summary() -> Dictionary:
+	var route_id := act2_route_completed
+	if route_id.is_empty():
+		if nurse_reverted_corrupted or get_switch("006d_Enfermeira_reverteu_dose"):
+			route_id = "reverted"
+		elif are_all_corrupted_street_npcs_defeated() or get_switch("006b_Dose_maior_pilulas"):
+			route_id = "corrupted"
+		else:
+			route_id = "normal"
+	match route_id:
+		"corrupted":
+			return {
+				"route_id": "corrupted",
+				"route_title": "ROTA CONCLUÍDA: PERCEPÇÃO CORROMPIDA",
+				"summary": "A dose excessiva rompeu a fronteira entre lembrança e rua.\nEm meio ao silêncio que restou de Agdangan, você encarou a fita VHS até o último fragmento."
+			}
+		"reverted":
+			return {
+				"route_id": "reverted",
+				"route_title": "ROTA CONCLUÍDA: REVERSÃO E RECONEXÃO",
+				"summary": "Após o excesso de comprimidos, você aceitou a checagem da Enfermeira Maria,\nestabilizou a percepção, voltou a ajudar Agdangan e enfrentou a memória sem filtro."
+			}
+		_:
+			return {
+				"route_id": "normal",
+				"route_title": "ROTA CONCLUÍDA: PERCEPÇÃO ESTÁVEL",
+				"summary": "Você manteve a dose habitual, atendeu os moradores de Agdangan com firmeza\ne atravessou a fita VHS de olhos abertos diante do que aconteceu."
+			}
 
 
 func mark_forest_santelmo_defeated(santelmo_id: String) -> void:
@@ -567,19 +765,24 @@ func mark_all_forest_santelmos_defeated() -> void:
 func advance_to_act_3() -> void:
 	variables["Ato"] = 3
 	variables["Intoxicacao"] = 0
+	corrupted_mode = false
+	set_switch("006b_Dose_maior_pilulas", false)
 	set_switch("022_Ato3_iniciado", true)
+	set_switch("022b_Ato3_despertar_visto", false)
 	variable_changed.emit("Ato", 3)
 	variable_changed.emit("Intoxicacao", 0)
 	is_afternoon = false
 	clock_minutes = day_start_minutes
 	_clock_accum = 0.0
 	_last_emitted_period = "morning"
+	restore_full_vitals()
 	set_perception_mode(PerceptionMode.UNFILTERED_ACT3)
 	higher_dose_changed.emit(false)
 	time_of_day_changed.emit(false)
 	clock_minute_changed.emit(clock_minutes, get_formatted_time(clock_minutes))
 	day_period_changed.emit("morning")
 	autosave(current_scene_path, "from_act2")
+	save_checkpoint(current_scene_path, Vector2.ZERO, "from_act2")
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_ambience("act3_ambience")
 		get_node("/root/AudioManager").play_sfx("vhs_glitch")
@@ -627,18 +830,25 @@ func advance_act() -> int:
 			notification_requested.emit("06:30 — Manhã Filtrada em Agdangan")
 			return 1
 
-## Conclui uma das 3 missões opcionais do Ato 2
+## Conclui uma das 3 missões dos moradores da rua no Ato 2 (Modo Normal ou Pós-Reversão)
 func complete_optional_mission(switch_done_key: String) -> void:
 	if get_switch(switch_done_key):
 		return
 	set_switch(switch_done_key, true)
-	var done_count: int = int(get_var("Missoes_concluidas", 0)) + 1
+	var done_count: int = get_completed_normal_street_mission_count()
 	set_var("Missoes_concluidas", done_count)
+	update_task_progress("ato2_ocorrencias_cidade", done_count, "Ajudar os 3 moradores de Agdangan na rua", ACT2_NORMAL_MISSION_SWITCHES.size())
 	if not get_switch("020_Alguma_missao_completa"):
 		set_switch("020_Alguma_missao_completa", true)
 		trigger_turn_afternoon()
-		notification_requested.emit("O tempo passou (Fim de Tarde). Retorne ao Quartel.")
+	if are_all_normal_street_missions_completed():
+		act2_route_completed = "reverted" if (nurse_reverted_corrupted or get_switch("006d_Enfermeira_reverteu_dose")) else "normal"
+		set_switch("019_Ato2_concluido", true)
+		notification_requested.emit("Todos os moradores da rua foram ajudados! Reporte ao Capitão Reyes ou descanse em casa.")
+	else:
+		notification_requested.emit("Morador ajudado (%d/%d). Continue auxiliando Agdangan." % [done_count, ACT2_NORMAL_MISSION_SWITCHES.size()])
 	autosave(current_scene_path, spawn_tag)
+	save_checkpoint()
 
 func set_perception_mode(mode: int) -> void:
 	perception_mode = clampi(mode, 0, 2)
@@ -659,42 +869,132 @@ func cycle_perception_preview() -> void:
 
 # --- SAVE / LOAD SYSTEM ---
 
+func get_place_display_name(scene_path: String) -> String:
+	var scene := scene_path
+	if scene.find("Street") != -1:
+		return "Rua de Agdangan"
+	if scene.find("Station") != -1:
+		return "Quartel BFP"
+	if scene.find("trail") != -1 or scene.find("Corridor") != -1:
+		return "Trilha da Floresta"
+	if scene.find("clearing") != -1 or scene.find("Clearing") != -1:
+		return "Clareira da Lagoa"
+	if scene.find("vhs_memory") != -1:
+		return "Memória / Pesadelo"
+	return "Quarto de Huwag"
+
+
+func _get_slot_json_path(slot_idx: int) -> String:
+	return "%s/slot_%d.json" % [SAVE_SLOTS_DIR, clampi(slot_idx, 1, MAX_SAVE_SLOTS)]
+
+
+func get_slot_thumbnail_path(slot_idx: int) -> String:
+	return "%s/slot_%d.png" % [SAVE_SLOTS_DIR, clampi(slot_idx, 1, MAX_SAVE_SLOTS)]
+
+
 func has_save_file() -> bool:
 	return FileAccess.file_exists(SAVE_PATH)
 
-func get_save_summary() -> Dictionary:
-	if not has_save_file():
-		return {}
-	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if file == null:
-		return {}
-	var parsed: Variant = JSON.parse_string(file.get_as_text())
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return {}
-	var data: Dictionary = parsed
+
+func has_any_save() -> bool:
+	if has_save_file():
+		return true
+	return get_latest_save_slot() > 0
+
+
+func get_latest_save_slot() -> int:
+	var best_slot := -1
+	var best_unix := -1
+	for slot in range(1, MAX_SAVE_SLOTS + 1):
+		var path := _get_slot_json_path(slot)
+		if not FileAccess.file_exists(path):
+			continue
+		var file := FileAccess.open(path, FileAccess.READ)
+		if file == null:
+			continue
+		var parsed: Variant = JSON.parse_string(file.get_as_text())
+		if typeof(parsed) != TYPE_DICTIONARY:
+			continue
+		var data: Dictionary = parsed
+		var ut: int = int(data.get("unix_time", 0))
+		if ut >= best_unix:
+			best_unix = ut
+			best_slot = slot
+	return best_slot
+
+
+func _summarize_save_dict(data: Dictionary, slot_idx: int = 0) -> Dictionary:
 	var ato: int = int(data.get("variables", {}).get("Ato", 1))
 	var saved_mins: int = int(data.get("clock_minutes", 960 if bool(data.get("is_afternoon", false)) else day_start_minutes))
 	var clock_hhmm: String = str(data.get("clock_hhmm", get_formatted_time(saved_mins)))
-	var scene: String = str(data.get("current_scene", "Quarto"))
-	var place := "Quarto de Huwag"
-	if scene.find("Street") != -1:
-		place = "Rua de Agdangan"
-	elif scene.find("Station") != -1:
-		place = "Quartel BFP"
-	elif scene.find("trail") != -1 or scene.find("Corridor") != -1:
-		place = "Trilha da Floresta"
-	elif scene.find("clearing") != -1 or scene.find("Clearing") != -1:
-		place = "Clareira da Lagoa"
-	elif scene.find("vhs_memory") != -1:
-		place = "Memória / Pesadelo"
+	var scene: String = str(data.get("current_scene", "RoomHuwag"))
+	var place := get_place_display_name(scene)
+	var sw: Dictionary = data.get("switches", {})
+	var vars: Dictionary = data.get("variables", {})
+	var corrupted: bool = bool(sw.get("006b_Mayor_Dose_Tomada", false)) and not bool(sw.get("006d_Enfermeira_reverteu_dose", false)) and ato < 3
+	if int(vars.get("Intoxicacao", 0)) >= 2 and ato < 3:
+		corrupted = true
+	var thumb := get_slot_thumbnail_path(slot_idx) if slot_idx > 0 else ""
 	return {
+		"exists": true,
+		"slot": slot_idx,
 		"ato": ato,
 		"clock_minutes": saved_mins,
 		"clock_hhmm": clock_hhmm,
 		"place": place,
 		"hp": int(data.get("player_hp", 100)),
-		"date": str(data.get("timestamp", "Recente"))
+		"date": str(data.get("timestamp", "Recente")),
+		"unix_time": int(data.get("unix_time", 0)),
+		"corrupted": corrupted,
+		"thumbnail_path": thumb if (slot_idx > 0 and FileAccess.file_exists(thumb)) else "",
 	}
+
+
+func get_save_summary() -> Dictionary:
+	if has_save_file():
+		var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+		if file != null:
+			var parsed: Variant = JSON.parse_string(file.get_as_text())
+			if typeof(parsed) == TYPE_DICTIONARY:
+				return _summarize_save_dict(parsed as Dictionary, 0)
+	var latest := get_latest_save_slot()
+	if latest > 0:
+		return get_slot_summary(latest)
+	return {}
+
+
+func get_slot_summary(slot_idx: int) -> Dictionary:
+	var clamped := clampi(slot_idx, 1, MAX_SAVE_SLOTS)
+	var path := _get_slot_json_path(clamped)
+	if not FileAccess.file_exists(path):
+		return {
+			"exists": false,
+			"slot": clamped,
+			"ato": 0,
+			"clock_minutes": 0,
+			"clock_hhmm": "--:--",
+			"place": "Slot Vazio",
+			"hp": 0,
+			"date": "",
+			"unix_time": 0,
+			"corrupted": false,
+			"thumbnail_path": "",
+		}
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {"exists": false, "slot": clamped}
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {"exists": false, "slot": clamped}
+	return _summarize_save_dict(parsed as Dictionary, clamped)
+
+
+func get_all_slot_summaries() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for i in range(1, MAX_SAVE_SLOTS + 1):
+		out.append(get_slot_summary(i))
+	return out
+
 
 func autosave(scene_path: String = "", tag: String = "", pos: Vector2 = Vector2.ZERO) -> bool:
 	if scene_path != "":
@@ -705,10 +1005,24 @@ func autosave(scene_path: String = "", tag: String = "", pos: Vector2 = Vector2.
 		saved_player_pos = pos
 	return save_game()
 
-func save_game() -> bool:
-	var data := {
-		"version": 3,
-		"timestamp": Time.get_datetime_string_from_system(),
+
+func _capture_live_player_position() -> void:
+	if not is_inside_tree():
+		return
+	var players := get_tree().get_nodes_in_group("player")
+	for p in players:
+		if is_instance_valid(p) and p is Node2D:
+			var p2d := p as Node2D
+			if p2d.global_position != Vector2.ZERO:
+				saved_player_pos = p2d.global_position
+			return
+
+
+func _build_save_payload() -> Dictionary:
+	return {
+		"version": 4,
+		"timestamp": Time.get_datetime_string_from_system(false, true),
+		"unix_time": int(Time.get_unix_time_from_system()),
 		"current_scene": current_scene_path,
 		"spawn_tag": spawn_tag,
 		"player_pos_x": saved_player_pos.x,
@@ -728,12 +1042,19 @@ func save_game() -> bool:
 		"active_tasks": active_tasks,
 		"completed_tasks": completed_tasks,
 		"defeated_forest_santelmos": defeated_forest_santelmos,
+		"defeated_corrupted_npcs": defeated_corrupted_npcs,
+		"nurse_reverted_corrupted": nurse_reverted_corrupted,
+		"act2_route_completed": act2_route_completed,
 		"settings": {
 			"flash_reduction": setting_flash_reduction,
 			"vhs_effects": setting_vhs_effects,
 			"screen_shake": setting_screen_shake
 		}
 	}
+
+
+func save_game() -> bool:
+	var data := _build_save_payload()
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
 		push_error("Erro ao abrir arquivo para salvar: %s" % SAVE_PATH)
@@ -743,17 +1064,42 @@ func save_game() -> bool:
 		get_node("/root/AudioManager").play_sfx("save_chime")
 	return true
 
-func load_game() -> bool:
-	if not has_save_file():
-		return false
-	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if file == null:
-		return false
-	var parsed: Variant = JSON.parse_string(file.get_as_text())
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return false
-	var data: Dictionary = parsed
 
+func save_to_slot(slot_idx: int, screenshot: Image = null) -> bool:
+	var clamped := clampi(slot_idx, 1, MAX_SAVE_SLOTS)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SAVE_SLOTS_DIR))
+	_capture_live_player_position()
+	var data := _build_save_payload()
+	var json_str := JSON.stringify(data, "\t")
+	var slot_path := _get_slot_json_path(clamped)
+	var file := FileAccess.open(slot_path, FileAccess.WRITE)
+	if file == null:
+		push_error("Erro ao gravar slot %d em %s" % [clamped, slot_path])
+		return false
+	file.store_string(json_str)
+	file.close()
+
+	# Mantém SAVE_PATH sincronizado com o salvamento mais recente
+	var main_file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if main_file != null:
+		main_file.store_string(json_str)
+		main_file.close()
+
+	if screenshot != null and not screenshot.is_empty():
+		var thumb := screenshot.duplicate() as Image
+		if thumb != null:
+			if thumb.get_format() != Image.FORMAT_RGBA8 and thumb.get_format() != Image.FORMAT_RGB8:
+				thumb.convert(Image.FORMAT_RGBA8)
+			thumb.resize(320, 180, Image.INTERPOLATE_BILINEAR)
+			var thumb_path := get_slot_thumbnail_path(clamped)
+			thumb.save_png(thumb_path)
+
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("save_chime")
+	return true
+
+
+func _apply_save_payload(data: Dictionary) -> bool:
 	if data.has("switches") and typeof(data["switches"]) == TYPE_DICTIONARY:
 		for k in data["switches"].keys():
 			switches[k] = bool(data["switches"][k])
@@ -776,12 +1122,19 @@ func load_game() -> bool:
 	active_tasks = data.get("active_tasks", {}).duplicate(true) if typeof(data.get("active_tasks", null)) == TYPE_DICTIONARY else {}
 	completed_tasks = data.get("completed_tasks", {}).duplicate() if typeof(data.get("completed_tasks", null)) == TYPE_DICTIONARY else {}
 	defeated_forest_santelmos = data.get("defeated_forest_santelmos", {}).duplicate() if typeof(data.get("defeated_forest_santelmos", null)) == TYPE_DICTIONARY else {}
+	defeated_corrupted_npcs = data.get("defeated_corrupted_npcs", {}).duplicate() if typeof(data.get("defeated_corrupted_npcs", null)) == TYPE_DICTIONARY else {}
+	nurse_reverted_corrupted = bool(data.get("nurse_reverted_corrupted", get_switch("006d_Enfermeira_reverteu_dose")))
+	act2_route_completed = str(data.get("act2_route_completed", ""))
+	corrupted_mode = is_higher_dose()
 	current_scene_path = str(data.get("current_scene", "res://scenes/levels/RoomHuwag.tscn"))
 	spawn_tag = str(data.get("spawn_tag", "initial"))
 	var px: float = float(data.get("player_pos_x", 0.0))
 	var py: float = float(data.get("player_pos_y", 0.0))
 	saved_player_pos = Vector2(px, py)
+	_pending_checkpoint_spawn_pos = saved_player_pos
+	_has_pending_checkpoint_spawn = (saved_player_pos != Vector2.ZERO)
 
+	clear_transient_state()
 	set_equipped_outfit(str(data.get("equipped_outfit", "casual")), false)
 	set_perception_mode(int(data.get("perception_mode", PerceptionMode.FILTERED_MORNING)))
 	if not variables.has("Intoxicacao"):
@@ -800,4 +1153,173 @@ func load_game() -> bool:
 	player_stamina = player_max_stamina
 	hp_changed.emit(player_hp, player_max_hp)
 	stamina_changed.emit(player_stamina, player_max_stamina)
+	save_checkpoint(current_scene_path, saved_player_pos, spawn_tag)
+	return true
+
+
+func load_game() -> bool:
+	if not has_save_file():
+		var latest := get_latest_save_slot()
+		if latest > 0:
+			return load_from_slot(latest)
+		return false
+	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if file == null:
+		return false
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return false
+	return _apply_save_payload(parsed as Dictionary)
+
+
+func load_from_slot(slot_idx: int) -> bool:
+	var clamped := clampi(slot_idx, 1, MAX_SAVE_SLOTS)
+	var path := _get_slot_json_path(clamped)
+	if not FileAccess.file_exists(path):
+		return false
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return false
+	var text := file.get_as_text()
+	file.close()
+	var parsed: Variant = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return false
+	var main_file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if main_file != null:
+		main_file.store_string(text)
+		main_file.close()
+	return _apply_save_payload(parsed as Dictionary)
+
+
+# --- CHECKPOINT SYSTEM (ÚLTIMO PONTO SEGURO) ---
+
+func _is_checkpoint_eligible_scene(scene_path: String) -> bool:
+	if scene_path.is_empty():
+		return false
+	if scene_path.ends_with("TitleScreen.tscn") or scene_path.ends_with("EndingCredits.tscn") or scene_path.ends_with("vhs_memory_minigame.tscn"):
+		return false
+	return true
+
+
+func has_checkpoint() -> bool:
+	return not _last_checkpoint.is_empty()
+
+
+func get_last_checkpoint() -> Dictionary:
+	return _last_checkpoint.duplicate(true)
+
+
+func has_pending_checkpoint_spawn() -> bool:
+	return _has_pending_checkpoint_spawn
+
+
+func consume_pending_checkpoint_spawn() -> Vector2:
+	if not _has_pending_checkpoint_spawn:
+		return Vector2.ZERO
+	_has_pending_checkpoint_spawn = false
+	var pos := _pending_checkpoint_spawn_pos
+	_pending_checkpoint_spawn_pos = Vector2.ZERO
+	return pos
+
+
+func save_checkpoint(scene_path: String = "", spawn_pos: Vector2 = Vector2.ZERO, tag: String = "") -> Dictionary:
+	if _is_restoring_checkpoint or is_player_defeated:
+		return _last_checkpoint.duplicate(true)
+	var target_scene := scene_path if not scene_path.is_empty() else current_scene_path
+	if not _is_checkpoint_eligible_scene(target_scene):
+		return _last_checkpoint.duplicate(true)
+
+	var target_tag := tag if not tag.is_empty() else spawn_tag
+	var safe_pos := spawn_pos
+	if safe_pos == Vector2.ZERO:
+		var tree := get_tree()
+		if tree != null:
+			var p := tree.get_first_node_in_group("player") as Node2D
+			if p != null and is_instance_valid(p) and not bool(p.get("is_dead")):
+				safe_pos = p.position
+	if safe_pos == Vector2.ZERO and saved_player_pos != Vector2.ZERO:
+		safe_pos = saved_player_pos
+
+	_last_checkpoint = {
+		"scene_path": target_scene,
+		"spawn_position": safe_pos,
+		"spawn_tag": target_tag,
+		"clock_minutes": clock_minutes,
+		"is_afternoon": is_afternoon,
+		"day_number": day_number,
+		"perception_mode": perception_mode,
+		"switches": switches.duplicate(true),
+		"variables": variables.duplicate(true),
+		"self_switches": self_switches.duplicate(true),
+		"inventory": inventory.duplicate(true),
+		"active_tasks": active_tasks.duplicate(true),
+		"completed_tasks": completed_tasks.duplicate(true),
+		"defeated_forest_santelmos": defeated_forest_santelmos.duplicate(true),
+		"defeated_corrupted_npcs": defeated_corrupted_npcs.duplicate(true),
+		"nurse_reverted_corrupted": nurse_reverted_corrupted,
+		"act2_route_completed": act2_route_completed,
+		"water_boss_defeated": water_boss_defeated,
+		"equipped_outfit": equipped_outfit,
+	}
+	checkpoint_saved.emit(_last_checkpoint.duplicate(true))
+	return _last_checkpoint.duplicate(true)
+
+
+func restore_last_checkpoint() -> bool:
+	_is_restoring_checkpoint = true
+	clear_transient_state()
+
+	if _last_checkpoint.is_empty():
+		# Fallback seguro caso ocorra derrota antes de qualquer snapshot explícito
+		if not _is_checkpoint_eligible_scene(current_scene_path):
+			current_scene_path = "res://scenes/levels/RoomHuwag.tscn"
+			spawn_tag = "initial"
+		_pending_checkpoint_spawn_pos = saved_player_pos
+		_has_pending_checkpoint_spawn = (saved_player_pos != Vector2.ZERO)
+		restore_full_vitals()
+		_is_restoring_checkpoint = false
+		checkpoint_restored.emit({
+			"scene_path": current_scene_path,
+			"spawn_position": saved_player_pos,
+			"spawn_tag": spawn_tag,
+		})
+		return true
+
+	var cp := _last_checkpoint
+	switches = (cp.get("switches", switches) as Dictionary).duplicate(true)
+	variables = (cp.get("variables", variables) as Dictionary).duplicate(true)
+	self_switches = (cp.get("self_switches", {}) as Dictionary).duplicate(true)
+	inventory = (cp.get("inventory", {}) as Dictionary).duplicate(true)
+	active_tasks = (cp.get("active_tasks", {}) as Dictionary).duplicate(true)
+	completed_tasks = (cp.get("completed_tasks", {}) as Dictionary).duplicate(true)
+	defeated_forest_santelmos = (cp.get("defeated_forest_santelmos", {}) as Dictionary).duplicate(true)
+	defeated_corrupted_npcs = (cp.get("defeated_corrupted_npcs", {}) as Dictionary).duplicate(true)
+	nurse_reverted_corrupted = bool(cp.get("nurse_reverted_corrupted", get_switch("006d_Enfermeira_reverteu_dose")))
+	act2_route_completed = str(cp.get("act2_route_completed", ""))
+	corrupted_mode = is_higher_dose()
+	water_boss_defeated = bool(cp.get("water_boss_defeated", false))
+	day_number = maxi(1, int(cp.get("day_number", 1)))
+	is_afternoon = bool(cp.get("is_afternoon", false))
+	clock_minutes = clampi(int(cp.get("clock_minutes", day_start_minutes)), 0, 1439)
+	_clock_accum = 0.0
+	_last_emitted_period = get_day_period(clock_minutes)
+	current_scene_path = str(cp.get("scene_path", "res://scenes/levels/RoomHuwag.tscn"))
+	spawn_tag = str(cp.get("spawn_tag", "initial"))
+	var cp_pos: Vector2 = cp.get("spawn_position", Vector2.ZERO) as Vector2
+	saved_player_pos = cp_pos
+	_pending_checkpoint_spawn_pos = cp_pos
+	_has_pending_checkpoint_spawn = (cp_pos != Vector2.ZERO)
+
+	set_equipped_outfit(str(cp.get("equipped_outfit", "casual")), false)
+	set_perception_mode(int(cp.get("perception_mode", PerceptionMode.FILTERED_MORNING)))
+	restore_full_vitals()
+
+	higher_dose_changed.emit(is_higher_dose())
+	time_of_day_changed.emit(is_afternoon)
+	clock_minute_changed.emit(clock_minutes, get_formatted_time(clock_minutes))
+	day_period_changed.emit(_last_emitted_period)
+
+	_is_restoring_checkpoint = false
+	checkpoint_restored.emit(_last_checkpoint.duplicate(true))
 	return true

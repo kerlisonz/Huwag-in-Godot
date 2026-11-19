@@ -1,39 +1,39 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3 uid="uid://bwldsar8qk7cd"]
 
-[ext_resource type="Script" path="res://scripts/levels/fire_station.gd" id="1_station"]
+[ext_resource type="Script" uid="uid://bys7amd7xqfoi" path="res://scripts/levels/fire_station.gd" id="1_station"]
 [ext_resource type="PackedScene" path="res://scenes/characters/Player.tscn" id="2_player"]
 
-[node name="FireStation" type="Node2D"]
+[node name="FireStation" type="Node2D" unique_id=1494641269]
 script = ExtResource("1_station")
 
-[node name="CanvasModulate" type="CanvasModulate" parent="."]
+[node name="CanvasModulate" type="CanvasModulate" parent="." unique_id=1554590941]
 color = Color(0.56, 0.58, 0.66, 1)
 
-[node name="FloorNormal" type="TileMapLayer" parent="."]
+[node name="FloorNormal" type="TileMapLayer" parent="." unique_id=1980484713]
 texture_filter = 1
 
-[node name="WallsNormal" type="TileMapLayer" parent="."]
+[node name="WallsNormal" type="TileMapLayer" parent="." unique_id=1695442241]
 texture_filter = 1
 
-[node name="FloorDistorted" type="TileMapLayer" parent="."]
+[node name="FloorDistorted" type="TileMapLayer" parent="." unique_id=246718955]
 visible = false
 texture_filter = 1
 
-[node name="WallsDistorted" type="TileMapLayer" parent="."]
+[node name="WallsDistorted" type="TileMapLayer" parent="." unique_id=1359510988]
 visible = false
 texture_filter = 1
 
-[node name="DecalsLayer" type="Node2D" parent="."]
+[node name="DecalsLayer" type="Node2D" parent="." unique_id=1542971881]
 z_index = 1
 
-[node name="Interactables" type="Node2D" parent="."]
+[node name="Interactables" type="Node2D" parent="." unique_id=470827354]
 
-[node name="YSortEntities" type="Node2D" parent="."]
+[node name="YSortEntities" type="Node2D" parent="." unique_id=2025048275]
 y_sort_enabled = true
 
-[node name="Player" parent="YSortEntities" instance=ExtResource("2_player")]
+[node name="Player" parent="YSortEntities" unique_id=32469185 instance=ExtResource("2_player")]
+y_sort_enabled = true
 position = Vector2(480, 512)
-y_sort_enabled = true
 
-[node name="LightsLayer" type="Node2D" parent="."]
+[node name="LightsLayer" type="Node2D" parent="." unique_id=168807195]
 z_index = 6

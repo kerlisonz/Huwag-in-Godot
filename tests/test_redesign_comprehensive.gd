@@ -91,9 +91,41 @@ func _run_all() -> void:
 	ato_npc.receive_water_hit(45, station.player.global_position)
 	await process_frame
 	_assert_ok(defeat_flag["done"] and ato_npc.is_defeated, "Combate existente derrota NPC hostil no Quartel")
+
+	# Valida colisores físicos reais dos novos móveis BFP e dos batentes da saída sul + interação com Capitão Reyes
+	var fs_p: CharacterBody2D = station.player
+	await physics_frame
+	fs_p.position = Vector2(480, 174)
+	for _i in range(10):
+		fs_p.move_and_collide(Vector2(0, -4))
+	_assert_ok(fs_p.position.y >= 156.0, "Mesa de comando do Chefe deve bloquear o jogador (y=%f)" % fs_p.position.y)
+
+	fs_p.position = Vector2(578, 424)
+	for _i in range(10):
+		fs_p.move_and_collide(Vector2(0, -4))
+	_assert_ok(fs_p.position.y >= 398.0, "Balcão de recepção BFP deve bloquear o jogador (y=%f)" % fs_p.position.y)
+
+	fs_p.position = Vector2(130, 168)
+	for _i in range(10):
+		fs_p.move_and_collide(Vector2(0, -4))
+	_assert_ok(fs_p.position.y >= 140.0, "Suporte de EPI na Ala Oeste deve bloquear o jogador (y=%f)" % fs_p.position.y)
+
+	fs_p.position = Vector2(462, 554)
+	for _i in range(10):
+		fs_p.move_and_collide(Vector2(-4, 0))
+	_assert_ok(fs_p.position.x >= 446.0, "Batente esquerdo da porta sul do FireStation deve bloquear o jogador (x=%f)" % fs_p.position.x)
+
+	var reyes_dlg := {"called": false}
+	station.request_dialogue.connect(func(pages: Array, _cb: Callable) -> void:
+		if pages.size() > 0:
+			reyes_dlg["called"] = true
+	)
+	station._on_npc_interacted("Cap_Reyes")
+	_assert_ok(reyes_dlg["called"], "Interação com Capitão Reyes dispara diálogo normalmente após reforma do Quartel")
+
 	station.queue_free()
 	await process_frame
-	print("[PASS] FireStation: multi-ala, NPCs bombeiros e conflito hostil validados.")
+	print("[PASS] FireStation: multi-ala, móveis BFP com colisão, batentes da saída, Cap. Reyes e conflito hostil validados.")
 
 	# ------------------------------------------------------------------
 	# 3. RUA ESTENDIDA (2880x560) + MORADORES + CONFLITO DE DIÁLOGO

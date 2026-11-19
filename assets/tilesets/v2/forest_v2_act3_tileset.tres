@@ -1,25 +1,50 @@
-[gd_resource type="TileSet" format=3]
+[gd_resource type="TileSet" format=3 uid="uid://3ct0bd2nb6mb"]
 
-[ext_resource type="Texture2D" path="res://assets/tilesets/v2/forest_v2_act3.png" id="1_y1k0w"]
+[ext_resource type="Texture2D" path="res://assets/tilesets/v2/forest_v2_act3.png" id="1_jw0ee"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestTree.tscn" id="2_vulph"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestBush.tscn" id="3_21apk"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestCoconutTree.tscn" id="4_e5gqc"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestRock.tscn" id="5_4e2fa"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestWitheredPine.tscn" id="6_im2ph"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestSlenderPine.tscn" id="7_uvgug"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestGnarledTree.tscn" id="8_10ofc"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestRoundTree.tscn" id="9_v6lla"]
+[ext_resource type="PackedScene" path="res://scenes/components/ForestAncientTree.tscn" id="10_68awv"]
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ordmm"]
-texture = ExtResource("1_y1k0w")
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_8wxv6"]
+texture = ExtResource("1_jw0ee")
 12:0/animation_columns = 3
-12:0/animation_frame_0/duration = 0.36
-12:0/animation_frame_1/duration = 0.36
-12:0/animation_frame_2/duration = 0.36
+12:0/animation_frame_0/duration = 0.28
+12:0/animation_frame_1/duration = 0.28
+12:0/animation_frame_2/duration = 0.28
 12:0/0 = 0
 12:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
 12:0/0/custom_data_0 = "water"
 12:0/0/custom_data_1 = true
 15:0/animation_columns = 3
-15:0/animation_frame_0/duration = 0.3
-15:0/animation_frame_1/duration = 0.3
-15:0/animation_frame_2/duration = 0.3
+15:0/animation_frame_0/duration = 0.24
+15:0/animation_frame_1/duration = 0.24
+15:0/animation_frame_2/duration = 0.24
 15:0/0 = 0
 15:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
 15:0/0/custom_data_0 = "water"
 15:0/0/custom_data_1 = true
+18:0/animation_columns = 3
+18:0/animation_frame_0/duration = 0.18
+18:0/animation_frame_1/duration = 0.18
+18:0/animation_frame_2/duration = 0.18
+18:0/0 = 0
+18:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+18:0/0/custom_data_0 = "water"
+18:0/0/custom_data_1 = true
+18:1/animation_columns = 3
+18:1/animation_frame_0/duration = 0.18
+18:1/animation_frame_1/duration = 0.18
+18:1/animation_frame_2/duration = 0.18
+18:1/0 = 0
+18:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+18:1/0/custom_data_0 = "water"
+18:1/0/custom_data_1 = true
 0:13/size_in_atlas = Vector2i(5, 6)
 0:13/0 = 0
 0:13/0/texture_origin = Vector2i(0, 40)
@@ -72,11 +97,11 @@ texture = ExtResource("1_y1k0w")
 20:13/0/y_sort_origin = 4
 20:13/0/physics_layer_0/polygon_0/points = PackedVector2Array(-22, -6, 22, -6, 22, 6, -22, 6)
 20:13/0/custom_data_0 = "wood"
-23:13/size_in_atlas = Vector2i(1, 2)
+23:13/size_in_atlas = Vector2i(2, 2)
 23:13/0 = 0
-23:13/0/texture_origin = Vector2i(0, 8)
+23:13/0/texture_origin = Vector2i(8, 8)
 23:13/0/y_sort_origin = 6
-23:13/0/physics_layer_0/polygon_0/points = PackedVector2Array(-10, -8, 10, -8, 10, 8, -10, 8)
+23:13/0/physics_layer_0/polygon_0/points = PackedVector2Array(-22, -10, 6, -10, 6, 8, -22, 8)
 23:13/0/custom_data_0 = "prop"
 25:13/size_in_atlas = Vector2i(2, 2)
 25:13/0 = 0
@@ -121,8 +146,6 @@ texture = ExtResource("1_y1k0w")
 10:0/0/custom_data_0 = "ground"
 11:0/0 = 0
 11:0/0/custom_data_0 = "ground"
-18:0/0 = 0
-18:0/0/custom_data_0 = "ground"
 0:1/0 = 0
 0:1/0/custom_data_0 = "ground"
 1:1/0 = 0
@@ -147,8 +170,6 @@ texture = ExtResource("1_y1k0w")
 10:1/0/custom_data_0 = "ground"
 11:1/0 = 0
 11:1/0/custom_data_0 = "ground"
-18:1/0 = 0
-18:1/0/custom_data_0 = "ground"
 0:2/0 = 0
 0:2/0/custom_data_0 = "ground"
 1:2/0 = 0
@@ -201,7 +222,8 @@ texture = ExtResource("1_y1k0w")
 17:2/0/custom_data_0 = "wood"
 18:2/0 = 0
 18:2/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-18:2/0/custom_data_0 = "wood"
+18:2/0/custom_data_0 = "water"
+18:2/0/custom_data_1 = true
 19:2/0 = 0
 19:2/0/custom_data_0 = "wood"
 20:2/0 = 0
@@ -252,9 +274,6 @@ texture = ExtResource("1_y1k0w")
 17:3/0 = 0
 17:3/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
 17:3/0/custom_data_0 = "wood"
-18:3/0 = 0
-18:3/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-18:3/0/custom_data_0 = "wood"
 19:3/0 = 0
 19:3/0/custom_data_0 = "wood"
 20:3/0 = 0
@@ -625,6 +644,17 @@ texture = ExtResource("1_y1k0w")
 7:12/0/custom_data_0 = "stone"
 7:12/0/custom_data_2 = true
 
+[sub_resource type="TileSetScenesCollectionSource" id="TileSetScenesCollectionSource_t3obh"]
+scenes/1/scene = ExtResource("2_vulph")
+scenes/2/scene = ExtResource("3_21apk")
+scenes/3/scene = ExtResource("4_e5gqc")
+scenes/4/scene = ExtResource("5_4e2fa")
+scenes/5/scene = ExtResource("6_im2ph")
+scenes/6/scene = ExtResource("7_uvgug")
+scenes/7/scene = ExtResource("8_10ofc")
+scenes/8/scene = ExtResource("9_v6lla")
+scenes/9/scene = ExtResource("10_68awv")
+
 [resource]
 physics_layer_0/collision_layer = 1
 physics_layer_0/collision_mask = 0
@@ -634,4 +664,5 @@ custom_data_layer_1/name = "is_water"
 custom_data_layer_1/type = 1
 custom_data_layer_2/name = "blocks_light"
 custom_data_layer_2/type = 1
-sources/0 = SubResource("TileSetAtlasSource_ordmm")
+sources/0 = SubResource("TileSetAtlasSource_8wxv6")
+sources/1 = SubResource("TileSetScenesCollectionSource_t3obh")

@@ -1,3 +1,4 @@
+@tool
 extends Node2D
 
 # VHSMemoryMinigame - Sequência Psicológica de Trauma / Memória do Ato 3
@@ -8,6 +9,7 @@ extends Node2D
 signal request_level_change(target_scene: String, spawn_tag: String)
 signal request_dialogue(pages: Array, callback: Callable)
 
+const RetroLevelHelpers := preload("res://scripts/levels/retro_level_helpers.gd")
 const V2TileCatalog := preload("res://scripts/levels/v2_tile_catalog.gd")
 const VHS_TILESET := preload("res://assets/tilesets/v2/interiors_v2_distorted_tileset.tres")
 
@@ -34,6 +36,10 @@ var _shake_intensity: float = 0.0
 var _pulse_time: float = 0.0
 
 func _ready() -> void:
+	if Engine.is_editor_hint():
+		_setup_editor_preview()
+		return
+
 	# Configura posição inicial de Huwag e câmera 1:1 para enquadrar todo o labirinto (640x360)
 	if player:
 		player.position = Vector2(80, 180)
@@ -72,7 +78,17 @@ func _ready() -> void:
 	# Diálogo de entrada no pesadelo
 	call_deferred("_trigger_intro_dialogue")
 
+func _setup_editor_preview() -> void:
+	RetroLevelHelpers.cleanup_editor_preview(self)
+	_build_vhs_v2_tiles()
+	_setup_memory_fragments()
+	RetroLevelHelpers.mark_unowned_preview_children([self, interactables_root])
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	_pulse_time += delta
 	if objective_label != null:
 		objective_label.visible = not GameState.dialogue_active
@@ -165,7 +181,7 @@ func _draw() -> void:
 			draw_circle(p, 19.0, ember_fire_col)
 			draw_circle(p, 10.0, ember_core_col)
 			draw_arc(p, 21.0, 0.0, TAU, 24, Color(1.0, 0.98, 0.90, 0.75), 1.2)
-			if player and player.position.distance_to(p) < 22.0:
+			if not Engine.is_editor_hint() and player and player.position.distance_to(p) < 22.0:
 				_damage_player_hazard()
 
 func _damage_player_hazard() -> void:
@@ -310,7 +326,7 @@ func _unlock_exit() -> void:
 		get_node("/root/AudioManager").play_sfx("save_chime")
 	GameState.set_switch("023_Ato3_pesadelo_vhs_concluido", true)
 	if objective_label:
-		objective_label.text = "PORTA DE SAÍDA ABERTA AO LESTE ► ENCARE A REALIDADE"
+		objective_label.text = "PORTA DE SAÍDA ABERTA AO LESTE ► CONCLUIR MEMÓRIA VHS"
 		objective_label.modulate = Color(0.95, 0.90, 0.50, 1.0)
 	if exit_door:
 		exit_door.monitoring = true
@@ -325,10 +341,16 @@ func _update_exit_door_visual() -> void:
 	var unlocked := _collected_fragments >= TOTAL_FRAGMENTS
 	door_vis.color = Color(0.95, 0.92, 0.72, 0.85) if unlocked else Color(0.32, 0.34, 0.38, 0.35)
 
+func complete_minigame() -> void:
+	GameState.set_switch("023_Ato3_pesadelo_vhs_concluido", true)
+	GameState.set_switch("026_Jogo_finalizado", true)
+	GameState.autosave("res://scenes/menu/EndingCredits.tscn", "demo_complete")
+	request_level_change.emit("res://scenes/menu/EndingCredits.tscn", "demo_complete")
+
 func _on_exit_door_entered(body: Node2D) -> void:
 	if body.is_in_group("player") and _collected_fragments >= TOTAL_FRAGMENTS:
-		# Sai do pesadelo e acorda na Agdangan sem filtro do Ato 3
-		request_level_change.emit("res://scenes/levels/RoomHuwag.tscn", "from_nightmare")
+		# Conclui o Minigame VHS e abre a Tela de Encerramento da Demo
+		complete_minigame()
 
 func _update_ui() -> void:
 	if fragments_label:

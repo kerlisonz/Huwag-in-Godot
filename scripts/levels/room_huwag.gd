@@ -1,3 +1,4 @@
+@tool
 extends Node2D
 
 signal request_level_change(target_scene: String, spawn_tag: String)
@@ -37,14 +38,20 @@ var _furniture_layer: TileMapLayer = null
 
 
 func _ready() -> void:
+	if Engine.is_editor_hint():
+		_setup_editor_preview()
+		return
+
 	if GameState.spawn_tag == "from_street":
 		player.position = Vector2(540, 220)
 		player.facing_dir = Vector2.LEFT
-	elif GameState.spawn_tag == "from_nightmare":
+	elif GameState.spawn_tag == "from_nightmare" or GameState.spawn_tag == "from_act2":
 		player.position = Vector2(288, 224)
 		player.facing_dir = Vector2.DOWN
-		GameState.advance_to_act_3()
-		call_deferred("_trigger_act3_wake_monologue")
+		if int(GameState.get_var("Ato", 1)) < 3:
+			GameState.advance_to_act_3()
+		if not GameState.get_switch("022b_Ato3_despertar_visto"):
+			call_deferred("_trigger_act3_wake_monologue")
 	else:
 		player.position = Vector2(288, 224)
 		player.facing_dir = Vector2.DOWN
@@ -66,14 +73,46 @@ func _ready() -> void:
 
 	_apply_visual_atmosphere()
 
-	if not GameState.get_self_switch("EV_Introducao", "A") and GameState.spawn_tag != "from_nightmare":
+	if not GameState.get_self_switch("EV_Introducao", "A") and int(GameState.get_var("Ato", 1)) == 1:
 		GameState.set_self_switch("EV_Introducao", "A", true)
+		GameState.start_task("ato1_apresentacao_reyes", "Ir ao Quartel BFP e falar com o Capitão Reyes")
 		call_deferred("_trigger_intro_monologue")
-	elif int(GameState.get_var("Ato", 1)) == 2 and not GameState.get_switch("006c_Dose_escolhida_Ato2") and GameState.spawn_tag != "from_nightmare":
+	elif int(GameState.get_var("Ato", 1)) == 2 and not GameState.get_switch("006c_Dose_escolhida_Ato2"):
 		call_deferred("_trigger_act2_pill_choice")
+	elif int(GameState.get_var("Ato", 1)) == 3 and not GameState.get_switch("022b_Ato3_despertar_visto"):
+		call_deferred("_trigger_act3_wake_monologue")
+
+
+func _setup_editor_preview() -> void:
+	RetroLevelHelpers.cleanup_editor_preview(self)
+	_furniture_layer = null
+	_normal_props.clear()
+	_distorted_props.clear()
+	_distorted_decals.clear()
+	var orig_fn := floor_normal
+	var orig_wn := walls_normal
+	var orig_fd := floor_distorted
+	var orig_wd := walls_distorted
+	floor_normal = RetroLevelHelpers.create_preview_tilemap(self, "EditorPreviewFloor", -2)
+	walls_normal = RetroLevelHelpers.create_preview_tilemap(self, "EditorPreviewWalls", -1)
+	var tmp_fd := TileMapLayer.new()
+	var tmp_wd := TileMapLayer.new()
+	floor_distorted = tmp_fd
+	walls_distorted = tmp_wd
+	_build_tilemaps()
+	_build_room_props_and_lights()
+	floor_normal = orig_fn
+	walls_normal = orig_wn
+	floor_distorted = orig_fd
+	walls_distorted = orig_wd
+	tmp_fd.free()
+	tmp_wd.free()
+	RetroLevelHelpers.mark_unowned_preview_children([self, ysort_root, decals_layer, lights_layer])
 
 
 func _process(delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	_fan_angle = fmod(_fan_angle + delta * 11.0, TAU)
 	if _fan_blades:
 		_fan_blades.rotation = _fan_angle
@@ -92,10 +131,14 @@ func apply_higher_dose_world(active: bool) -> void:
 
 
 func _is_higher_dose_active() -> bool:
+	if Engine.is_editor_hint():
+		return false
 	return GameState.has_method("is_higher_dose") and GameState.is_higher_dose()
 
 
 func _is_night_room() -> bool:
+	if Engine.is_editor_hint():
+		return false
 	if GameState.is_unfiltered_act3():
 		return false
 	if GameState.has_method("is_night_time") and GameState.is_night_time():
@@ -110,7 +153,7 @@ func _is_night_room() -> bool:
 func _build_tilemaps() -> void:
 	var t_cat := V2TileCatalog.INTERIOR_TILES
 	for layer in [floor_normal, walls_normal]:
-		layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else NORMAL_TS
+		layer.tile_set = ACT3_TS if RetroLevelHelpers.is_act3_unfiltered() else NORMAL_TS
 	for layer in [floor_distorted, walls_distorted]:
 		layer.tile_set = DISTORTED_TS
 		layer.collision_enabled = false
@@ -121,21 +164,15 @@ func _build_tilemaps() -> void:
 		V2TileCatalog.fill_rect(fl, Rect2i(12, 8, 23, 13), t_cat["wood_floor_dark"])
 		V2TileCatalog.fill_rect(fl, Rect2i(13, 10, 21, 10), t_cat["wood_floor_warm"])
 
-		# Tábuas mais escuras alternadas para textura contínua de madeira filipina
-		for y in range(10, 20):
-			for x in range(13, 34):
-				if (x + y * 2) % 4 == 0:
-					fl.set_cell(Vector2i(x, y), 0, t_cat["wood_floor_dark"])
-
 		# Área de dormir oeste com UMA esteira Banig limpa ao pé da cama (100% caminhável)
 		V2TileCatalog.stamp_rect(fl, Vector2i(13, 14), t_cat["banig_tl"], Vector2i(3, 2))
 
-		# Tapete vermelho central tecido na sala de estar sob a janela (livres os trilhos ao redor da mesa)
-		V2TileCatalog.stamp_rect(fl, Vector2i(18, 14), t_cat["rug_crimson_tl"], Vector2i(2, 2))
+		# Tapete central tecido na área aberta do quarto (centro 100% livre para circulação)
 		V2TileCatalog.stamp_rect(fl, Vector2i(20, 14), t_cat["rug_crimson_tl"], Vector2i(2, 2))
+		V2TileCatalog.stamp_rect(fl, Vector2i(22, 14), t_cat["rug_crimson_tl"], Vector2i(2, 2))
 
-		# Canto nordeste de cozinha compacta com piso terracota e tábuas contínuas na entrada
-		V2TileCatalog.fill_rect(fl, Rect2i(26, 10, 8, 3), t_cat["concrete_station"])
+		# Canto nordeste de cozinha/despensa delimitado ao ladrilho sob a bancada
+		V2TileCatalog.fill_rect(fl, Rect2i(27, 10, 7, 3), t_cat["tile_terracotta"])
 
 	# Paredes perimetrais Sawali + Madeira + Sombra projetada nas camadas normal e distorcida
 	for wl in [walls_normal, walls_distorted]:
@@ -172,30 +209,60 @@ func _build_tilemaps() -> void:
 			ysort_root.add_child(_furniture_layer)
 		else:
 			add_child(_furniture_layer)
-	if ysort_root != null:
+	if not Engine.is_editor_hint() and ysort_root != null:
 		ysort_root.z_index = 2
-	_furniture_layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
+	_furniture_layer.tile_set = ACT3_TS if RetroLevelHelpers.is_act3_unfiltered() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
 	_furniture_layer.clear()
 
-	# Zona de descanso (canto NO) + Estudo/Armário alinhados abaixo da parede superior + Janela na parede + Cozinha NE + Mesa com 4 cadeiras
+	# Zona de descanso & estudos (NO) + Janela + Bloco unificado de cozinha/despensa (NE), sem mesa central
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(13, 10), t_cat["bed_huwag"], Vector2i(3, 4))
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(16, 8), t_cat["wardrobe"], Vector2i(2, 3))
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(18, 9), t_cat["bookshelf_a"], Vector2i(2, 2))
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(21, 8), t_cat["window_day_tl"], Vector2i(2, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(24, 8), t_cat["radio_pc_bfp"], Vector2i(1, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(26, 8), t_cat["fridge_sari"], Vector2i(2, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(29, 9), t_cat["kitchen_counter"], Vector2i(4, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(24, 14), t_cat["table_dining"], Vector2i(3, 3))
-	_furniture_layer.set_cell(Vector2i(25, 13), 0, t_cat["chair_down"])
-	_furniture_layer.set_cell(Vector2i(25, 17), 0, t_cat["chair_up"])
-	_furniture_layer.set_cell(Vector2i(23, 15), 0, t_cat["chair_right"])
-	_furniture_layer.set_cell(Vector2i(27, 15), 0, t_cat["chair_left"])
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(27, 8), t_cat["radio_pc_bfp"], Vector2i(1, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(28, 8), t_cat["fridge_sari"], Vector2i(2, 3))
+	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(30, 8), t_cat["kitchen_counter"], Vector2i(4, 3))
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(13, 17), t_cat["indoor_palm"], Vector2i(2, 3))
 
 
 func _build_room_props_and_lights() -> void:
-	# Gato Pusa no canto sudeste do quarto compacto
-	_add_dual_prop("pusa_cat", Vector2(504, 298), Vector2(1.25, 1.25), -4)
+	# Criado-mudo compacto para remédios encostado na parede norte (deixa centro 100% livre)
+	_add_dual_prop("pill_nightstand", Vector2(382, 164), Vector2(1.0, 1.0), 0)
+
+	# Gato preto animado (Pusa) descansando no canto sudeste do quarto
+	var pusa_norm := AnimatedSprite2D.new()
+	pusa_norm.name = "PusaCatNormal"
+	pusa_norm.sprite_frames = RetroLevelHelpers.build_pusa_cat_frames(false)
+	pusa_norm.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	pusa_norm.position = Vector2(496, 294)
+	pusa_norm.scale = Vector2(1.15, 1.15)
+	pusa_norm.play("idle")
+	ysort_root.add_child(pusa_norm)
+	_normal_props.append(pusa_norm)
+
+	var pusa_dist := AnimatedSprite2D.new()
+	pusa_dist.name = "PusaCatDistorted"
+	pusa_dist.sprite_frames = RetroLevelHelpers.build_pusa_cat_frames(true)
+	pusa_dist.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	pusa_dist.position = Vector2(496, 294)
+	pusa_dist.scale = Vector2(1.15, 1.15)
+	pusa_dist.visible = false
+	pusa_dist.play("idle")
+	ysort_root.add_child(pusa_dist)
+	_distorted_props.append(pusa_dist)
+
+	# Enxame de olhos bizarros que vigiam das sombras durante o Modo Corrompido
+	var swarm := get_node_or_null("CorruptedEyeSwarm") as CorruptedEyeSwarm
+	if swarm == null:
+		swarm = CorruptedEyeSwarm.new()
+		swarm.name = "CorruptedEyeSwarm"
+		add_child(swarm)
+	swarm.setup_world_swarm([
+		Vector2(214, 152), Vector2(266, 152), Vector2(304, 152), Vector2(352, 134),
+		Vector2(404, 152), Vector2(464, 152), Vector2(520, 152), Vector2(198, 224),
+		Vector2(198, 286), Vector2(246, 326), Vector2(334, 326), Vector2(422, 326),
+		Vector2(522, 324), Vector2(552, 192), Vector2(552, 276), Vector2(342, 240)
+	], 4102, 0.85)
 
 	# Decais exclusivos do estado distorcido (Yume Nikki + manchas dentro dos novos limites x=224..528)
 	_add_distorted_decal("floor_stain", Vector2(288, 224), Vector2(1.4, 1.2))
@@ -230,16 +297,16 @@ func _build_room_props_and_lights() -> void:
 		_fan_blades.add_child(blade)
 	fan_root.add_child(_fan_blades)
 
-	if light_shaft != null:
+	if not Engine.is_editor_hint() and light_shaft != null:
 		light_shaft.polygon = PackedVector2Array([
 			Vector2(336, 144), Vector2(368, 144), Vector2(392, 236), Vector2(312, 236)
 		])
 
 	# Luzes PointLight2D atmosféricas alinhadas ao quarto compacto
 	_window_light = RetroLevelHelpers.create_point_light(Vector2(352, 195), Color(0.76, 0.85, 0.98), 0.72, 2.2)
-	_lamp_light = RetroLevelHelpers.create_point_light(Vector2(408, 240), Color(1.0, 0.76, 0.42), 0.92, 1.8)
+	_lamp_light = RetroLevelHelpers.create_point_light(Vector2(382, 180), Color(1.0, 0.78, 0.44), 0.88, 1.9)
 	_door_light = RetroLevelHelpers.create_point_light(Vector2(536, 228), Color(0.90, 0.76, 0.48), 0.58, 1.3)
-	_radio_light = RetroLevelHelpers.create_point_light(Vector2(392, 152), Color(0.28, 0.92, 0.52), 0.45, 0.6)
+	_radio_light = RetroLevelHelpers.create_point_light(Vector2(440, 152), Color(0.28, 0.92, 0.52), 0.45, 0.6)
 	for lt in [_window_light, _lamp_light, _door_light, _radio_light]:
 		lights_layer.add_child(lt)
 
@@ -311,12 +378,15 @@ func _apply_visual_atmosphere() -> void:
 			canvas_mod.color = Color(0.76, 0.78, 0.84, 1.0)
 
 	if _lamp_light:
-		_lamp_light.color = Color(0.92, 0.46, 0.52) if higher else (Color(0.84, 0.84, 0.86) if act3 else Color(1.0, 0.76, 0.42))
+		_lamp_light.color = Color(0.58, 0.54, 0.90) if higher else (Color(0.84, 0.84, 0.86) if act3 else Color(1.0, 0.78, 0.44))
 	if _window_light:
 		_window_light.energy = 0.48 if higher else (0.58 if night else 0.82)
-		_window_light.color = Color(0.84, 0.48, 0.56) if higher else (Color(0.82, 0.84, 0.88) if act3 else Color(0.74, 0.84, 0.96))
+		_window_light.color = Color(0.54, 0.50, 0.86) if higher else (Color(0.82, 0.84, 0.88) if act3 else Color(0.74, 0.84, 0.96))
 	if _radio_light:
-		_radio_light.color = Color(0.95, 0.36, 0.42) if higher else Color(0.28, 0.92, 0.52)
+		_radio_light.color = Color(0.68, 0.62, 0.96) if higher else Color(0.28, 0.92, 0.52)
+	var swarm := get_node_or_null("CorruptedEyeSwarm") as CorruptedEyeSwarm
+	if swarm != null:
+		swarm.refresh_visibility()
 	if light_shaft:
 		light_shaft.visible = not higher
 		light_shaft.color = Color(0.75, 0.78, 0.82, 0.05) if act3 else (Color(0.45, 0.56, 0.78, 0.06) if night else Color(0.78, 0.84, 0.94, 0.09))
@@ -351,12 +421,15 @@ func _setup_room_collisions() -> void:
 	_add_box_collision(body, Rect2(544, 256, 96, 104))      # Leste abaixo da porta
 	_add_box_collision(body, Rect2(552, 208, 88, 48))       # Trava externa do vão da porta (y=208..256)
 
+	# Colisão compacta do criado-mudo dos remédios encostado à parede norte
+	_add_box_collision(body, Rect2(370, 152, 24, 22))
+
 	# Colisão circular do gato dormindo no canto sudeste
 	var cat_shape := CollisionShape2D.new()
 	var cat_circle := CircleShape2D.new()
-	cat_circle.radius = 11.0
+	cat_circle.radius = 10.0
 	cat_shape.shape = cat_circle
-	cat_shape.position = Vector2(504, 298)
+	cat_shape.position = Vector2(496, 294)
 	body.add_child(cat_shape)
 
 
@@ -371,13 +444,13 @@ func _add_box_collision(parent: Node2D, r: Rect2) -> void:
 
 func _setup_interactables() -> void:
 	_add_interactable("Cama", "Cama de Bambu", "Descansar", Vector2(236, 198), Vector2(68, 66))
-	_add_interactable("Mesa_Remedios", "Mesa de Remédios", "Examinar", Vector2(408, 248), Vector2(56, 48))
+	_add_interactable("Mesa_Remedios", "Criado-Mudo (Remédios)", "Examinar", Vector2(382, 174), Vector2(44, 34))
 	_add_interactable("Armario_Uniforme", "Armário do Uniforme", "Abrir", Vector2(270, 166), Vector2(36, 20))
-	_add_interactable("Janela_Norte", "Janela Grades", "Olhar", Vector2(352, 166), Vector2(40, 24))
-	_add_interactable("Radio_Quartel", "Rádio Comunicador BFP", "Checar", Vector2(392, 166), Vector2(28, 24))
-	_add_interactable("Geladeira", "Jarra e Provisões", "Examinar", Vector2(432, 166), Vector2(40, 24))
+	_add_interactable("Janela_Norte", "Janela Grades", "Olhar", Vector2(352, 166), Vector2(36, 24))
+	_add_interactable("Radio_Quartel", "Rádio Comunicador BFP", "Checar", Vector2(440, 170), Vector2(28, 24))
+	_add_interactable("Geladeira", "Jarra e Provisões", "Examinar", Vector2(480, 170), Vector2(48, 24))
 	_add_interactable("Porta_Saida", "Porta para Agdangan", "Sair", Vector2(546, 228), Vector2(26, 44))
-	_add_interactable("Gato", "Pusa", "Acariciar", Vector2(504, 296), Vector2(28, 24))
+	_add_interactable("Gato", "Pusa", "Acariciar", Vector2(496, 294), Vector2(30, 24))
 
 
 func _add_interactable(id: String, title_text: String, verb_text: String, pos: Vector2, box_size: Vector2) -> void:
@@ -417,18 +490,19 @@ func _trigger_intro_monologue() -> void:
 
 
 func _trigger_act3_wake_monologue() -> void:
+	GameState.set_switch("022b_Ato3_despertar_visto", true)
 	var wake_act3: Array[Dictionary] = [
 		{
 			"speaker": "Huwag Matitiis",
 			"expression": "unfiltered",
 			"is_monologue": true,
-			"text": "Acordei sem fôlego... As fitas na cabeça pararam de rodar e o quarto voltou a ter apenas o cheiro de madeira úmida e cinza antiga."
+			"text": "Acordei sem fôlego... O filtro dos comprimidos cedeu de vez e o quarto voltou a ter apenas o cheiro de madeira úmida e cinza antiga."
 		},
 		{
 			"speaker": "Huwag Matitiis",
 			"expression": "unfiltered",
 			"is_monologue": true,
-			"text": "Os frascos na mesa estão vazios. Não existe mais filtro entre mim e Agdangan. Preciso sair."
+			"text": "Os frascos na mesa estão vazios. Não existe mais nada para adiar — quando eu fechar os olhos nesta cama, a fita daquela noite vai rodar até o fim."
 		}
 	]
 	request_dialogue.emit(wake_act3, Callable())
@@ -480,7 +554,7 @@ func _on_interactable_triggered(item_name: String) -> void:
 
 	match item_name:
 		"Cama":
-			if GameState.get_switch("005_Chefe_liberou_cidade") and ato == 1:
+			if ato == 1 and GameState.get_switch("005_Chefe_liberou_cidade"):
 				request_dialogue.emit([
 					{
 						"speaker": "Huwag Matitiis",
@@ -495,26 +569,48 @@ func _on_interactable_triggered(item_name: String) -> void:
 						_trigger_act2_pill_choice()
 				)
 				return
-			elif GameState.get_switch("019_Ato2_concluido") and ato == 2:
+			elif ato == 1 and (GameState.get_switch("003_Ovos_sem_derrotar") or GameState.get_switch("004_Ovos_e_derrotou")):
+				request_dialogue.emit([{
+					"speaker": "Huwag Matitiis",
+					"expression": "tired",
+					"text": "Já trouxe os ovos da floresta, mas preciso reportar ao Capitão Reyes no Quartel BFP antes de encerrar o turno."
+				}], Callable())
+				return
+			elif ato == 2 and GameState.get_switch("019_Ato2_concluido"):
 				request_dialogue.emit([
 					{
 						"speaker": "Huwag Matitiis",
 						"expression": "tired",
-						"text": "O segundo dia terminou, mas algo antigo arranha atrás da memória.\nDeitar e fechar os olhos?",
-						"choices": ["Dormir (Enfrentar a fita VHS)", "Ainda não"]
+						"text": "O segundo dia terminou, mas o silêncio pesa sobre o quarto.\nDormir até o amanhecer?",
+						"choices": ["Dormir até o amanhecer", "Ainda não"]
 					}
 				], func(choice: int) -> void:
 					if choice == 0:
-						request_level_change.emit("res://scenes/levels/vhs_memory_minigame.tscn", "from_bed")
+						GameState.advance_to_act_3()
+						_apply_visual_atmosphere()
+						_trigger_act3_wake_monologue()
+				)
+				return
+			elif ato >= 3 or act3:
+				request_dialogue.emit([
+					{
+						"speaker": "Huwag Matitiis",
+						"expression": "unfiltered",
+						"text": "A cama de bambu range no quarto sem cor. A fita daquela noite espera atrás das pálpebras.\nDeitar e encarar a memória?",
+						"choices": ["Dormir (Iniciar Memória VHS)", "Ainda não"]
+					}
+				], func(choice: int) -> void:
+					if choice == 0:
+						request_level_change.emit("res://scenes/levels/vhs_memory_minigame.tscn", "from_act3_bed")
 				)
 				return
 
 			var bed_txt := (
-				"Os lençóis estão empapados de suor frio... Há um afundamento no colchão, como se alguém tivesse saído daqui um segundo atrás."
+				"Os lençóis estão empapados de suor frio... Ainda preciso ir ao Quartel BFP e resolver o que ficou pendente na rua."
 				if higher else (
-					"A cama de bambu range no quarto sem cor. Os pesadelos deixaram marcas escuras no travesseiro."
-					if act3 else
-					"Minha cama de bambu, com o mosquiteiro recolhido e o tapete de banig ao pé.\nUm lugar conhecido que já não parece acolhedor."
+					"Ainda tenho tarefas pendentes neste turno em Agdangan. Preciso falar com o Capitão Reyes no Quartel BFP."
+					if ato == 2 else
+					"Minha cama de bambu, com o mosquiteiro recolhido e o tapete de banig ao pé.\nPreciso cumprir meu chamado no Quartel BFP antes de descansar."
 				)
 			)
 			request_dialogue.emit([{"speaker": "Huwag Matitiis", "expression": "tired", "text": bed_txt}], Callable())
@@ -528,6 +624,12 @@ func _on_interactable_triggered(item_name: String) -> void:
 				}], Callable())
 			elif ato == 2 and not GameState.get_switch("006c_Dose_escolhida_Ato2"):
 				_trigger_act2_pill_choice()
+			elif ato == 2 and GameState.get_switch("006d_Enfermeira_reverteu_dose"):
+				request_dialogue.emit([{
+					"speaker": "Huwag Matitiis",
+					"expression": "neutral",
+					"text": "Depois da checagem e da medicação da Enfermeira Maria, o zumbido baixou e os contornos do quarto voltaram ao normal."
+				}], Callable())
 			elif ato == 2:
 				var txt := (
 					"Os vidros estão caídos e comprimidos brancos se misturam a estilhaços sobre a madeira.\nA dose extra rasgou os contornos da realidade."

@@ -1,0 +1,26 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/components/forest_prop.gd" id="1_forest_prop"]
+[ext_resource type="Texture2D" path="res://assets/tilesets/v2/forest_v2_normal.png" id="2_forest_tex"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_tree_trunk"]
+radius = 6.0
+height = 22.0
+
+[node name="ForestTree" type="StaticBody2D"]
+y_sort_enabled = true
+collision_layer = 1
+collision_mask = 6
+script = ExtResource("1_forest_prop")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture_filter = 0
+texture = ExtResource("2_forest_tex")
+offset = Vector2(0, -27)
+region_enabled = true
+region_rect = Rect2(80, 208, 48, 96)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -2)
+rotation = 1.5707964
+shape = SubResource("CapsuleShape2D_tree_trunk")

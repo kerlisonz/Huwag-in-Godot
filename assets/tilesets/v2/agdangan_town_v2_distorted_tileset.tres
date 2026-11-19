@@ -1,4 +1,4 @@
-[gd_resource type="TileSet" format=3]
+[gd_resource type="TileSet" format=3 uid="uid://c60r4pvdni5wj"]
 
 [ext_resource type="Texture2D" path="res://assets/tilesets/v2/agdangan_town_v2_distorted.png" id="1_rm8dd"]
 

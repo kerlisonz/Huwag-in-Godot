@@ -58,7 +58,7 @@ const FOREST_TILES := {
 	"tree_gnarled_mid": Vector2i(0, 13),     # 5x6
 	"pine_dark": Vector2i(5, 13),            # 3x6
 	"pine_withered": Vector2i(8, 13),        # 3x6
-	"pine_slender": Vector2i(11, 13),        # 2x5
+	"pine_slender": Vector2i(11, 13),        # 1x6
 	"tree_canopy_round": Vector2i(13, 13),   # 4x5
 	"stump_rooted": Vector2i(17, 13),        # 2x2
 	"log_v": Vector2i(19, 13),               # 1x3
@@ -66,6 +66,7 @@ const FOREST_TILES := {
 	"bush_dense": Vector2i(23, 13),          # 2x2
 	"moss_boulder": Vector2i(25, 13),        # 2x2
 	"ancient_tree": Vector2i(0, 19),         # 14x18
+	"coconut_palm": Vector2i(15, 19),        # 3x6
 }
 
 const TOWN_TILES := {

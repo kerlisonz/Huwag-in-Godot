@@ -332,17 +332,12 @@ func _add_rect_animation(sf: SpriteFrames, anim_name: String, tex: Texture2D, ro
 func _style_prompt_label() -> void:
 	if prompt_label == null:
 		return
-	var sb := StyleBoxFlat.new()
-	sb.corner_detail = 1
-	sb.set_corner_radius_all(3)
-	sb.set_border_width_all(1)
-	sb.content_margin_left = 6
-	sb.content_margin_right = 6
-	sb.content_margin_top = 2
-	sb.content_margin_bottom = 2
-	sb.bg_color = Color(0.07, 0.08, 0.11, 0.88)
-	sb.border_color = Color(0.76, 0.79, 0.84, 0.65)
-	prompt_label.add_theme_stylebox_override("normal", sb)
+	prompt_label.add_theme_stylebox_override("normal", HuwagUiTheme.make_omori_box_style(Color(0.0, 0.0, 0.0, 0.96), Color.WHITE, 6, 3))
+	var ui_font := HuwagUiTheme.get_ui_font()
+	if ui_font != null:
+		prompt_label.add_theme_font_override("font", ui_font)
+	prompt_label.add_theme_font_size_override("font_size", 13)
+	prompt_label.add_theme_color_override("font_color", Color.WHITE)
 
 
 func set_camera_limits(bounds: Rect2i) -> void:
@@ -471,10 +466,27 @@ func trigger_death() -> void:
 	_death_anim_timer = 0.85
 	_attack_anim_timer = 0.0
 	_dodge_timer = 0.0
+	_jump_timer = 0.0
+	_jump_height = 0.0
 	is_dodging = false
+	is_jumping = false
+	is_moving = false
+	is_running = false
+	is_crouching = false
 	velocity = Vector2.ZERO
+	_attack_lunge_vel = Vector2.ZERO
+	_knockback_vel = Vector2.ZERO
+	_combat_fx.clear()
+	if prompt_label:
+		prompt_label.visible = false
+	var gs := _get_game_state()
+	if gs != null:
+		if int(gs.get("player_hp")) > 0:
+			gs.set("player_hp", 0)
+			if gs.has_signal("hp_changed"):
+				gs.emit_signal("hp_changed", 0, int(gs.get("player_max_hp")))
+		gs.set("is_player_defeated", true)
 	CombatSfx.play(self, "player_hurt", -3.0)
-	_spawn_combat_fx("hurt", global_position + Vector2(0, -18), "DERROTADO", Color("#FF595E"))
 	_update_character_sprite_state()
 	player_died.emit()
 	queue_redraw()
@@ -487,9 +499,13 @@ func revive(restore_hp: int = -1) -> void:
 	_hurt_anim_timer = 0.0
 	var gs := _get_game_state()
 	if gs != null:
+		gs.set("is_player_defeated", false)
 		var max_hp := int(gs.get("player_max_hp"))
 		var target_hp := restore_hp if restore_hp > 0 else maxi(1, int(max_hp * 0.5))
-		gs.set("player_hp", clampi(target_hp, 1, max_hp))
+		var final_hp := clampi(target_hp, 1, max_hp)
+		gs.set("player_hp", final_hp)
+		if gs.has_signal("hp_changed"):
+			gs.emit_signal("hp_changed", final_hp, max_hp)
 		if gs.has_method("reset_stamina"):
 			gs.call("reset_stamina")
 	_local_stamina = STAMINA_MAX

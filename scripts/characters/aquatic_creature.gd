@@ -32,10 +32,14 @@ var is_hostile: bool = false
 var is_defeated: bool = false
 var current_phase: int = 1
 
+const GUARDIAN_FRAMES: SpriteFrames = preload("res://assets/sprites/enemies/lagoon_guardian/lagoon_guardian_spriteframes.tres")
+
 var _bob_time: float = 0.0
 var _state_timer: float = 0.0
 var _attack_cooldown: float = 1.15
 var _hit_flash_timer: float = 0.0
+var _hurt_anim_timer: float = 0.0
+var _facing: String = "down"
 var _knockback_vel: Vector2 = Vector2.ZERO
 var _lunge_dir: Vector2 = Vector2.DOWN
 var _lunge_target: Vector2 = Vector2.ZERO
@@ -46,7 +50,7 @@ var _phase2_triggered: bool = false
 var _phase3_triggered: bool = false
 var _home_pos: Vector2 = Vector2.ZERO
 
-@onready var sprite: Sprite2D = get_node_or_null("Sprite2D") as Sprite2D
+@onready var sprite: AnimatedSprite2D = (get_node_or_null("AnimatedSprite2D") if has_node("AnimatedSprite2D") else get_node_or_null("Sprite2D")) as AnimatedSprite2D
 @onready var interact_area: Interactable = (get_node_or_null("CreatureInteractable") if has_node("CreatureInteractable") else get_node_or_null("Interactable")) as Interactable
 @onready var aura_light: PointLight2D = get_node_or_null("PointLight2D") as PointLight2D
 @onready var aura_particles: CPUParticles2D = get_node_or_null("AuraParticles") as CPUParticles2D
@@ -56,6 +60,12 @@ var _home_pos: Vector2 = Vector2.ZERO
 func _ready() -> void:
 	_home_pos = global_position
 	current_hp = max_hp
+	if sprite:
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sprite.sprite_frames = GUARDIAN_FRAMES
+		sprite.position = Vector2(0.0, -10.0)
+		if sprite.sprite_frames and sprite.sprite_frames.has_animation("idle_down"):
+			sprite.play("idle_down")
 	if interact_area:
 		interact_area.interaction_id = "Criatura_Lagoa"
 		interact_area.title = "Guardião da Lagoa Azul"
@@ -75,9 +85,10 @@ func _is_dialogue_locked() -> bool:
 func start_boss_fight() -> void:
 	if is_defeated or is_hostile:
 		return
-	if GameState.has_method("are_all_forest_santelmos_defeated") and not GameState.is_unfiltered_act3() and not GameState.are_all_forest_santelmos_defeated():
-		var rem: int = GameState.get_remaining_forest_santelmo_count()
-		GameState.notification_requested.emit("Derrote todos os %d Santelmos restantes na floresta antes de enfrentar a Guardiã." % rem)
+	var gs := get_node_or_null("/root/GameState")
+	if gs and gs.has_method("are_all_forest_santelmos_defeated") and not gs.is_unfiltered_act3() and not gs.are_all_forest_santelmos_defeated():
+		var rem: int = gs.get_remaining_forest_santelmo_count()
+		gs.notification_requested.emit("Derrote todos os %d Santelmos restantes na floresta antes de enfrentar a Guardiã." % rem)
 		return
 	is_hostile = true
 	boss_state = BossState.IDLE_COMBAT
@@ -105,10 +116,12 @@ func _physics_process(delta: float) -> void:
 	_bob_time += delta * 2.4
 	if _hit_flash_timer > 0.0:
 		_hit_flash_timer = maxf(0.0, _hit_flash_timer - delta)
+	if _hurt_anim_timer > 0.0:
+		_hurt_anim_timer = maxf(0.0, _hurt_anim_timer - delta)
 
 	if sprite:
-		var bob_amp := 1.8 if not is_hostile else 2.6
-		sprite.position.y = roundf(sin(_bob_time) * bob_amp)
+		var bob_amp := 1.5 if not is_hostile else 2.2
+		sprite.position.y = -10.0 + (roundf(sin(_bob_time) * bob_amp) if not is_defeated else 0.0)
 		if _hit_flash_timer > 0.0:
 			sprite.modulate = Color(1.0, 0.45, 0.45, 1.0)
 		elif boss_state == BossState.STAGGERED:
@@ -125,17 +138,20 @@ func _physics_process(delta: float) -> void:
 
 	if not is_hostile or is_defeated:
 		velocity = Vector2.ZERO
+		_animate_guardian()
 		queue_redraw()
 		return
 
 	if _is_dialogue_locked():
 		velocity = Vector2.ZERO
+		_animate_guardian()
 		queue_redraw()
 		return
 
 	_knockback_vel = _knockback_vel.move_toward(Vector2.ZERO, 420.0 * delta)
 	_update_boss_fsm(delta)
 	move_and_slide()
+	_animate_guardian()
 	global_position.x = clampf(global_position.x, 160.0, 780.0)
 	global_position.y = clampf(global_position.y, 100.0, 440.0)
 	queue_redraw()
@@ -365,6 +381,7 @@ func _apply_boss_damage(damage: int, from_pos: Vector2, _is_water: bool) -> void
 	var bonus_dmg := int(round(float(damage) * 1.2)) if boss_state == BossState.STAGGERED else damage
 	current_hp = clampi(current_hp - bonus_dmg, 0, max_hp)
 	_hit_flash_timer = 0.18
+	_hurt_anim_timer = 0.24
 	var push_dir := (global_position - from_pos).normalized()
 	if push_dir.length_squared() < 0.01:
 		push_dir = Vector2.UP
@@ -422,7 +439,58 @@ func _handle_boss_defeat() -> void:
 		interact_area.set_deferred("monitorable", true)
 
 	boss_defeated.emit()
+	_play_guardian_anim("death")
 	queue_redraw()
+
+
+func _update_guardian_facing(vec: Vector2) -> void:
+	if vec.length_squared() < 0.01:
+		return
+	if absf(vec.x) > absf(vec.y):
+		_facing = "right" if vec.x >= 0.0 else "left"
+	else:
+		_facing = "down" if vec.y >= 0.0 else "up"
+
+
+func _play_guardian_anim(prefix: String) -> void:
+	if not sprite or not sprite.sprite_frames:
+		return
+	var anim_name := "%s_%s" % [prefix, _facing]
+	if sprite.sprite_frames.has_animation(anim_name):
+		if sprite.animation != anim_name or (prefix != "death" and not sprite.is_playing()):
+			sprite.play(anim_name)
+
+
+func _animate_guardian() -> void:
+	if not sprite:
+		return
+	if is_defeated or boss_state == BossState.DEFEATED:
+		_play_guardian_anim("death")
+		return
+	if _hurt_anim_timer > 0.0:
+		_play_guardian_anim("hurt")
+		return
+	var player := _find_player()
+	match boss_state:
+		BossState.TELEGRAPH_LUNGE, BossState.ATTACK_LUNGE:
+			_update_guardian_facing(_lunge_dir)
+			_play_guardian_anim("attack1")
+		BossState.TELEGRAPH_WAVE, BossState.ATTACK_WAVE:
+			if player != null:
+				_update_guardian_facing(player.global_position - global_position)
+			_play_guardian_anim("attack2")
+		BossState.IDLE_COMBAT:
+			if velocity.length_squared() > 9.0:
+				_update_guardian_facing(velocity)
+				_play_guardian_anim("run" if current_phase >= 2 else "walk")
+			else:
+				if player != null:
+					_update_guardian_facing(player.global_position - global_position)
+				_play_guardian_anim("idle")
+		_:
+			if not is_hostile and player != null:
+				_update_guardian_facing(player.global_position - global_position)
+			_play_guardian_anim("idle")
 
 
 func _draw() -> void:

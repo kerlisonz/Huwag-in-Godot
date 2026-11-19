@@ -1,3 +1,4 @@
+@tool
 extends Node2D
 
 signal request_level_change(target_scene: String, spawn_tag: String)
@@ -33,6 +34,10 @@ var _time_acc: float = 0.0
 
 
 func _ready() -> void:
+	if Engine.is_editor_hint():
+		_setup_editor_preview()
+		return
+
 	player.position = Vector2(480, 512)
 	player.facing_dir = Vector2.UP
 	player.set_camera_limits(Rect2i(0, 0, 960, 640))
@@ -53,7 +58,40 @@ func _ready() -> void:
 	_apply_station_atmosphere()
 
 
+func _setup_editor_preview() -> void:
+	RetroLevelHelpers.cleanup_editor_preview(self)
+	_npcs.clear()
+	_normal_props.clear()
+	_distorted_props.clear()
+	_distorted_decals.clear()
+	_lights.clear()
+	_bay_flicker_light = null
+	_furniture_layer = null
+	var orig_fn := floor_normal
+	var orig_wn := walls_normal
+	var orig_fd := floor_distorted
+	var orig_wd := walls_distorted
+	floor_normal = RetroLevelHelpers.create_preview_tilemap(self, "EditorPreviewFloor", -2)
+	walls_normal = RetroLevelHelpers.create_preview_tilemap(self, "EditorPreviewWalls", -1)
+	var tmp_fd := TileMapLayer.new()
+	var tmp_wd := TileMapLayer.new()
+	floor_distorted = tmp_fd
+	walls_distorted = tmp_wd
+	_build_station_tilemaps()
+	_build_station_props_and_lights()
+	_spawn_firefighter_npcs()
+	floor_normal = orig_fn
+	walls_normal = orig_wn
+	floor_distorted = orig_fd
+	walls_distorted = orig_wd
+	tmp_fd.free()
+	tmp_wd.free()
+	RetroLevelHelpers.mark_unowned_preview_children([self, ysort_root, decals_layer, lights_layer])
+
+
 func _process(delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	_time_acc += delta
 	if _bay_flicker_light != null:
 		var higher := _is_higher_dose_active()
@@ -71,13 +109,15 @@ func apply_higher_dose_world(_active: bool) -> void:
 
 
 func _is_higher_dose_active() -> bool:
+	if Engine.is_editor_hint():
+		return false
 	return GameState.has_method("is_higher_dose") and GameState.is_higher_dose()
 
 
 func _build_station_tilemaps() -> void:
 	var t_cat := V2TileCatalog.INTERIOR_TILES
 	for layer in [floor_normal, walls_normal]:
-		layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else NORMAL_TS
+		layer.tile_set = ACT3_TS if RetroLevelHelpers.is_act3_unfiltered() else NORMAL_TS
 	for layer in [floor_distorted, walls_distorted]:
 		layer.tile_set = DISTORTED_TS
 		layer.collision_enabled = false
@@ -102,10 +142,9 @@ func _build_station_tilemaps() -> void:
 		V2TileCatalog.stamp_rect(fl, Vector2i(28, 9), t_cat["rug_crimson_tl"], Vector2i(2, 2))
 		V2TileCatalog.stamp_rect(fl, Vector2i(30, 9), t_cat["rug_crimson_tl"], Vector2i(2, 2))
 
-		# 3. Ala Oeste - Prontidão & Armários (x: 6..16, y: 7..32) + corredores x:17..18
+		# 3. Ala Oeste - Vestiário & Depósito de Combate a Incêndio (x: 6..16, y: 7..32) + corredores x:17..18
 		V2TileCatalog.fill_rect(fl, Rect2i(6, 7, 11, 26), t_cat["concrete_station"])
-		for gy in [13, 19, 25]:
-			V2TileCatalog.stamp_rect(fl, Vector2i(10, gy), t_cat["banig_tl"], Vector2i(3, 2))
+		V2TileCatalog.fill_rect(fl, Rect2i(9, 15, 5, 8), t_cat["wood_floor_warm"])
 		V2TileCatalog.fill_rect(fl, Rect2i(17, 10, 2, 3), t_cat["wood_floor_warm"])
 		V2TileCatalog.fill_rect(fl, Rect2i(17, 25, 2, 3), t_cat["wood_floor_warm"])
 
@@ -171,43 +210,122 @@ func _build_station_tilemaps() -> void:
 			ysort_root.add_child(_furniture_layer)
 		else:
 			add_child(_furniture_layer)
-	if ysort_root != null:
+	if not Engine.is_editor_hint() and ysort_root != null:
 		ysort_root.z_index = 2
-	_furniture_layer.tile_set = ACT3_TS if GameState.is_unfiltered_act3() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
+	_furniture_layer.tile_set = ACT3_TS if RetroLevelHelpers.is_act3_unfiltered() else (DISTORTED_TS if _is_higher_dose_active() else NORMAL_TS)
 	_furniture_layer.clear()
 
-	# Comando Central: Janelas, Lousa BFP, Mesa de Comando Cap. Reyes, Rádio e Estantes
+	# Comando Central: Janelas norte (móveis temáticos BFP vêm com Y-sort e colisão em _build_station_props_and_lights)
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(22, 4), t_cat["window_day_tl"], Vector2i(2, 3))
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(36, 4), t_cat["window_day_tl"], Vector2i(2, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(29, 4), t_cat["chalkboard_bfp"], Vector2i(2, 2))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(20, 6), t_cat["radio_pc_bfp"], Vector2i(1, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(37, 6), t_cat["bookshelf_b"], Vector2i(2, 2))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(27, 7), t_cat["dispatch_desk"], Vector2i(6, 2))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(25, 19), t_cat["bulletin_board"], Vector2i(2, 2))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(33, 19), t_cat["bulletin_board"], Vector2i(2, 2))
 
-	# Recepção: Balcão de Atendimento Leste e Cadeiras de Espera Oeste
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(32, 25), t_cat["dispatch_desk"], Vector2i(6, 2))
-	for cx in range(21, 25):
-		_furniture_layer.set_cell(Vector2i(cx, 26), 0, t_cat["chair_down"])
-
-	# Ala Oeste (Prontidão): Armários, Suprimentos e Mesa de Rádio
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(11, 7), t_cat["supply_crates"], Vector2i(2, 2))
+	# Ala Oeste (Vestiário & Depósito): Caixotes de suprimentos no canto nordeste
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(14, 7), t_cat["supply_crates"], Vector2i(2, 2))
-	for wy in [10, 14, 18, 22]:
-		V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(6, wy), t_cat["wardrobe"], Vector2i(2, 3))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(9, 28), t_cat["table_dining"], Vector2i(3, 3))
 
-	# Ala Leste (Enfermaria): Janela, Arquivo Médico, Mesa Médica e 2 Macas
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(48, 4), t_cat["window_day_tl"], Vector2i(2, 3))
+	# Ala Leste (Alojamento & Enfermaria): Arquivo Médico e 2 Camas de Plantão
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(44, 6), t_cat["bookshelf_a"], Vector2i(2, 2))
-	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(47, 9), t_cat["table_dining"], Vector2i(3, 3))
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(50, 14), t_cat["bed_huwag"], Vector2i(3, 4))
 	V2TileCatalog.stamp_rect(_furniture_layer, Vector2i(50, 21), t_cat["bed_huwag"], Vector2i(3, 4))
 
 
 func _build_station_props_and_lights() -> void:
-	# Decais exclusivos no estado distorcido (mobiliário agora vem 100% do atlas interiors_v2)
+	# === 1. ALA OESTE (VESTIÁRIO & DEPÓSITO DE COMBATE A INCÊNDIO) ===
+	# Armários metálicos de vestiário alinhados na parede oeste (x ~ 114)
+	for ly in [198.0, 254.0, 310.0, 366.0]:
+		_add_station_prop("bfp_locker_bank", Vector2(114, ly), Vector2(24, 18))
+	# Banco de madeira central para troca de equipamento (abaixo da ronda do Bombeiro Ato em y=212)
+	_add_station_prop("bfp_locker_bench", Vector2(182, 326), Vector2(14, 42))
+	# Suporte/cabideiro de EPI (jaquetas amarelas/laranjas refletivas + capacetes) na parede norte
+	_add_station_prop("bfp_ppe_rack", Vector2(130, 142), Vector2(54, 16))
+	# Três cilindros vermelhos de combate + extintores junto ao ponto interativo Cilindros_Parede (168, 134)
+	_add_station_prop("bfp_extinguisher_row", Vector2(190, 138), Vector2(44, 14))
+	# Caixa vermelha com machado de incêndio na parede norte
+	_add_wall_prop("bfp_axe_case", Vector2(214, 98))
+	# Extintores nas laterais dos corredores da Ala Oeste
+	_add_station_prop("bfp_extinguisher", Vector2(262, 248), Vector2(10, 8))
+	_add_station_prop("bfp_extinguisher", Vector2(262, 386), Vector2(10, 8))
+	# Mangueiras de incêndio enroladas sobre suportes/paletes (depósito sudoeste)
+	_add_station_prop("bfp_hose_rack", Vector2(120, 444), Vector2(34, 14))
+	_add_station_prop("bfp_hose_rack", Vector2(120, 492), Vector2(34, 14))
+	# Galões/tambores d'água e cones de sinalização laranja no sul da Ala Oeste (livre ao redor de Bombeiro_Santos em 214,456)
+	_add_station_prop("water_drum", Vector2(162, 514), Vector2(14, 10))
+	_add_station_prop("water_drum", Vector2(182, 514), Vector2(14, 10))
+	_add_station_prop("traffic_cone", Vector2(246, 512), Vector2(10, 6))
+	_add_station_prop("traffic_cone", Vector2(260, 502), Vector2(10, 6))
+	_add_station_prop("bfp_bucket", Vector2(230, 512), Vector2(10, 6))
+
+	# === 2. SALA CENTRAL SUPERIOR (SALA DO CHEFE & CENTRAL DE DESPACHO / RÁDIO) ===
+	# Parede norte entre janelas: Mapa Tático de Agdangan, Brasão/Estandarte BFP e Escala de Plantão
+	_add_wall_prop("bfp_tactical_map", Vector2(428, 86))
+	_add_wall_prop("bfp_crest_banner", Vector2(480, 86))
+	_add_wall_prop("bfp_roster_board", Vector2(532, 86))
+	# Mesa de Comando e Despacho robusta com rádio VHF/UHF, telefone vermelho, prancheta, luminária e mapas + cadeira do Chefe
+	_add_station_prop("bfp_chief_chair", Vector2(480, 134), Vector2(16, 10))
+	_add_station_prop("bfp_command_desk", Vector2(480, 158), Vector2(118, 22))
+	# Arquivos metálicos de documentos nas laterais da central
+	_add_station_prop("bfp_filing_cabinet", Vector2(394, 144), Vector2(18, 16))
+	_add_station_prop("bfp_filing_cabinet", Vector2(368, 144), Vector2(18, 16))
+	_add_station_prop("bfp_filing_cabinet", Vector2(566, 144), Vector2(18, 16))
+	# Bebedouro de água + estação de rádio auxiliar no canto noroeste
+	_add_station_prop("bfp_water_cooler", Vector2(320, 138), Vector2(14, 12))
+	_add_station_prop("bfp_radio_rack", Vector2(344, 140), Vector2(20, 14))
+	# Estante cheia de manuais técnicos no canto nordeste
+	_add_station_prop("bfp_manual_shelf", Vector2(624, 140), Vector2(38, 16))
+	# Extintores ladeando o arco sul do comando + vasos de planta nos cantos inferiores
+	_add_station_prop("bfp_extinguisher", Vector2(432, 294), Vector2(10, 8))
+	_add_station_prop("bfp_extinguisher", Vector2(528, 294), Vector2(10, 8))
+	_add_station_prop("bfp_potted_plant", Vector2(324, 292), Vector2(12, 8))
+	_add_station_prop("bfp_potted_plant", Vector2(634, 292), Vector2(12, 8))
+
+	# === 3. SALA CENTRAL INFERIOR (RECEPÇÃO & ÁREA DE PRONTIDÃO) ===
+	# Parede divisória norte da recepção: Cartazes de segurança contra incêndio e campainhas de alarme vermelhas
+	_add_wall_prop("bfp_safety_posters", Vector2(366, 322))
+	_add_wall_prop("bfp_alarm_bell", Vector2(422, 322))
+	_add_wall_prop("bfp_alarm_bell", Vector2(538, 322))
+	_add_wall_prop("bfp_safety_posters", Vector2(594, 322))
+	# Balcão de recepção completo em L no lado leste (livro de ocorrências, telefone, rádio portátil, divisória)
+	_add_station_prop("bfp_chief_chair", Vector2(584, 376), Vector2(16, 10))
+	_add_station_prop("bfp_reception_counter_h", Vector2(578, 400), Vector2(86, 18))
+	_add_station_prop("bfp_reception_counter_v", Vector2(541, 440), Vector2(18, 42))
+	# Cadeiras de espera alinhadas no setor oeste + mesinha lateral com folhetos + vasos de planta (mantém Velhinha_Espera 368,464 livre!)
+	_add_station_prop("bfp_wait_chairs", Vector2(356, 386), Vector2(64, 14))
+	_add_station_prop("bfp_side_table_brochures", Vector2(408, 388), Vector2(18, 12))
+	_add_station_prop("bfp_wait_chairs", Vector2(366, 542), Vector2(64, 14))
+	_add_station_prop("bfp_side_table_brochures", Vector2(320, 542), Vector2(18, 12))
+	_add_station_prop("bfp_potted_plant", Vector2(636, 542), Vector2(12, 8))
+	_add_station_prop("bfp_potted_plant", Vector2(318, 366), Vector2(12, 8))
+	# Suportes com extintores e batentes físicos visuais da porta principal de saída sul (x=448..512)
+	_add_station_prop("bfp_extinguisher", Vector2(426, 544), Vector2(10, 8))
+	_add_station_prop("bfp_extinguisher", Vector2(534, 544), Vector2(10, 8))
+	_add_station_prop("bfp_door_jamb", Vector2(442, 566), Vector2(12, 22))
+	_add_station_prop("bfp_door_jamb", Vector2(518, 566), Vector2(12, 22))
+
+	# Faixas de sinalização amarelo/preto no piso junto às passagens (não bloqueiam caminhada)
+	for hpos in [Vector2(480, 336), Vector2(480, 548)]:
+		_add_floor_decal("bfp_hazard_strip", hpos)
+
+	# === 4. ALA LESTE (ALOJAMENTO DE PLANTÃO & APOIO MÉDICO) ===
+	# Parede norte: Armário médico branco com cruz vermelha, janela com persiana/cortina e relógio de parede
+	_add_wall_prop("bfp_med_cabinet", Vector2(752, 96))
+	_add_wall_prop("bfp_curtained_window", Vector2(784, 86))
+	_add_wall_prop("bfp_wall_clock", Vector2(834, 96))
+	# Estação de café noturna (garrafa térmica + canecas) na parte superior
+	_add_station_prop("bfp_coffee_table", Vector2(812, 168), Vector2(44, 18))
+	# Carrinho médico junto à parede divisória oeste da Ala Leste
+	_add_station_prop("bfp_med_cart", Vector2(706, 314), Vector2(22, 16))
+	# Criados-mudos, baús de pé de cama e botas de bombeiro alinhadas junto às 2 camas de plantão (800..848, y=224..288 e 336..400)
+	_add_station_prop("bfp_nightstand", Vector2(784, 248), Vector2(14, 12))
+	_add_station_prop("bfp_footlocker", Vector2(824, 304), Vector2(30, 12))
+	_add_floor_decal("bfp_boots_pair", Vector2(784, 278))
+	_add_station_prop("bfp_nightstand", Vector2(784, 360), Vector2(14, 12))
+	_add_station_prop("bfp_footlocker", Vector2(824, 416), Vector2(30, 12))
+	_add_floor_decal("bfp_boots_pair", Vector2(784, 390))
+	# Armários individuais do alojamento na parede sul
+	for dx_l in [778.0, 804.0, 832.0]:
+		_add_station_prop("bfp_locker_single", Vector2(dx_l, 514), Vector2(16, 16))
+	_add_station_prop("bfp_potted_plant", Vector2(710, 514), Vector2(12, 8))
+
+	# Decais exclusivos no estado distorcido (manchas e olhos vigiando os corredores)
 	_add_distorted_decal("floor_stain", Vector2(480, 232), Vector2(1.8, 1.5))
 	_add_distorted_decal("floor_stain", Vector2(180, 280), Vector2(1.6, 1.4))
 	_add_distorted_decal("floor_stain", Vector2(760, 290), Vector2(1.7, 1.4))
@@ -232,6 +350,81 @@ func _build_station_props_and_lights() -> void:
 	for lt in [cmd_light, rec_light, clinic_light, _bay_flicker_light, bay_lower_light, wait_corner_light, exit_light]:
 		lights_layer.add_child(lt)
 		_lights.append(lt)
+
+	var swarm := get_node_or_null("CorruptedEyeSwarm") as CorruptedEyeSwarm
+	if swarm == null:
+		swarm = CorruptedEyeSwarm.new()
+		swarm.name = "CorruptedEyeSwarm"
+		add_child(swarm)
+	swarm.setup_world_swarm([
+		Vector2(118, 128), Vector2(246, 128), Vector2(126, 360), Vector2(264, 520),
+		Vector2(338, 122), Vector2(480, 114), Vector2(620, 122), Vector2(342, 344),
+		Vector2(620, 344), Vector2(340, 520), Vector2(620, 520), Vector2(720, 128),
+		Vector2(820, 128), Vector2(832, 364), Vector2(832, 514), Vector2(292, 260),
+		Vector2(668, 260), Vector2(480, 360)
+	], 5203, 0.90)
+
+
+## Adiciona um prop Y-sorted (normal + distorcido) ancorado pela base, com StaticBody2D opcional.
+func _add_station_prop(kind: String, foot: Vector2, col_size: Vector2 = Vector2.ZERO) -> void:
+	if ysort_root == null:
+		return
+	var tex_h := float(RetroLevelHelpers.get_prop_texture(kind, false).get_height())
+	var n_spr := RetroLevelHelpers.create_prop_sprite(kind, false)
+	n_spr.position = foot
+	n_spr.offset = Vector2(0.0, -tex_h * 0.5)
+	var d_spr := RetroLevelHelpers.create_prop_sprite(kind, true)
+	d_spr.position = foot
+	d_spr.offset = Vector2(0.0, -tex_h * 0.5)
+	d_spr.visible = false
+	ysort_root.add_child(n_spr)
+	ysort_root.add_child(d_spr)
+	_normal_props.append(n_spr)
+	_distorted_props.append(d_spr)
+	if col_size != Vector2.ZERO and not Engine.is_editor_hint():
+		var body := StaticBody2D.new()
+		body.name = "PropCol_%s_%d_%d" % [kind, int(foot.x), int(foot.y)]
+		body.position = foot + Vector2(0.0, -col_size.y * 0.5)
+		body.collision_layer = 1
+		body.collision_mask = 0
+		var cs := CollisionShape2D.new()
+		var rs := RectangleShape2D.new()
+		rs.size = col_size
+		cs.shape = rs
+		body.add_child(cs)
+		ysort_root.add_child(body)
+
+
+## Adiciona um item fixado na parede (mapa tático, brasão, alarmes, armário médico, relógio).
+func _add_wall_prop(kind: String, center_pos: Vector2) -> void:
+	var target: Node2D = decals_layer if decals_layer != null else self
+	var n_spr := RetroLevelHelpers.create_prop_sprite(kind, false)
+	n_spr.position = center_pos
+	n_spr.z_index = 1
+	var d_spr := RetroLevelHelpers.create_prop_sprite(kind, true)
+	d_spr.position = center_pos
+	d_spr.z_index = 1
+	d_spr.visible = false
+	target.add_child(n_spr)
+	target.add_child(d_spr)
+	_normal_props.append(n_spr)
+	_distorted_props.append(d_spr)
+
+
+## Adiciona um elemento plano no piso (faixas de sinalização, botas alinhadas).
+func _add_floor_decal(kind: String, center_pos: Vector2) -> void:
+	var target: Node2D = decals_layer if decals_layer != null else self
+	var n_spr := RetroLevelHelpers.create_prop_sprite(kind, false)
+	n_spr.position = center_pos
+	n_spr.z_index = 0
+	var d_spr := RetroLevelHelpers.create_prop_sprite(kind, true)
+	d_spr.position = center_pos
+	d_spr.z_index = 0
+	d_spr.visible = false
+	target.add_child(n_spr)
+	target.add_child(d_spr)
+	_normal_props.append(n_spr)
+	_distorted_props.append(d_spr)
 
 
 func _add_dual_prop(kind: String, pos: Vector2, scl: Vector2, offset_y: float) -> void:
@@ -265,9 +458,10 @@ func _setup_collisions() -> void:
 	body.collision_layer = 1
 	add_child(body)
 
-	# Banco de espera + batentes/trava física da porta de saída sul (impede sair para o vazio fora do mapa)
+	# Batentes laterais sólidos + soleira/trava física da porta de saída sul (impede sair para o vazio fora do mapa)
 	var boxes: Array[Rect2] = [
-		Rect2(340, 424, 56, 16),
+		Rect2(434, 544, 14, 32),   # Batente esquerdo da porta sul
+		Rect2(512, 544, 14, 32),   # Batente direito da porta sul
 		Rect2(448, 560, 64, 32),   # Soleira física da porta sul (x=28..31, y=35..36)
 		Rect2(272, 560, 416, 48),  # Contenção de segurança inferior sob toda a recepção
 	]
@@ -324,6 +518,9 @@ func _spawn_firefighter_npcs() -> void:
 
 
 func _spawn_npc(id: String, prompt: String, norm_path: String, dist_path: String, pos: Vector2, dir: String, patrol: Array[Vector2]) -> void:
+	if Engine.is_editor_hint():
+		RetroLevelHelpers.add_npc_editor_preview(ysort_root, id, norm_path, pos, dir)
+		return
 	var npc := NPC_SCENE.instantiate() as NpcEntity
 	npc.name = id
 	npc.npc_id = id
@@ -386,6 +583,7 @@ func _apply_station_atmosphere() -> void:
 
 	for s in _normal_props:
 		s.visible = not higher
+		s.modulate = Color(0.78, 0.80, 0.84, 1.0) if act3 else Color.WHITE
 	for s in _distorted_props:
 		s.visible = higher
 	for d in _distorted_decals:
@@ -423,9 +621,13 @@ func _apply_station_atmosphere() -> void:
 		if lt == null:
 			continue
 		if higher:
-			lt.color = Color(0.92, 0.46, 0.52)
+			lt.color = Color(0.58, 0.54, 0.88)
 		elif act3:
 			lt.color = Color(0.86, 0.88, 0.90)
+
+	var swarm := get_node_or_null("CorruptedEyeSwarm") as CorruptedEyeSwarm
+	if swarm != null:
+		swarm.refresh_visibility()
 
 	if has_node("/root/AudioManager"):
 		var am = get_node("/root/AudioManager")
@@ -457,6 +659,26 @@ func _trigger_interaction_id(id: String) -> void:
 	match id:
 		"Cap_Reyes":
 			if higher:
+				if GameState.are_all_corrupted_street_npcs_defeated():
+					if not GameState.get_switch("019_Ato2_concluido"):
+						GameState.complete_corrupted_route_at_chief()
+					request_dialogue.emit([
+						{
+							"speaker": "Capitão Reyes",
+							"expression": "distorted",
+							"text": "O rádio atrás dele chiou até ficar mudo. O mapa de Agdangan parece vazio.\n\"A rua inteira silenciou, Huwag... Nenhum chamado, nenhuma voz acusando lá fora.\""
+						},
+						{
+							"speaker": "Capitão Reyes",
+							"expression": "distorted",
+							"text": "\"Volte para o seu quarto e deite na cama. Amanhã não vai restar mais nenhum comprimido para esconder o que ficou para trás.\""
+						}
+					], Callable())
+					return
+				if not GameState.get_switch("007_Chefe_Ato2_apresentado"):
+					GameState.set_switch("007_Chefe_Ato2_apresentado", true)
+				var defeated_n := GameState.get_defeated_corrupted_street_npc_count()
+				var total_n := GameState.ACT2_STREET_TASK_NPCS.size()
 				request_dialogue.emit([
 					{
 						"speaker": "Capitão Reyes",
@@ -466,11 +688,9 @@ func _trigger_interaction_id(id: String) -> void:
 					{
 						"speaker": "Capitão Reyes",
 						"expression": "distorted",
-						"text": "\"Termine os atendimentos na rua e fale com a senhora na recepção antes que o fogo engula a trilha leste outra vez.\""
+						"text": "\"Os moradores da rua estão todos lá fora sussurrando teu nome (%d/%d confrontados). Ou encare cada um deles... ou passe na enfermaria falar com a Maria antes de perder o controle.\"" % [defeated_n, total_n]
 					}
 				], Callable())
-				if not GameState.get_switch("007_Chefe_Ato2_apresentado"):
-					GameState.set_switch("007_Chefe_Ato2_apresentado", true)
 				return
 
 			if ato == 1:
@@ -478,13 +698,13 @@ func _trigger_interaction_id(id: String) -> void:
 					if not GameState.get_switch("005_Chefe_liberou_cidade"):
 						GameState.set_switch("005_Chefe_liberou_cidade", true)
 						var msg := (
-							"Você trouxe os ovos e enfrentou aquela criatura na clareira? Bom trabalho, Huwag. Vá para casa descansar por hoje."
+							"Você trouxe os ovos e enfrentou aquela criatura na clareira? Bom trabalho, Huwag. Vá para casa descansar na sua cama por hoje."
 							if GameState.get_switch("004_Ovos_e_derrotou") else
-							"Você recolheu os ovos e conseguiu sair da clareira a tempo. Já é fim de tarde, Huwag — vá para casa descansar."
+							"Você recolheu os ovos e conseguiu sair da clareira a tempo. Já é fim de tarde, Huwag — volte para o seu quarto e descanse."
 						)
 						request_dialogue.emit([{"speaker": "Capitão Reyes", "text": msg}], Callable())
 					else:
-						request_dialogue.emit([{"speaker": "Capitão Reyes", "text": "Seu turno já terminou por hoje, anak. Vá descansar em casa."}], Callable())
+						request_dialogue.emit([{"speaker": "Capitão Reyes", "text": "Seu turno já terminou por hoje, anak. Vá dormir em casa."}], Callable())
 				elif not GameState.get_switch("002_Chefe_Ato1_apresentado"):
 					GameState.set_switch("002_Chefe_Ato1_apresentado", true)
 					request_dialogue.emit([
@@ -494,37 +714,44 @@ func _trigger_interaction_id(id: String) -> void:
 						},
 						{
 							"speaker": "Capitão Reyes",
-							"text": "Recebemos um chamado estranho na trilha leste, dentro da floresta de Agdangan. Siga até a clareira e traga o que encontrar."
+							"text": "Recebemos um chamado estranho na trilha leste, dentro da floresta de Agdangan. Siga até a clareira, colete os ovos que encontrar lá e reporte de volta."
 						}
 					], Callable())
 				else:
 					request_dialogue.emit([{
 						"speaker": "Huwag",
-						"text": "(O Capitão Reyes revisa os despachos no rádio. Preciso ir para a estrada da floresta ao leste da cidade.)"
+						"text": "(O Capitão Reyes revisa os despachos no rádio. Preciso ir para a estrada da floresta ao leste da cidade e coletar os ovos.)"
 					}], Callable())
 			elif ato == 2:
 				if not GameState.get_switch("007_Chefe_Ato2_apresentado"):
 					GameState.set_switch("007_Chefe_Ato2_apresentado", true)
 					request_dialogue.emit([{
 						"speaker": "Capitão Reyes",
-						"text": "Bom dia, Huwag. Kuya Ben no Jeepney, Aling Nena na Sari-Sari e o pessoal da feira pediram ajuda na rua principal. Apoie ao menos um deles e volte para retirar seu suprimento."
+						"text": "Bom dia, Huwag. Hoje a demanda está toda na rua principal de Agdangan: ajude Aling Nena na Sari-Sari, Mang Carding no píer da praia e o Feirante perto da igreja. Quando atender os três, volte para descansar."
+					}], Callable())
+				elif GameState.are_all_normal_street_missions_completed() or GameState.get_switch("019_Ato2_concluido"):
+					if not GameState.get_switch("019_Ato2_concluido"):
+						GameState.set_switch("019_Ato2_concluido", true)
+					if not GameState.get_switch("021_Recompensa_entregue"):
+						GameState.set_switch("021_Recompensa_entregue", true)
+						GameState.add_item("gota_calmante", 1)
+					request_dialogue.emit([{
+						"speaker": "Capitão Reyes",
+						"text": "Excelente trabalho ajudando os moradores de Agdangan hoje, Huwag! Seu plantão está concluído — volte para casa e descanse na sua cama."
 					}], Callable())
 				elif GameState.get_switch("020_Alguma_missao_completa") and not GameState.get_switch("021_Recompensa_entregue"):
 					GameState.set_switch("021_Recompensa_entregue", true)
 					GameState.add_item("gota_calmante", 1)
+					var done_m := GameState.get_completed_normal_street_mission_count()
 					request_dialogue.emit([{
 						"speaker": "Capitão Reyes",
-						"text": "Excelente apoio aos moradores, Huwag (+1 Cápsula Calmante).\nAgora fale imediatamente com a Senhora Luningning na sala de espera da recepção — é uma emergência na floresta."
-					}], Callable())
-				elif GameState.get_switch("019_Ato2_concluido"):
-					request_dialogue.emit([{
-						"speaker": "Capitão Reyes",
-						"text": "Você conteve o incêndio na floresta e salvou o gato da senhora. Pode voltar ao seu quarto para descansar quando quiser."
+						"text": "Bom apoio aos moradores até aqui (%d/3 concluídos · +1 Cápsula Calmante).\nTermine de ajudar quem ainda aguarda na rua (Aling Nena, Mang Carding e o Feirante) para encerrar o turno." % done_m
 					}], Callable())
 				else:
+					var done_m2 := GameState.get_completed_normal_street_mission_count()
 					request_dialogue.emit([{
 						"speaker": "Capitão Reyes",
-						"text": "Ajude os moradores na rua principal e depois atenda à senhora na recepção, Huwag."
+						"text": "Os moradores da rua principal ainda precisam de apoio (%d/3 ajudados): fale com Aling Nena, Mang Carding no píer e o Feirante perto da igreja." % done_m2
 					}], Callable())
 			else:
 				GameState.set_switch("024_Ato3_revelacao_reyes", true)
@@ -539,7 +766,7 @@ func _trigger_interaction_id(id: String) -> void:
 					},
 					{
 						"speaker": "Capitão Reyes",
-						"text": "Sobreviver não faz de você o culpado, anak. Para continuar de pé por Agdangan, vá até a clareira uma última vez e encare o que restou sem filtros."
+						"text": "Sobreviver não faz de você o culpado, anak. Volte para sua cama quando estiver pronto para encarar a fita daquela noite sem filtros."
 					}
 				], Callable())
 
@@ -606,23 +833,73 @@ func _trigger_interaction_id(id: String) -> void:
 				}], Callable())
 
 		"Enfermeira_Maria":
-			if higher:
-				request_dialogue.emit([
-					{
-						"speaker": "Enfermeira Maria",
-						"expression": "distorted",
-						"text": "Ela segura uma prancheta manchada de vermelho.\n\"A dosagem de hoje passou do limite seguro, Huwag. Vai continuar negando que os nomes neste prontuário eram reais?\"",
-						"choices": [
-							"\"Eu me lembro deles... não estou tentando apagar ninguém.\"",
-							"\"Você está inventando isso! Larga essa prancheta!\""
-						],
-						"conflict_choices": {1: "Enfermeira_Maria"}
-					}
-				], Callable())
+			if higher and not GameState.are_all_corrupted_street_npcs_defeated():
+				if GameState.has_item("antidoto_reversao"):
+					request_dialogue.emit([
+						{
+							"speaker": "Enfermeira Maria",
+							"expression": "worried",
+							"text": "Huwag, você ainda está com a medicação de reversão no bolso e suas mãos continuam tremendo. Quer tomar agora para estabilizar a superdosagem?",
+							"choices": ["Tomar a medicação de reversão agora", "Ainda não"]
+						}
+					], func(choice: int) -> void:
+						if choice == 0:
+							_apply_nurse_antidote_reversal()
+					)
+				else:
+					request_dialogue.emit([
+						{
+							"speaker": "Enfermeira Maria",
+							"expression": "worried",
+							"text": "Huwag, pare um segundo! Suas pupilas estão dilatadas, sua pele está gelada e seu pulso está disparado... Deixe eu fazer uma checagem rápida agora.",
+							"choices": ["Permitir a checagem médica", "Recusar e se afastar"]
+						}
+					], func(check_choice: int) -> void:
+						if check_choice == 0:
+							request_dialogue.emit([
+								{
+									"speaker": "Enfermeira Maria",
+									"expression": "worried",
+									"text": "Como eu suspeitava — você tomou uma dose muito acima da receita hoje de manhã. Isso explica as distorções visuais e o pânico na rua."
+								},
+								{
+									"speaker": "Enfermeira Maria",
+									"text": "Preparei uma solução de reversão e hidratação para neutralizar o excesso. Aceita tomar agora?",
+									"choices": ["Aceitar e tomar a medicação de reversão", "Guardar para depois"]
+								}
+							], func(med_choice: int) -> void:
+								if med_choice == 0:
+									_apply_nurse_antidote_reversal()
+								else:
+									GameState.add_item("antidoto_reversao", 1)
+									GameState.save_checkpoint()
+									request_dialogue.emit([{
+										"speaker": "Enfermeira Maria",
+										"text": "Deixei o frasco com você. Fale comigo de novo assim que decidir tomar."
+									}], Callable())
+							)
+						else:
+							request_dialogue.emit([{
+								"speaker": "Enfermeira Maria",
+								"expression": "worried",
+								"text": "Huwag... eu vou continuar aqui na enfermaria se você mudar de ideia. Não enfrente a rua nesse estado."
+							}], Callable())
+					)
+			elif higher:
+				request_dialogue.emit([{
+					"speaker": "Enfermeira Maria",
+					"expression": "distorted",
+					"text": "Ela segura a prancheta em silêncio diante do corredor vazio.\n\"A rua inteira já silenciou, Huwag... fale com o Capitão Reyes.\""
+				}], Callable())
+			elif GameState.get_switch("006d_Enfermeira_reverteu_dose"):
+				request_dialogue.emit([{
+					"speaker": "Enfermeira Maria",
+					"text": "Sua pressão e seus reflexos já estabilizaram, Huwag. Respire fundo e volte a ajudar os moradores de Agdangan com calma."
+				}], Callable())
 			else:
 				request_dialogue.emit([{
 					"speaker": "Enfermeira Maria",
-					"text": "Passei cedo para conferir seus sinais vitais e receitas, Huwag. Não exceda três comprimidos por dia — o rebote piora os apagões."
+					"text": "Passei cedo para conferir seus sinais vitais e receitas, Huwag. Não exceda três comprimidos por dia — o rebote distorce tudo ao redor."
 				}], Callable())
 
 		"Cilindros_Parede":
@@ -656,3 +933,21 @@ func _trigger_interaction_id(id: String) -> void:
 					if choice == 0:
 						request_level_change.emit("res://scenes/levels/StreetPreview.tscn", "from_station")
 				)
+
+
+func _apply_nurse_antidote_reversal() -> void:
+	GameState.revert_corrupted_mode_via_nurse()
+	_apply_station_atmosphere()
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("save_chime")
+	request_dialogue.emit([
+		{
+			"speaker": "Huwag Matitiis",
+			"expression": "tired",
+			"text": "Assim que a medicação faz efeito, o chiado na nuca desaparece e as paredes do quartel voltam à cor normal."
+		},
+		{
+			"speaker": "Enfermeira Maria",
+			"text": "Ótimo... você estabilizou, Huwag. A rua voltou a ficar calma — fale com o Capitão Reyes se precisar confirmar e ajude os moradores de Agdangan no seu ritmo."
+		}
+	], Callable())

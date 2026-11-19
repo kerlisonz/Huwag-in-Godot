@@ -2,7 +2,61 @@ extends Node
 
 const MIX_RATE := 22050
 const SFX_POOL_SIZE := 8
-const CROSSFADE_SEC := 1.10
+const CROSSFADE_SEC := 0.85
+
+const BGM_FILE_MAP := {
+	"title_theme": "res://assets/audio/bgm/dark_fog.mp3",
+	"day_theme": "res://assets/audio/bgm/study_and_relax.mp3",
+	"afternoon_theme": "res://assets/audio/bgm/evening_melodrama.mp3",
+	"forest_theme": "res://assets/audio/bgm/comfortable_mystery_2.mp3",
+	"night_forest": "res://assets/audio/bgm/dark_fog.mp3",
+	"corrupted_tension": "res://assets/audio/bgm/giant_wyrm.mp3",
+	"boss_bgm": "res://assets/audio/bgm/tempting_secrets.mp3",
+	"vhs_memory_bgm": "res://assets/audio/bgm/comfortable_mystery_2.mp3",
+}
+
+const MUSIC_CREDITS: Array[Dictionary] = [
+	{
+		"title": "Study and Relax",
+		"artist": "Kevin MacLeod (incompetech.com)",
+		"license": "CC-BY 4.0",
+		"usage": "Quarto de Huwag & Agdangan (Manhã)"
+	},
+	{
+		"title": "Evening Melodrama",
+		"artist": "Kevin MacLeod (incompetech.com)",
+		"license": "CC-BY 4.0",
+		"usage": "Fim de Tarde em Agdangan"
+	},
+	{
+		"title": "Dark Fog",
+		"artist": "Kevin MacLeod (incompetech.com)",
+		"license": "CC-BY 4.0",
+		"usage": "Menu Inicial & Noite em Agdangan"
+	},
+	{
+		"title": "Comfortable Mystery 2",
+		"artist": "Kevin MacLeod (incompetech.com)",
+		"license": "CC-BY 4.0",
+		"usage": "Trilha da Floresta & Memória VHS"
+	},
+	{
+		"title": "Giant Wyrm",
+		"artist": "Kevin MacLeod (incompetech.com)",
+		"license": "CC-BY 4.0",
+		"usage": "Modo Corrompido (Psicológico)"
+	},
+	{
+		"title": "Tempting Secrets",
+		"artist": "Kevin MacLeod (incompetech.com)",
+		"license": "CC-BY 4.0",
+		"usage": "Guardiã da Lagoa & Confrontos"
+	},
+]
+
+var master_volume: float = 1.0
+var music_volume: float = 0.80
+var sfx_volume: float = 0.90
 
 var current_bgm_track: String = ""
 var current_ambience_track: String = ""
@@ -15,6 +69,7 @@ var _ambience_player: AudioStreamPlayer
 var _amb_fade_player: AudioStreamPlayer
 var _bgm_tween: Tween = null
 var _amb_tween: Tween = null
+var _lp_tween: Tween = null
 
 var _sfx_pool: Array[AudioStreamPlayer] = []
 var _sfx_index: int = 0
@@ -24,8 +79,9 @@ var _stream_cache: Dictionary = {}
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_audio_buses()
+	set_volumes(master_volume, music_volume, sfx_volume)
 
-	_bgm_player = _create_bus_player("BGMPlayerA", "Music", -11.5)
+	_bgm_player = _create_bus_player("BGMPlayerA", "Music", -10.0)
 	_bgm_fade_player = _create_bus_player("BGMPlayerB", "Music", -40.0)
 	_ambience_player = _create_bus_player("AmbiencePlayerA", "Ambience", -13.0)
 	_amb_fade_player = _create_bus_player("AmbiencePlayerB", "Ambience", -40.0)
@@ -38,9 +94,49 @@ func _ready() -> void:
 
 
 func _setup_audio_buses() -> void:
-	_ensure_filtered_bus("Music", 1650.0, 0.34, -1.5)
-	_ensure_filtered_bus("Ambience", 1450.0, 0.30, -2.0)
-	_ensure_filtered_bus("SFX", 2100.0, 0.32, -1.0)
+	_ensure_filtered_bus("Music", 14000.0, 0.34, -1.5)
+	_ensure_filtered_bus("Ambience", 1800.0, 0.30, -2.0)
+	_ensure_filtered_bus("SFX", 3600.0, 0.32, -1.0)
+
+
+func set_volumes(master: float, music: float, sfx: float) -> void:
+	master_volume = clampf(master, 0.0, 1.0)
+	music_volume = clampf(music, 0.0, 1.0)
+	sfx_volume = clampf(sfx, 0.0, 1.0)
+	_apply_bus_volume("Master", master_volume, 0.0)
+	_apply_bus_volume("Music", music_volume, -1.5)
+	_apply_bus_volume("Ambience", music_volume, -2.5)
+	_apply_bus_volume("SFX", sfx_volume, -1.0)
+
+
+func _apply_bus_volume(bus_name: String, norm_val: float, base_db: float) -> void:
+	var idx := AudioServer.get_bus_index(bus_name)
+	if idx == -1:
+		return
+	AudioServer.set_bus_mute(idx, norm_val <= 0.01)
+	if norm_val > 0.01:
+		AudioServer.set_bus_volume_db(idx, base_db + linear_to_db(norm_val))
+
+
+func set_music_lowpass_cutoff(target_hz: float, duration_sec: float = 0.65) -> void:
+	var idx := AudioServer.get_bus_index("Music")
+	if idx == -1:
+		return
+	var lpf: AudioEffectLowPassFilter = null
+	for i in range(AudioServer.get_bus_effect_count(idx)):
+		var eff := AudioServer.get_bus_effect(idx, i)
+		if eff is AudioEffectLowPassFilter:
+			lpf = eff as AudioEffectLowPassFilter
+			break
+	if lpf == null:
+		return
+	if _lp_tween != null and _lp_tween.is_valid():
+		_lp_tween.kill()
+	if not is_inside_tree() or duration_sec <= 0.01:
+		lpf.cutoff_hz = target_hz
+		return
+	_lp_tween = create_tween()
+	_lp_tween.tween_property(lpf, "cutoff_hz", target_hz, duration_sec).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 func _ensure_filtered_bus(bus_name: String, cutoff_hz: float, resonance: float, volume_db: float) -> void:
@@ -151,52 +247,58 @@ func sync_adaptive_soundtrack(scene_id: String = "", is_boss_fight: bool = false
 	var is_vhs := ("vhs" in low_scene)
 
 	if is_title:
-		play_bgm("title_theme", -11.5)
-		play_ambience("night_ambience" if period == "night" else "morning_ambience", -15.5)
+		set_music_lowpass_cutoff(13500.0, 0.5)
+		play_bgm("title_theme", -9.0)
+		play_ambience("night_ambience" if period == "night" else "morning_ambience", -16.5)
 		return
 
 	if is_vhs:
-		play_bgm("vhs_memory_bgm", -11.5)
-		play_ambience("corrupted_ambience", -15.0)
+		set_music_lowpass_cutoff(1350.0, 0.4)
+		play_bgm("vhs_memory_bgm", -9.5)
+		play_ambience("corrupted_ambience", -15.5)
 		return
 
 	if is_act3:
+		set_music_lowpass_cutoff(9500.0, 0.5)
 		stop_bgm()
 		play_ambience("act3_ambience", -13.5)
 		return
 
 	if is_boss_fight:
-		play_bgm("boss_bgm", -9.5)
-		play_ambience("corrupted_ambience", -13.0)
+		set_music_lowpass_cutoff(12500.0, 0.4)
+		play_bgm("boss_bgm", -8.0)
+		play_ambience("corrupted_ambience", -14.0)
 		return
 
 	if is_corrupted:
-		play_bgm("corrupted_tension", -10.5)
-		play_ambience("corrupted_ambience", -12.0)
+		set_music_lowpass_cutoff(1250.0, 0.45)
+		play_bgm("corrupted_tension", -8.0)
+		play_ambience("corrupted_ambience", -12.5)
 		return
 
+	set_music_lowpass_cutoff(14000.0, 0.65)
 	if is_forest:
 		if fire_active:
-			play_bgm("night_forest", -10.5)
-			play_ambience("fire_hazard", -11.0)
+			play_bgm("night_forest", -9.0)
+			play_ambience("fire_hazard", -12.0)
 		elif period == "night":
-			play_bgm("night_forest", -11.0)
-			play_ambience("night_ambience", -12.0)
+			play_bgm("night_forest", -9.5)
+			play_ambience("night_ambience", -13.0)
 		else:
-			play_bgm("forest_theme", -11.5)
-			play_ambience("forest_ambience", -12.5)
+			play_bgm("forest_theme", -9.5)
+			play_ambience("forest_ambience", -14.0)
 		return
 
 	# Agdangan & Interiores (Manhã / Tarde / Noite)
 	if period == "night":
-		play_bgm("night_forest", -12.0)
-		play_ambience("night_ambience", -12.5)
+		play_bgm("night_forest", -9.5)
+		play_ambience("night_ambience", -13.5)
 	elif period == "afternoon":
-		play_bgm("day_theme", -11.0)
-		play_ambience("afternoon_ambience", -12.5)
+		play_bgm("afternoon_theme", -9.5)
+		play_ambience("afternoon_ambience", -14.5)
 	else:
-		play_bgm("day_theme", -11.5)
-		play_ambience("morning_ambience", -13.0)
+		play_bgm("day_theme", -9.5)
+		play_ambience("morning_ambience", -15.0)
 
 
 func play_sfx(sfx_name: String, volume_db: float = -7.5, pitch_scale: float = 1.0) -> void:
@@ -212,8 +314,8 @@ func play_sfx(sfx_name: String, volume_db: float = -7.5, pitch_scale: float = 1.
 	p.play()
 
 
-func play_bgm(track_name: String, volume_db: float = -11.5) -> void:
-	if track_name.is_empty():
+func play_bgm(track_name: String, volume_db: float = -9.5) -> void:
+	if track_name.is_empty() or track_name == "none":
 		stop_bgm()
 		return
 	var stream := _get_or_build_stream("bgm:" + track_name)
@@ -239,7 +341,7 @@ func stop_bgm() -> void:
 
 
 func play_ambience(track_name: String, volume_db: float = -12.5) -> void:
-	if track_name.is_empty():
+	if track_name.is_empty() or track_name == "none":
 		stop_ambience()
 		return
 	var stream := _get_or_build_stream("amb:" + track_name)
@@ -264,7 +366,7 @@ func stop_ambience() -> void:
 	_amb_fade_player.stop()
 
 
-func _crossfade_pair(outgoing: AudioStreamPlayer, incoming: AudioStreamPlayer, next_stream: AudioStreamWAV, target_db: float, is_bgm: bool) -> void:
+func _crossfade_pair(outgoing: AudioStreamPlayer, incoming: AudioStreamPlayer, next_stream: AudioStream, target_db: float, is_bgm: bool) -> void:
 	if is_bgm:
 		if _bgm_tween != null and _bgm_tween.is_valid():
 			_bgm_tween.kill()
@@ -296,21 +398,48 @@ func _crossfade_pair(outgoing: AudioStreamPlayer, incoming: AudioStreamPlayer, n
 		_amb_tween = tw
 
 
-func _get_or_build_stream(key: String) -> AudioStreamWAV:
-	if _stream_cache.has(key):
-		return _stream_cache[key] as AudioStreamWAV
+func _load_mp3_looped(res_path: String) -> AudioStreamMP3:
+	var stream: AudioStreamMP3 = null
+	if ResourceLoader.exists(res_path):
+		var loaded := load(res_path)
+		if loaded is AudioStreamMP3:
+			stream = (loaded as AudioStreamMP3).duplicate() as AudioStreamMP3
+	if stream == null:
+		var abs_path := ProjectSettings.globalize_path(res_path)
+		if FileAccess.file_exists(abs_path):
+			stream = AudioStreamMP3.load_from_file(abs_path)
+	if stream != null:
+		stream.loop = true
+	return stream
 
-	var stream: AudioStreamWAV = null
+
+func _get_or_build_stream(key: String) -> AudioStream:
+	if _stream_cache.has(key):
+		return _stream_cache[key] as AudioStream
+
+	if key.begins_with("bgm:"):
+		var track_id := key.trim_prefix("bgm:")
+		if BGM_FILE_MAP.has(track_id):
+			var mp3 := _load_mp3_looped(str(BGM_FILE_MAP[track_id]))
+			if mp3 != null:
+				_stream_cache[key] = mp3
+				return mp3
+
+	var stream: AudioStream = null
 	match key:
 		# === UI & Gameplay SFX (timbres quentes e graves, zero agudos estridentes) ===
-		"sfx:ui_hover":
+		"sfx:ui_hover", "sfx:ui_move":
 			stream = _synth_tone(0.045, 220.0, 260.0, 0.22, false, 0.0)
-		"sfx:ui_select":
+		"sfx:ui_select", "sfx:save_chime":
 			stream = _synth_ui_select()
 		"sfx:ui_back":
 			stream = _synth_tone(0.09, 240.0, 165.0, 0.26, false, 0.04)
 		"sfx:ui_dialogue":
 			stream = _synth_tone(0.032, 196.0, 220.0, 0.16, false, 0.02)
+		"sfx:eye_open":
+			stream = _synth_tone(0.18, 92.0, 148.0, 0.20, false, 0.45)
+		"sfx:heartbeat_muffled":
+			stream = _synth_tone(0.24, 62.0, 40.0, 0.28, false, 0.05)
 		"sfx:footstep":
 			stream = _synth_footstep()
 		"sfx:vhs_glitch":
@@ -338,10 +467,12 @@ func _get_or_build_stream(key: String) -> AudioStreamWAV:
 		"sfx:player_hurt":
 			stream = _synth_player_hurt()
 
-		# === BGM Adaptativa (pads graves, melancólicos e filtrados) ===
+		# === Fallback Procedural BGM ===
 		"bgm:title_theme":
 			stream = _synth_title_bgm()
 		"bgm:day_theme":
+			stream = _synth_day_bgm()
+		"bgm:afternoon_theme":
 			stream = _synth_day_bgm()
 		"bgm:forest_theme":
 			stream = _synth_forest_bgm()

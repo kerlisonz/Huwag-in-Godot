@@ -35,9 +35,9 @@ const MOOD_PRESETS := {
 		"fog_density": 0.40,
 	},
 	"distorted": {
-		"ambient": Color(0.56, 0.50, 0.58, 1.0),
-		"fog_color": Color(0.54, 0.28, 0.34, 1.0),
-		"fog_density": 0.24,
+		"ambient": Color(0.44, 0.43, 0.56, 1.0),
+		"fog_color": Color(0.18, 0.16, 0.30, 1.0),
+		"fog_density": 0.26,
 	},
 	"act3_unfiltered": {
 		"ambient": Color(0.84, 0.85, 0.87, 1.0),
